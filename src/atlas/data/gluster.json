@@ -1,0 +1,458 @@
+{
+  "group": "Gluster",
+  "tables": {
+    "gluster_volumes": {
+      "name": "gluster_volumes",
+      "summary": "Тома GlusterFS: тип (Replicate/Disperse), статус, количество снапшотов и параметры репликации",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор тома Gluster",
+        "cluster_id": "Кластер Gluster к которому принадлежит том. Связан с таблицей cluster через поле cluster_id",
+        "vol_name": "Имя тома в GlusterFS",
+        "vol_type": "Тип тома: Replicate, Disperse, Distribute, Stripe или их комбинации",
+        "status": "Статус тома: Started, Stopped, Created, Offline",
+        "replica_count": "Количество реплик данных (для Replicated volume)",
+        "stripe_count": "Количество страйпов (для Striped volume)",
+        "disperse_count": "Количество дисперсных блоков данных (для Dispersed volume)",
+        "redundancy_count": "Количество блоков четности (parity) для Dispersed volume",
+        "is_arbiter": "Флаг Arbiter-тома (хранит только метаданные для защиты от split-brain)",
+        "snapshot_count": "Текущее количество активных снапшотов тома",
+        "snapshot_scheduled": "Настроено ли автоматическое расписание снапшотов",
+        "task_id": "ID текущей фоновой задачи над томом (create/delete/snapshot)"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер Gluster"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_details": {
+      "name": "gluster_volume_details",
+      "summary": "Статистика использования диска томом: занятое/свободное место, VDO savings",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["volume_id"],
+      "fields_doc": {
+        "volume_id": "Идентификатор тома. Связан с таблицей gluster_volumes через поле id",
+        "total_space": "Общий объем тома в байтах",
+        "used_space": "Занятое пространство в байтах",
+        "free_space": "Свободное пространство в байтах",
+        "confirmed_free_space": "Подтвержденное свободное место (после sync)",
+        "vdo_savings": "Экономия места благодаря VDO дедупликации в процентах"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Родительский том"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_bricks": {
+      "name": "gluster_volume_bricks",
+      "summary": "Кирпичи (bricks) тома: путь на сервере, порядок, статус синхронизации и сеть",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор кирпича",
+        "volume_id": "Том владелец кирпича. Связан с таблицей gluster_volumes через поле id",
+        "server_id": "Сервер на котором расположен кирпич. Связан с таблицей gluster_server через поле server_id",
+        "brick_dir": "Полный путь к директории кирпича на сервере (например /data/brick1)",
+        "status": "Статус кирпича: Started, Stopped, Unknown",
+        "brick_order": "Порядковый номер кирпича в томе (важно для striped/disperse)",
+        "network_id": "Логическая сеть используемая для трафика bricks. Связан с таблицей network через поле id",
+        "unsynced_entries": "Количество несинхронизированных записей (для healing)",
+        "unsynced_entries_history": "История изменений счетчика несинхронизированных записей",
+        "is_arbiter": "Является ли этот кирпич arbiter-кирпичом",
+        "task_id": "ID текущей задачи над кирпичом (add/remove/heal)"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Том владелец",
+        "→ gluster_server (через server_id): Сервер размещения",
+        "→ network (через network_id): Сеть для brick traffic"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_brick_details": {
+      "name": "gluster_volume_brick_details",
+      "summary": "Статистика использования диска конкретным кирпичом: заполненность, inode usage, VDO",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["brick_id"],
+      "fields_doc": {
+        "brick_id": "Идентификатор кирпича. Связан с таблицей gluster_volume_bricks через поле id",
+        "total_space": "Общий объем раздела кирпича в байтах",
+        "used_space": "Занятое пространство в байтах",
+        "free_space": "Свободное пространство в байтах",
+        "confirmed_free_space": "Подтвержденное свободное место после проверки",
+        "vdo_savings": "Экономия места благодаря VDO в процентах"
+      },
+      "relations_doc": [
+        "→ gluster_volume_bricks (через brick_id): Кирпич владелец статистики"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_options": {
+      "name": "gluster_volume_options",
+      "summary": "Пользовательские опции конкретного тома (performance.cache-size, auth.allow и др.)",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["volume_id", "option_key"],
+      "fields_doc": {
+        "volume_id": "Том к которому применена опция. Связан с таблицей gluster_volumes через поле id",
+        "option_key": "Имя параметра Gluster (например performance.io-cache)",
+        "option_val": "Значение параметра"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Том владелец опций"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_global_volume_options": {
+      "name": "gluster_global_volume_options",
+      "summary": "Глобальные опции Gluster применяемые ко всем новым томам кластера по умолчанию",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["cluster_id", "option_key"],
+      "fields_doc": {
+        "cluster_id": "Кластер к которому применяются глобальные опции. Связан с таблицей cluster через поле cluster_id",
+        "option_key": "Имя глобального параметра",
+        "option_val": "Значение по умолчанию"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер владелец настроек"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_access_protocols": {
+      "name": "gluster_volume_access_protocols",
+      "summary": "Протоколы доступа разрешенные для тома (NFS, SMB/CIFS, FUSE)",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["volume_id", "access_protocol"],
+      "fields_doc": {
+        "volume_id": "Том для которого настроен протокол. Связан с таблицей gluster_volumes через поле id",
+        "access_protocol": "Тип протокола: NFS, CIFS, FUSE"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Том владелец протокола"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_transport_types": {
+      "name": "gluster_volume_transport_types",
+      "summary": "Типы транспорта для коммуникации между bricks (tcp, rdma, tcp,rdma)",
+      "subgroup": "Volumes & Bricks",
+      "key_fields": ["volume_id", "transport_type"],
+      "fields_doc": {
+        "volume_id": "Том использующий транспорт. Связан с таблицей gluster_volumes через поле id",
+        "transport_type": "Тип транспорта: tcp, rdma или tcp,rdma"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Том владелец транспорта"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_georep_session": {
+      "name": "gluster_georep_session",
+      "summary": "Сессии гео-репликации: master/slave volumes, статус синхронизации и целевой хост",
+      "subgroup": "Geo-Replication",
+      "key_fields": ["session_id"],
+      "fields_doc": {
+        "session_id": "Уникальный идентификатор сессии geo-rep",
+        "master_volume_id": "Мастер том источник данных. Связан с таблицей gluster_volumes через поле id",
+        "slave_host_uuid": "UUID целевого хоста для репликации",
+        "slave_host_name": "Имя или IP целевого хоста",
+        "slave_volume_id": "Целевой том приемник данных",
+        "slave_volume_name": "Имя целевого тома",
+        "status": "Статус сессии: Active, Faulty, Passive, Initializing",
+        "user_name": "Пользователь под которым выполняется репликация (обычно georep)",
+        "session_key": "SSH ключ или токен аутентификации сессии"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через master_volume_id): Мастер том"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_georep_session_details": {
+      "name": "gluster_georep_session_details",
+      "summary": "Детали синхронизации по кирпичам: pending data, checkpoint status, last synced time",
+      "subgroup": "Geo-Replication",
+      "key_fields": ["session_id", "master_brick_id"],
+      "fields_doc": {
+        "session_id": "Сессия geo-rep. Связан с таблицей gluster_georep_session через поле session_id",
+        "master_brick_id": "Кирпич мастера для которого ведется статистика. Связан с таблицей gluster_volume_bricks через поле id",
+        "slave_host_uuid": "UUID slave хоста для этого кирпича",
+        "slave_host_name": "Имя slave хоста",
+        "status": "Статус синхронизации кирпича",
+        "checkpoint_status": "Статус чекпоинта: Not Started, In Progress, Completed",
+        "crawl_status": "Статус обхода файловой системы: Hybrid, Changelog, Full",
+        "data_pending": "Объем данных ожидающих синхронизации в байтах",
+        "entry_pending": "Количество записей (файлов/директорий) ожидающих синхронизации",
+        "meta_pending": "Объем метаданных ожидающих синхронизации",
+        "failures": "Количество ошибок синхронизации",
+        "last_synced_at": "Время последней успешной синхронизации",
+        "checkpoint_time": "Время создания чекпоинта",
+        "checkpoint_completed_time": "Время завершения чекпоинта",
+        "is_checkpoint_completed": "Завершен ли текущий чекпоинт полностью"
+      },
+      "relations_doc": [
+        "→ gluster_georep_session (через session_id): Родительская сессия",
+        "→ gluster_volume_bricks (через master_brick_id): Кирпич мастера"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_georep_config": {
+      "name": "gluster_georep_config",
+      "summary": "Конфигурация конкретной geo-rep сессии: ssh-port, sync-jobs, ignore-deletes",
+      "subgroup": "Geo-Replication",
+      "key_fields": ["session_id", "config_key"],
+      "fields_doc": {
+        "session_id": "Сессия geo-rep. Связан с таблицей gluster_georep_session через поле session_id",
+        "config_key": "Имя параметра конфигурации (например use-rsync-xattrs)",
+        "config_value": "Значение параметра"
+      },
+      "relations_doc": [
+        "→ gluster_georep_session (через session_id): Сессия владелец конфига"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_services": {
+      "name": "gluster_services",
+      "summary": "Справочник типов сервисов Gluster: NFS, SMB/CIFS, GeoRep, Snapd",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор сервиса",
+        "service_type": "Тип сервиса (ссылка на gluster_service_types)",
+        "service_name": "Человекочитаемое название сервиса"
+      },
+      "relations_doc": [
+        "→ gluster_service_types (через service_type): Тип сервиса"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_service_types": {
+      "name": "gluster_service_types",
+      "summary": "Глобальный справочник доступных типов сервисов Gluster",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["service_type"],
+      "fields_doc": {
+        "service_type": "Уникальный код типа сервиса (NFS_GANESHA, SMB, GEOREP)"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_cluster_services": {
+      "name": "gluster_cluster_services",
+      "summary": "Сервисы активированные на уровне всего кластера Gluster",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["cluster_id", "service_type"],
+      "fields_doc": {
+        "cluster_id": "Кластер в котором активирован сервис. Связан с таблицей cluster через поле cluster_id",
+        "service_type": "Тип сервиса. Связан с таблицей gluster_services через поле service_type",
+        "status": "Статус сервиса в кластере: Started, Stopped, Unknown"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер владелец",
+        "→ gluster_services (через service_type): Сервис"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_server": {
+      "name": "gluster_server",
+      "summary": "Серверы Gluster-кластера: peer status, известные адреса, UUID",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["server_id"],
+      "fields_doc": {
+        "server_id": "Уникальный идентификатор сервера в oVirt",
+        "gluster_server_uuid": "Внутренний UUID узла Gluster (peer uuid)",
+        "known_addresses": "Список IP-адресов сервера через запятую",
+        "peer_status": "Статус пиринга: Connected, Disconnected, Unknown"
+      },
+      "relations_doc": [
+        "→ vds_static (через server_id): Соответствующий хост oVirt"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_server_services": {
+      "name": "gluster_server_services",
+      "summary": "Статус сервиса на конкретном сервере: PID процесса, сообщение об ошибке",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор записи статуса",
+        "server_id": "Сервер на котором запущен сервис. Связан с таблицей gluster_server через поле server_id",
+        "service_id": "Сервис который проверяется. Связан с таблицей gluster_services через поле id",
+        "pid": "PID процесса сервиса на сервере",
+        "status": "Статус: Running, Stopped, Error",
+        "message": "Сообщение об ошибке или статусе от демона"
+      },
+      "relations_doc": [
+        "→ gluster_server (через server_id): Сервер",
+        "→ gluster_services (через service_id): Сервис"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_hooks": {
+      "name": "gluster_hooks",
+      "summary": "Скрипты-хуки выполняемые при событиях Gluster (pre/post create volume, start brick)",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор хука",
+        "cluster_id": "Кластер к которому привязан хук. Связан с таблицей cluster через поле cluster_id",
+        "gluster_command": "Команда Gluster которая триггерит хук (volume-create, volume-start)",
+        "stage": "Стадия выполнения: PRE, POST",
+        "name": "Имя файла скрипта хука",
+        "hook_status": "Статус распространения хука на серверы",
+        "content_type": "Тип содержимого: SCRIPT, BINARY",
+        "checksum": "SHA256 хэш содержимого для верификации целостности",
+        "content": "Текст скрипта или base64 бинарника",
+        "conflict_status": "Статус конфликта версий хука на разных серверах"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер владелец хука"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_server_hooks": {
+      "name": "gluster_server_hooks",
+      "summary": "Статус выполнения хука на конкретном сервере: checksum mismatch, execution error",
+      "subgroup": "Services & Hooks",
+      "key_fields": ["hook_id", "server_id"],
+      "fields_doc": {
+        "hook_id": "Хук который проверяется. Связан с таблицей gluster_hooks через поле id",
+        "server_id": "Сервер на котором должен быть хук. Связан с таблицей gluster_server через поле server_id",
+        "hook_status": "Статус на этом сервере: Synced, Missing, Conflict",
+        "content_type": "Тип содержимого на сервере",
+        "checksum": "Хэш файла на сервере для сравнения с эталоном"
+      },
+      "relations_doc": [
+        "→ gluster_hooks (через hook_id): Эталонный хук",
+        "→ gluster_server (через server_id): Сервер проверки"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_snapshots": {
+      "name": "gluster_volume_snapshots",
+      "summary": "Снапшоты томов Gluster: имя, описание, статус (active/inactive/deleted)",
+      "subgroup": "Snapshots & Jobs",
+      "key_fields": ["snapshot_id"],
+      "fields_doc": {
+        "snapshot_id": "Уникальный идентификатор снапшота",
+        "volume_id": "Том владелец снапшота. Связан с таблицей gluster_volumes через поле id",
+        "snapshot_name": "Имя снапшота в GlusterFS",
+        "description": "Описание назначения снапшота",
+        "status": "Статус: Created, Activated, Deactivated, Deleted"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Том владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_snapshot_config": {
+      "name": "gluster_volume_snapshot_config",
+      "summary": "Конфигурация снапшотов: max-hard-limit, auto-delete threshold, description",
+      "subgroup": "Snapshots & Jobs",
+      "key_fields": ["cluster_id", "param_name"],
+      "fields_doc": {
+        "cluster_id": "Кластер к которому применяется конфиг. Связан с таблицей cluster через поле cluster_id",
+        "volume_id": "Том к которому применяется конфиг (если не глобально). Связан с таблицей gluster_volumes через поле id",
+        "param_name": "Имя параметра (например max-hard-limit, auto-delete-threshold)",
+        "param_value": "Значение параметра"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер владелец",
+        "→ gluster_volumes (через volume_id): Том владелец (опционально)"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_volume_snapshot_schedules": {
+      "name": "gluster_volume_snapshot_schedules",
+      "summary": "Расписание автоматических снапшотов: cron expression, retention policy, prefix",
+      "subgroup": "Snapshots & Jobs",
+      "key_fields": ["volume_id"],
+      "fields_doc": {
+        "volume_id": "Том для которого настроено расписание. Связан с таблицей gluster_volumes через поле id",
+        "job_id": "ID задачи планировщика",
+        "snapshot_name_prefix": "Префикс имени создаваемых снапшотов",
+        "snapshot_description": "Описание добавляемое к каждому снапшоту",
+        "recurrence": "Тип повторения: MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY",
+        "interval": "Интервал в единицах recurrence",
+        "start_date": "Дата начала действия расписания",
+        "end_by": "Дата окончания действия расписания",
+        "execution_time": "Время выполнения для daily/weekly/monthly",
+        "days": "Дни недели для weekly (MON,TUE,WED...)",
+        "time_zone": "Часовой пояс для расписания"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через volume_id): Том владелец расписания"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_scheduler_job_details": {
+      "name": "gluster_scheduler_job_details",
+      "summary": "Задачи планировщика Gluster: scrub, heal, rebalance, snapshot",
+      "subgroup": "Snapshots & Jobs",
+      "key_fields": ["job_id"],
+      "fields_doc": {
+        "job_id": "Уникальный идентификатор задачи",
+        "job_name": "Имя задачи",
+        "job_class_name": "Java класс реализующий задачу",
+        "cron_schedule": "Cron выражение расписания",
+        "start_date": "Дата первого запуска",
+        "end_date": "Дата последнего запуска",
+        "timezone": "Часовой пояс задачи"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_scheduler_job_params": {
+      "name": "gluster_scheduler_job_params",
+      "summary": "Параметры конкретной задачи планировщика Gluster",
+      "subgroup": "Snapshots & Jobs",
+      "key_fields": ["job_id", "params_class_name"],
+      "fields_doc": {
+        "job_id": "Задача владелец параметров. Связан с таблицей gluster_scheduler_job_details через поле job_id",
+        "params_class_name": "Имя класса параметра",
+        "params_class_value": "Значение параметра"
+      },
+      "relations_doc": [
+        "→ gluster_scheduler_job_details (через job_id): Задача владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "gluster_config_master": {
+      "name": "gluster_config_master",
+      "summary": "Master конфигурация Gluster: словарь всех возможных параметров и их валидных значений",
+      "subgroup": "Config",
+      "key_fields": ["config_key"],
+      "fields_doc": {
+        "config_key": "Уникальный ключ параметра конфигурации",
+        "config_description": "Описание параметра",
+        "minimum_supported_cluster": "Минимальная версия кластера поддерживающая параметр",
+        "config_possible_values": "Список допустимых значений через запятую",
+        "config_feature": "Фича к которой относится параметр"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

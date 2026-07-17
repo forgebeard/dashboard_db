@@ -1,0 +1,51 @@
+{
+  "group": "Снапшоты",
+  "tables": {
+    "snapshots": {
+      "name": "snapshots",
+      "summary": "Снапшоты ВМ: моментальные снимки конфигурации и памяти для отката или бэкапа",
+      "subgroup": "VM Snapshots",
+      "key_fields": ["snapshot_id"],
+      "fields_doc": {
+        "snapshot_id": "Уникальный идентификатор снапшота",
+        "vm_id": "ВМ владелец снапшота. Связан с таблицей vm_static через поле vm_guid",
+        "snapshot_type": "Тип снапшота: ACTIVE (текущее состояние), REGULAR (обычный), STATELESS",
+        "status": "Статус создания: OK, LOCKED, FAILED",
+        "description": "Описание назначения снапшота",
+        "creation_date": "Дата и время создания снимка",
+        "app_list": "Список приложений поддерживающих VSS (для Windows consistent snapshots)",
+        "vm_configuration": "XML-конфигурация ВМ на момент создания снапшота",
+        "memory_metadata_disk_id": "Диск метаданных памяти для memory snapshot. Связан с таблицей base_disks через поле disk_id",
+        "memory_dump_disk_id": "Диск дампа памяти (RAM content). Связан с таблицей base_disks через поле disk_id",
+        "vm_configuration_broken": "Флаг повреждения конфигурации снапшота (нельзя восстановить)",
+        "changed_fields": "Список полей измененных после создания этого снапшота"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): ВМ владелец",
+        "→ base_disks (через memory_metadata_disk_id): Диск метаданных памяти",
+        "→ base_disks (через memory_dump_disk_id): Диск дампа памяти"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_checkpoints": {
+      "name": "vm_checkpoints",
+      "summary": "Чекпоинты ВМ: легковесные снимки состояния дисков для инкрементального бэкапа",
+      "subgroup": "VM Checkpoints",
+      "key_fields": ["checkpoint_id"],
+      "fields_doc": {
+        "checkpoint_id": "Уникальный идентификатор чекпоинта",
+        "parent_id": "Родительский чекпоинт в цепочке. NULL для базового. Связан с таблицей vm_checkpoints через поле checkpoint_id",
+        "vm_id": "ВМ владелец чекпоинта. Связан с таблицей vm_static через поле vm_guid",
+        "state": "Статус: Created, InProgress, Done, Failed",
+        "description": "Описание чекпоинта (обычно timestamp или имя backup job)"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): ВМ владелец",
+        "→ vm_checkpoints (через parent_id): Родительский чекпоинт"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

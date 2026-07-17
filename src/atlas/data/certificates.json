@@ -1,0 +1,27 @@
+{
+  "group": "Сертификаты",
+  "tables": {
+    "certificates_data": {
+      "name": "certificates_data",
+      "summary": "Данные сертификатов PKI инфраструктуры: CA, host certs, engine cert",
+      "subgroup": "PKI Certificates",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор записи сертификата",
+        "subject_orgname": "Название организации владельца сертификата (O field)",
+        "subject_comname": "Common Name сертификата (CN field)",
+        "issuer_orgname": "Название организации эмитента (CA)",
+        "issuer_comname": "Common Name эмитента",
+        "valid_not_before": "Дата начала действия сертификата",
+        "valid_not_after": "Дата окончания действия сертификата",
+        "expired": "Флаг истекшего срока действия",
+        "file_path": "Путь к файлу сертификата на сервере Engine",
+        "object_id": "ID объекта которому принадлежит сертификат (Host, Engine, User)",
+        "object_type_id": "Тип объекта: 0=Engine, 1=Host, 2=User"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

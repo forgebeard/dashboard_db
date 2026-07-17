@@ -1,0 +1,274 @@
+{
+  "group": "Кластеры",
+  "tables": {
+    "cluster": {
+      "name": "cluster",
+      "summary": "Основные параметры кластера: CPU, память, политики миграции, HA и совместимость версий",
+      "subgroup": "Core",
+      "key_fields": ["cluster_id"],
+      "fields_doc": {
+        "cluster_id": "Уникальный идентификатор кластера",
+        "name": "Имя кластера в интерфейсе",
+        "description": "Описание назначения кластера",
+        "cpu_name": "Базовый тип CPU для кластера (например Intel SandyBridge Family). Определяет минимальный набор флагов",
+        "storage_pool_id": "Пул хранения (Data Center) к которому принадлежит кластер. Связан с таблицей storage_pool через поле id",
+        "max_vds_memory_over_commit": "Максимальный процент оверкоммита памяти на хостах кластера (по умолчанию 100%)",
+        "compatibility_version": "Версия совместимости кластера (например 4.10). Ограничивает доступные функции ВМ и хостов",
+        "transparent_hugepages": "Разрешены ли Transparent Huge Pages на хостах кластера",
+        "migrate_on_error": "Политика при ошибке хоста: 0=DoNothing, 1=Migrate, 2=Shutdown",
+        "virt_service": "Включен ли сервис виртуализации (KVM) в этом кластере",
+        "gluster_service": "Включен ли сервис GlusterFS в этом кластере",
+        "count_threads_as_cores": "Считать ли потоки CPU как отдельные ядра для лицензирования и scheduling",
+        "emulated_machine": "Тип эмулируемой машины по умолчанию (q35 или pc-i440fx)",
+        "trusted_service": "Флаг доверенного кластера. Разрешает запуск ВМ без проверки подписи образов",
+        "tunnel_migration": "Туннелировать ли трафик миграции через Engine (для обхода firewall)",
+        "cluster_policy_id": "Активная политика планирования ресурсов. Связан с таблицей cluster_policies через поле id",
+        "enable_balloon": "Разрешено ли динамическое управление памятью (Ballooning) для всех ВМ кластера",
+        "detect_emulated_machine": "Автоопределение типа эмулируемой машины на основе гостевой ОС",
+        "architecture": "Архитектура: 0=x86_64, 1=aarch64",
+        "optimization_type": "Тип оптимизации: 0=Desktop, 1=Server, 2=HighPerformance",
+        "spice_proxy": "Адрес SPICE-прокси для внешних подключений",
+        "ha_reservation": "Резервировать ли ресурсы для HA-ВМ при планировании",
+        "enable_ksm": "Включен ли Kernel Samepage Merging для дедупликации памяти",
+        "skip_fencing_if_sd_active": "Не выполнять фенсинг если домен хранения активен (защита от split-brain)",
+        "skip_fencing_if_connectivity_broken": "Не выполнять фенсинг если нарушена связность хостов",
+        "hosts_with_broken_connectivity_threshold": "Процент хостов с нарушенной связностью для триггера защиты (по умолчанию 50%)",
+        "fencing_enabled": "Глобальный флаг включения фенсинга (STONITH) в кластере",
+        "is_auto_converge": "Использовать ли Auto-Converge для ускорения миграции при высокой dirty rate",
+        "is_migrate_compressed": "Сжимать ли трафик live migration",
+        "migration_bandwidth_limit_type": "Тип лимита полосы пропускания миграции: AUTO, CUSTOM, UNLIMITED",
+        "custom_migration_bandwidth_limit": "Пользовательский лимит в Mbps если выбран тип CUSTOM",
+        "migration_policy_id": "Политика миграции (Post-Copy / Pre-Copy). Связан с таблицей migration_policies через поле id",
+        "mac_pool_id": "Пул MAC-адресов для этого кластера. Связан с таблицей mac_pools через поле id",
+        "switch_type": "Тип сетевого коммутатора: legacy или ovn",
+        "default_network_provider_id": "Провайдер SDN по умолчанию. Связан с таблицей providers через поле id",
+        "vnc_encryption_enabled": "Шифровать ли VNC-трафик",
+        "smt_disabled": "Отключен ли SMT/HyperThreading на уровне кластера (для безопасности L1TF/MDS)",
+        "bios_type": "Тип BIOS по умолчанию: 0=SeaBIOS, 1=OVMF (UEFI)",
+        "cpu_flags": "Дополнительные флаги CPU которые нужно эмулировать или пробрасывать",
+        "is_migrate_encrypted": "Шифровать ли трафик live migration",
+        "managed": "Управляется ли кластер движком (false для external clusters)",
+        "fips_mode": "Режим FIPS: 0=Disabled, 1=Enabled"
+      },
+      "relations_doc": [
+        "→ storage_pool (через storage_pool_id): Data Center владельца",
+        "→ cluster_policies (через cluster_policy_id): Политика планирования",
+        "→ mac_pools (через mac_pool_id): Пул MAC-адресов",
+        "→ providers (через default_network_provider_id): SDN-провайдер по умолчанию"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "cluster_features": {
+      "name": "cluster_features",
+      "summary": "Глобальный справочник функций кластера (CPU flags, capabilities)",
+      "subgroup": "Core",
+      "key_fields": ["feature_id"],
+      "fields_doc": {
+        "feature_id": "Уникальный идентификатор функции",
+        "feature_name": "Имя функции (например intel_sandy_bridge_family, vmx, aes)",
+        "version": "Версия схемы с которой функция доступна",
+        "category": "Категория: 0=CPU, 1=Storage, 2=Network",
+        "description": "Человекочитаемое описание функции"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "supported_cluster_features": {
+      "name": "supported_cluster_features",
+      "summary": "Функции разрешенные для конкретного кластера на основе его compatibility_version",
+      "subgroup": "Core",
+      "key_fields": ["cluster_id", "feature_id"],
+      "fields_doc": {
+        "cluster_id": "Идентификатор кластера. Связан с таблицей cluster через поле cluster_id",
+        "feature_id": "Идентификатор функции. Связан с таблицей cluster_features через поле feature_id",
+        "is_enabled": "Включена ли функция явно администратором"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер владелец",
+        "→ cluster_features (через feature_id): Описание функции"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "supported_host_features": {
+      "name": "supported_host_features",
+      "summary": "Физические возможности CPU конкретного хоста (flags, extensions)",
+      "subgroup": "Core",
+      "key_fields": ["host_id", "feature_name"],
+      "fields_doc": {
+        "host_id": "Идентификатор хоста. Связан с таблицей vds_static через поле vds_id",
+        "feature_name": "Имя флага CPU или capability (vmx, avx2, fsgsbase)"
+      },
+      "relations_doc": [
+        "→ vds_static (через host_id): Хост владелец возможностей"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "cpu_profiles": {
+      "name": "cpu_profiles",
+      "summary": "Профили CPU: ограничение частоты и QoS для ВМ в кластере",
+      "subgroup": "Core",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор профиля",
+        "name": "Имя профиля CPU",
+        "cluster_id": "Кластер к которому привязан профиль. Связан с таблицей cluster через поле cluster_id",
+        "qos_id": "QoS-ограничение CPU (shares/limit). Связан с таблицей qos через поле id",
+        "description": "Описание назначения профиля"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер владелец",
+        "→ qos (через qos_id): Ограничения CPU"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "cluster_policies": {
+      "name": "cluster_policies",
+      "summary": "Политики планирования ресурсов (Scheduler Policies): набор фильтров и весов",
+      "subgroup": "Policies",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор политики",
+        "name": "Имя политики (например Default, EvenDistribution)",
+        "description": "Описание стратегии планирования",
+        "is_locked": "Заблокирована ли политика от редактирования (системная)",
+        "is_default": "Является ли политикой по умолчанию для новых кластеров",
+        "custom_properties": "Кастомные параметры политики в формате key=value"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "cluster_policy_units": {
+      "name": "cluster_policy_units",
+      "summary": "Конкретные единицы (фильтры/веса) входящие в состав политики планирования",
+      "subgroup": "Policies",
+      "key_fields": ["cluster_policy_id", "policy_unit_id"],
+      "fields_doc": {
+        "cluster_policy_id": "Политика владелец. Связан с таблицей cluster_policies через поле id",
+        "policy_unit_id": "Единица политики. Связан с таблицей policy_units через поле id",
+        "filter_sequence": "Порядок применения фильтра (меньше = раньше)",
+        "factor": "Весовой коэффициент для scoring-алгоритмов"
+      },
+      "relations_doc": [
+        "→ cluster_policies (через cluster_policy_id): Родительская политика",
+        "→ policy_units (через policy_unit_id): Единица планирования"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "policy_units": {
+      "name": "policy_units",
+      "summary": "Глобальный справочник единиц планирования: фильтры и scorers",
+      "subgroup": "Policies",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор единицы",
+        "name": "Имя единицы (например CpuFilter, RamBalance)",
+        "is_internal": "Встроенная ли единица движка или плагин",
+        "custom_properties_regex": "Regex для валидации кастомных свойств",
+        "type": "Тип: 0=Filter (бинарный), 1=Weight (scored)",
+        "enabled": "Включена ли единица глобально",
+        "description": "Описание алгоритма работы единицы"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "affinity_groups": {
+      "name": "affinity_groups",
+      "summary": "Группы аффинности: правила притяжения и отталкивания ВМ/Хостов",
+      "subgroup": "Affinity",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор группы",
+        "name": "Имя группы аффинности",
+        "description": "Описание правила",
+        "cluster_id": "Кластер в котором действует правило. Связан с таблицей cluster через поле cluster_id",
+        "vm_positive": "True = ВМ должны быть вместе (Positive), False = порознь (Negative)",
+        "vm_enforcing": "Жесткое ли правило для ВМ (блокирует запуск при нарушении)",
+        "vds_positive": "True = Хосты должны быть вместе, False = порознь",
+        "vds_enforcing": "Жесткое ли правило для хостов",
+        "vms_affinity_enabled": "Включено ли правило для ВМ",
+        "vds_affinity_enabled": "Включено ли правило для хостов",
+        "priority": "Приоритет правила (больше = важнее). По умолчанию 10000000"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер действия правила"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "affinity_group_members": {
+      "name": "affinity_group_members",
+      "summary": "Члены групп аффинности: конкретные ВМ, хосты или метки",
+      "subgroup": "Affinity",
+      "key_fields": ["affinity_group_id"],
+      "fields_doc": {
+        "affinity_group_id": "Группа владелец. Связан с таблицей affinity_groups через поле id",
+        "vm_id": "ВМ участник группы. Связан с таблицей vm_static через поле vm_guid",
+        "vds_id": "Хост участник группы. Связан с таблицей vds_static через поле vds_id",
+        "vm_label_id": "Метка ВМ для группового правила. Связан с таблицей labels через поле label_id",
+        "host_label_id": "Метка хоста для группового правила. Связан с таблицей labels через поле label_id"
+      },
+      "relations_doc": [
+        "→ affinity_groups (через affinity_group_id): Родительская группа",
+        "→ vm_static (через vm_id): ВМ участник",
+        "→ vds_static (через vds_id): Хост участник",
+        "→ labels (через vm_label_id): Метка ВМ",
+        "→ labels (через host_label_id): Метка хоста"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "numa_node": {
+      "name": "numa_node",
+      "summary": "NUMA-узлы хостов и ВМ: топология памяти и CPU",
+      "subgroup": "Numa",
+      "key_fields": ["numa_node_id"],
+      "fields_doc": {
+        "numa_node_id": "Уникальный идентификатор NUMA-узла",
+        "vds_id": "Хост владелец узла. Связан с таблицей vds_static через поле vds_id",
+        "vm_id": "ВМ владелец узла (для guest NUMA). Связан с таблицей vm_static через поле vm_guid",
+        "numa_node_index": "Индекс узла (0, 1, 2...)",
+        "mem_total": "Общий объем памяти узла в байтах",
+        "cpu_count": "Количество физических ядер в узле",
+        "mem_free": "Свободная память узла в байтах",
+        "usage_mem_percent": "Утилизация памяти узла в процентах",
+        "cpu_sys": "Загрузка CPU в kernel mode",
+        "cpu_user": "Загрузка CPU в user mode",
+        "cpu_idle": "Простой CPU в процентах",
+        "usage_cpu_percent": "Общая утилизация CPU узла",
+        "distance": "Матрица расстояний между NUMA-узлами (текстовый формат)",
+        "hugepages": "Настройка hugepages для узла",
+        "numa_tune_mode": "Режим распределения памяти: interleave, preferred, bind"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Хост владелец",
+        "→ vm_static (через vm_id): ВМ владелец (guest NUMA)"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "numa_node_cpu_map": {
+      "name": "numa_node_cpu_map",
+      "summary": "Маппинг физических CPU-ядер к NUMA-узлам",
+      "subgroup": "Numa",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор маппинга",
+        "numa_node_id": "NUMA-узел. Связан с таблицей numa_node через поле numa_node_id",
+        "cpu_core_id": "ID физического ядра CPU"
+      },
+      "relations_doc": [
+        "→ numa_node (через numa_node_id): NUMA-узел владелец"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "group": "Задачи",
+  "tables": {
+    "job": {
+      "name": "job",
+      "summary": "Родительские задачи и операции: агрегированное представление действий пользователя или системы",
+      "subgroup": "Core",
+      "key_fields": ["job_id"],
+      "fields_doc": {
+        "job_id": "Уникальный идентификатор задачи",
+        "action_type": "Тип действия (например CreateVm, RunVm, MigrateVm)",
+        "description": "Человекочитаемое описание задачи",
+        "status": "Статус выполнения: Started, Succeeded, Failed, Unknown",
+        "owner_id": "Идентификатор владельца задачи (пользователь или система). Связан с таблицей users через поле user_id",
+        "visible": "Видима ли задача в UI. False для системных фоновых операций",
+        "start_time": "Время начала выполнения",
+        "end_time": "Время завершения (NULL если задача еще выполняется)",
+        "last_update_time": "Время последнего обновления статуса",
+        "correlation_id": "ID корреляции для трассировки цепочки вызовов API",
+        "is_external": "Флаг внешней задачи (инициированной не через oVirt API)",
+        "is_auto_cleared": "Автоматически очищать задачу после завершения",
+        "engine_session_seq_id": "ID сессии Engine в которой создана задача"
+      },
+      "relations_doc": [
+        "→ users (через owner_id): Владелец задачи"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "step": {
+      "name": "step",
+      "summary": "Шаги выполнения операций: атомарные единицы работы внутри родительской задачи",
+      "subgroup": "Core",
+      "key_fields": ["step_id"],
+      "fields_doc": {
+        "step_id": "Уникальный идентификатор шага",
+        "parent_step_id": "Родительский шаг для вложенных операций. Связан с таблицей step через поле step_id",
+        "job_id": "Родительская задача. Связан с таблицей job через поле job_id",
+        "step_type": "Тип шага (например VdsBrokerCommand, ImageTransfer)",
+        "description": "Описание конкретного действия",
+        "step_number": "Порядковый номер шага в задаче",
+        "status": "Статус: Started, Succeeded, Failed, Aborted",
+        "start_time": "Время начала шага",
+        "end_time": "Время завершения шага",
+        "correlation_id": "ID корреляции для трассировки",
+        "external_id": "Внешний ID шага в сторонней системе",
+        "external_system_type": "Тип внешней системы (VDSM, Storage)",
+        "is_external": "Выполняется ли шаг во внешней системе",
+        "progress": "Прогресс выполнения в процентах (0-100)"
+      },
+      "relations_doc": [
+        "→ job (через job_id): Родительская задача",
+        "→ step (через parent_step_id): Родительский шаг"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_jobs": {
+      "name": "vm_jobs",
+      "summary": "Специализированные фоновые задачи ВМ: export, import, convert disk, live merge",
+      "subgroup": "Core",
+      "key_fields": ["vm_job_id"],
+      "fields_doc": {
+        "vm_job_id": "Уникальный идентификатор задачи ВМ",
+        "vm_id": "ВМ над которой выполняется операция. Связан с таблицей vm_static через поле vm_guid",
+        "job_state": "Состояние: 0=Started, 1=InProgress, 2=Finished, 3=Failed",
+        "job_type": "Тип операции: 0=Export, 1=Import, 2=Convert, 3=MoveDisk",
+        "block_job_type": "Тип block job на уровне QEMU: 0=Commit, 1=Copy, 2=Mirror, 3=Stream",
+        "bandwidth": "Ограничение пропускной способности в MB/s",
+        "cursor_cur": "Текущая позиция обработки в байтах",
+        "cursor_end": "Общий объем данных для обработки в байтах",
+        "image_group_id": "Группа образов над которой идет операция. Связан с таблицей images через поле image_guid"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): ВМ-объект задачи",
+        "→ images (через image_group_id): Группа образов"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "async_tasks": {
+      "name": "async_tasks",
+      "summary": "Активные асинхронные задачи VDSM: миграция, создание диска, live merge. Очищаются после завершения",
+      "subgroup": "Async VDSM",
+      "key_fields": ["task_id"],
+      "fields_doc": {
+        "task_id": "Уникальный идентификатор async-задачи",
+        "action_type": "Тип действия VDSM",
+        "status": "Статус задачи: Active, Finished, Failed",
+        "result": "Код результата выполнения",
+        "step_id": "Связанный шаг Engine. Связан с таблицей step через поле step_id",
+        "command_id": "Команда Engine инициировавшая задачу. Связан с таблицей command_entities через поле command_id",
+        "started_at": "Время запуска задачи на VDSM",
+        "storage_pool_id": "Пул хранения к которому относится задача. Связан с таблицей storage_pool через поле id",
+        "task_type": "Тип задачи: 0=Unknown, 1=CreateVolume, 2=DeleteVolume, 3=ExtendVolume",
+        "vdsm_task_id": "Внутренний ID задачи в VDSM",
+        "root_command_id": "Корневая команда в цепочке вызовов",
+        "user_id": "Пользователь инициировавший операцию. Связан с таблицей users через поле user_id"
+      },
+      "relations_doc": [
+        "→ step (через step_id): Шаг Engine",
+        "→ command_entities (через command_id): Команда Engine",
+        "→ storage_pool (через storage_pool_id): Пул хранения",
+        "→ users (через user_id): Инициатор"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "command_entities": {
+      "name": "command_entities",
+      "summary": "История команд Engine: тип операции, параметры, статус, время старта/завершения",
+      "subgroup": "Async VDSM",
+      "key_fields": ["command_id"],
+      "fields_doc": {
+        "command_id": "Уникальный идентификатор команды",
+        "command_type": "Тип команды (integer enum)",
+        "root_command_id": "Корневая команда в дереве вызовов",
+        "command_parameters": "Параметры команды в сериализованном виде",
+        "command_params_class": "Java класс параметров команды",
+        "created_at": "Время создания команды",
+        "status": "Статус: NOT_STARTED, ACTIVE, SUCCEEDED, FAILED",
+        "callback_enabled": "Включен ли callback по завершении",
+        "callback_notified": "Было ли отправлено уведомление о завершении",
+        "return_value": "Возвращаемое значение команды",
+        "return_value_class": "Класс возвращаемого значения",
+        "executed": "Факт физического выполнения команды",
+        "user_id": "Пользователь выполнивший команду. Связан с таблицей users через поле user_id",
+        "parent_command_id": "Родительская команда в цепочке",
+        "data": "Дополнительные данные команды",
+        "engine_session_seq_id": "ID сессии Engine",
+        "command_context": "Контекст выполнения (reason, end-user info)"
+      },
+      "relations_doc": [
+        "→ users (через user_id): Исполнитель команды"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "async_tasks_entities": {
+      "name": "async_tasks_entities",
+      "summary": "Объекты инфраструктуры задействованные в активной async-задаче",
+      "subgroup": "Relations",
+      "key_fields": ["async_task_id", "entity_id"],
+      "fields_doc": {
+        "async_task_id": "Async-задача. Связан с таблицей async_tasks через поле task_id",
+        "entity_id": "UUID объекта инфраструктуры (VM, Disk, Host)",
+        "entity_type": "Тип объекта: VM, DISK, VDS, STORAGE_DOMAIN"
+      },
+      "relations_doc": [
+        "→ async_tasks (через async_task_id): Родительская задача"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "job_subject_entity": {
+      "name": "job_subject_entity",
+      "summary": "Объекты над которыми выполняется задача (subject of the job)",
+      "subgroup": "Relations",
+      "key_fields": ["job_id", "entity_id"],
+      "fields_doc": {
+        "job_id": "Задача. Связан с таблицей job через поле job_id",
+        "entity_id": "UUID целевого объекта",
+        "entity_type": "Тип объекта: VM, DISK, VDS, CLUSTER"
+      },
+      "relations_doc": [
+        "→ job (через job_id): Родительская задача"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "step_subject_entity": {
+      "name": "step_subject_entity",
+      "summary": "Объекты над которыми выполняется конкретный шаг задачи",
+      "subgroup": "Relations",
+      "key_fields": ["step_id", "entity_id"],
+      "fields_doc": {
+        "step_id": "Шаг. Связан с таблицей step через поле step_id",
+        "entity_id": "UUID целевого объекта",
+        "entity_type": "Тип объекта",
+        "step_entity_weight": "Вес объекта в прогрессе шага (для расчета общего %)"
+      },
+      "relations_doc": [
+        "→ step (через step_id): Родительский шаг"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "command_assoc_entities": {
+      "name": "command_assoc_entities",
+      "summary": "Связь команд с объектами инфраструктуры. Позволяет найти все команды затрагивающие конкретный объект",
+      "subgroup": "Relations",
+      "key_fields": ["command_id", "entity_id"],
+      "fields_doc": {
+        "command_id": "Команда. Связан с таблицей command_entities через поле command_id",
+        "entity_id": "UUID объекта инфраструктуры",
+        "entity_type": "Тип объекта: VM, DISK, VDS, NETWORK"
+      },
+      "relations_doc": [
+        "→ command_entities (через command_id): Родительская команда"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "event_map": {
+      "name": "event_map",
+      "summary": "Справочник типов событий: коды, severity, текстовые шаблоны сообщений",
+      "subgroup": "Audit & Events",
+      "key_fields": ["event_up_name"],
+      "fields_doc": {
+        "event_up_name": "Имя события в верхнем регистре (USER_ADD_VM)",
+        "event_down_name": "Имя события в нижнем регистре (user_add_vm)"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "event_notification_hist": {
+      "name": "event_notification_hist",
+      "summary": "История отправленных уведомлений (email/SNMP/Telegram) по событиям из audit_log",
+      "subgroup": "Audit & Events",
+      "key_fields": ["audit_log_id", "method_type"],
+      "fields_doc": {
+        "event_name": "Имя события которое триггернуло уведомление",
+        "audit_log_id": "Запись аудита. Связан с таблицей audit_log через поле audit_log_id",
+        "method_type": "Тип уведомления: E=email, S=SNMP, T=Telegram",
+        "sent_at": "Время отправки уведомления",
+        "status": "Статус доставки: true=Success, false=Failed",
+        "reason": "Причина ошибки доставки если status=false"
+      },
+      "relations_doc": [
+        "→ audit_log (через audit_log_id): Исходное событие"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "event_subscriber": {
+      "name": "event_subscriber",
+      "summary": "Подписчики на события: пользователи или группы получающие уведомления",
+      "subgroup": "Audit & Events",
+      "key_fields": ["subscriber_id", "event_up_name"],
+      "fields_doc": {
+        "subscriber_id": "ID подписчика (user или group). Связан с таблицей users/ad_groups",
+        "event_up_name": "Имя события на которое подписан",
+        "method_address": "Адрес доставки (email, SNMP trap target)",
+        "tag_name": "Тег для фильтрации событий",
+        "notification_method": "Метод уведомления: EMAIL, SNMP, TELEGRAM",
+        "use_telegram_notification": "Флаг использования Telegram бота",
+        "telegram_bot_token": "Токен Telegram бота (хранить осторожно!)",
+        "telegram_bot_chat_id": "Chat ID для отправки уведомлений"
+      },
+      "relations_doc": [
+        "→ users (через subscriber_id): Пользователь подписчик"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "dwh_history_timekeeping": {
+      "name": "dwh_history_timekeeping",
+      "summary": "Отслеживание времени для DWH: маркеры последнего собранного интервала статистики",
+      "subgroup": "Audit & Events",
+      "key_fields": ["var_name"],
+      "fields_doc": {
+        "var_name": "Имя переменной времени (например LAST_HOUR, LAST_DAY)",
+        "var_value": "Значение метки времени",
+        "var_datetime": "Дата и время последнего обновления метки"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

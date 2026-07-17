@@ -1,0 +1,316 @@
+{
+  "group": "Пользователи и права",
+  "tables": {
+    "users": {
+      "name": "users",
+      "summary": "Учетные записи пользователей системы: имя, домен аутентификации, namespace",
+      "subgroup": "Auth & Profiles",
+      "key_fields": ["user_id"],
+      "fields_doc": {
+        "user_id": "Уникальный идентификатор пользователя",
+        "name": "Имя пользователя",
+        "surname": "Фамилия пользователя",
+        "domain": "Домен аутентификации (internal, ldap, kerberos)",
+        "username": "Логин пользователя в домене",
+        "department": "Подразделение пользователя",
+        "email": "Email адрес для уведомлений",
+        "note": "Произвольная заметка администратора",
+        "last_admin_check_status": "Статус последней проверки прав администратора",
+        "external_id": "Внешний ID пользователя в системе аутентификации",
+        "namespace": "Пространство имен пользователя (* для глобальных)",
+        "max_sessions_count": "Максимальное количество одновременных сессий (по умолчанию 1000)"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "user_profiles": {
+      "name": "user_profiles",
+      "summary": "Расширенные свойства профиля пользователя (EAV/JSONB): UI preferences, locale, theme",
+      "subgroup": "Auth & Profiles",
+      "key_fields": ["property_id"],
+      "fields_doc": {
+        "user_id": "Владелец профиля. Связан с таблицей users через поле user_id",
+        "property_id": "Уникальный идентификатор свойства",
+        "property_type": "Тип свойства: UNKNOWN, STRING, INTEGER, BOOLEAN, JSON",
+        "property_name": "Имя свойства (например ui.theme, language)",
+        "property_content": "Значение свойства в формате JSONB"
+      },
+      "relations_doc": [
+        "→ users (через user_id): Владелец профиля"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "roles": {
+      "name": "roles",
+      "summary": "Системные роли доступа: SuperUser, UserRole, PowerUserRole, DiskOperator",
+      "subgroup": "Roles & Permissions",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор роли",
+        "name": "Имя роли",
+        "description": "Описание назначения роли",
+        "is_readonly": "Заблокирована ли роль от редактирования (системная)",
+        "role_type": "Тип роли: 0=System, 1=UserDefined",
+        "allows_viewing_children": "Разрешает ли роль просмотр дочерних объектов",
+        "app_mode": "Режим приложения для роли"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "permissions": {
+      "name": "permissions",
+      "summary": "Назначения ролей на объекты инфраструктуры. Связывает ad_element_id с role_id и object_id",
+      "subgroup": "Roles & Permissions",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор разрешения",
+        "role_id": "Назначаемая роль. Связан с таблицей roles через поле id",
+        "ad_element_id": "Субъект назначения (user или group). Связан с таблицей users/ad_groups",
+        "object_id": "Целевой объект инфраструктуры (VM, Host, Cluster)",
+        "object_type_id": "Тип целевого объекта (integer enum)",
+        "creation_date": "Дата назначения права (unix timestamp)"
+      },
+      "relations_doc": [
+        "→ roles (через role_id): Назначаемая роль"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "ad_groups": {
+      "name": "ad_groups",
+      "summary": "Группы Active Directory/LDAP импортированные в oVirt Engine",
+      "subgroup": "Roles & Permissions",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор группы",
+        "name": "Имя группы AD",
+        "domain": "Домен к которому принадлежит группа",
+        "distinguishedname": "DN группы в LDAP (cn=...,ou=...)",
+        "external_id": "Внешний ID группы в AD",
+        "namespace": "Пространство имен группы"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "roles_groups": {
+      "name": "roles_groups",
+      "summary": "Состав системных ролей: какие action_group входят в каждую роль",
+      "subgroup": "Roles & Permissions",
+      "key_fields": ["role_id", "action_group_id"],
+      "fields_doc": {
+        "role_id": "Роль владелец. Связан с таблицей roles через поле id",
+        "action_group_id": "ID группы действий (CREATE_VM, DELETE_DISK и т.д.)"
+      },
+      "relations_doc": [
+        "→ roles (через role_id): Родительская роль"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "tags": {
+      "name": "tags",
+      "summary": "Теги для организации объектов: имена, readonly-флаг, тип тега",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["tag_id"],
+      "fields_doc": {
+        "tag_id": "Уникальный идентификатор тега",
+        "tag_name": "Имя тега",
+        "description": "Описание назначения тега",
+        "parent_id": "Родительский тег для иерархии. Связан с таблицей tags через поле tag_id",
+        "readonly": "Защищен ли тег от удаления",
+        "type": "Тип тега: 0=User, 1=System"
+      },
+      "relations_doc": [
+        "→ tags (через parent_id): Родительский тег"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "tags_user_map": {
+      "name": "tags_user_map",
+      "summary": "Теги назначенные пользователям. Используются для фильтрации и RBAC",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["tag_id", "user_id"],
+      "fields_doc": {
+        "tag_id": "Тег. Связан с таблицей tags через поле tag_id",
+        "user_id": "Пользователь. Связан с таблицей users через поле user_id"
+      },
+      "relations_doc": [
+        "→ tags (через tag_id): Тег",
+        "→ users (через user_id): Пользователь"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "tags_user_group_map": {
+      "name": "tags_user_group_map",
+      "summary": "Теги назначенные группам AD. Наследуются всеми пользователями группы",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["tag_id", "group_id"],
+      "fields_doc": {
+        "tag_id": "Тег. Связан с таблицей tags через поле tag_id",
+        "group_id": "Группа AD. Связан с таблицей ad_groups через поле id"
+      },
+      "relations_doc": [
+        "→ tags (через tag_id): Тег",
+        "→ ad_groups (через group_id): Группа AD"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "tags_vds_map": {
+      "name": "tags_vds_map",
+      "summary": "Теги назначенные хостам. Используются для фильтрации и правил размещения ВМ",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["tag_id", "vds_id"],
+      "fields_doc": {
+        "tag_id": "Тег. Связан с таблицей tags через поле tag_id",
+        "vds_id": "Хост. Связан с таблицей vds_static через поле vds_id"
+      },
+      "relations_doc": [
+        "→ tags (через tag_id): Тег",
+        "→ vds_static (через vds_id): Хост"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "tags_vm_map": {
+      "name": "tags_vm_map",
+      "summary": "Теги назначенные ВМ. Используются для фильтрации, прав доступа и правил размещения",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["tag_id", "vm_id"],
+      "fields_doc": {
+        "tag_id": "Тег. Связан с таблицей tags через поле tag_id",
+        "vm_id": "ВМ. Связан с таблицей vm_static через поле vm_guid",
+        "defaultdisplaytype": "Тип консоли по умолчанию для ВМ с этим тегом: 0=SPICE, 1=VNC"
+      },
+      "relations_doc": [
+        "→ tags (через tag_id): Тег",
+        "→ vm_static (через vm_id): ВМ"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "tags_vm_pool_map": {
+      "name": "tags_vm_pool_map",
+      "summary": "Теги назначенные пулам ВМ. Наследуются всеми ВМ в пуле",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["tag_id", "vm_pool_id"],
+      "fields_doc": {
+        "tag_id": "Тег. Связан с таблицей tags через поле tag_id",
+        "vm_pool_id": "Пул ВМ. Связан с таблицей vm_pools через поле vm_pool_id"
+      },
+      "relations_doc": [
+        "→ tags (через tag_id): Тег",
+        "→ vm_pools (через vm_pool_id): Пул ВМ"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "labels": {
+      "name": "labels",
+      "summary": "Метки для сетей и интерфейсов. Используются для SR-IOV и affinity rules",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["label_id"],
+      "fields_doc": {
+        "label_id": "Уникальный идентификатор метки",
+        "label_name": "Имя метки",
+        "read_only": "Защищена ли метка от удаления",
+        "has_implicit_affinity_group": "Создавать ли автоматически группу аффинности для этой метки"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "labels_map": {
+      "name": "labels_map",
+      "summary": "Маппинг меток на ВМ и хосты. Определяет принадлежность объектов к метке",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["label_id"],
+      "fields_doc": {
+        "label_id": "Метка. Связан с таблицей labels через поле label_id",
+        "vm_id": "ВМ владелец метки. Связан с таблицей vm_static через поле vm_guid",
+        "vds_id": "Хост владелец метки. Связан с таблицей vds_static через поле vds_id"
+      },
+      "relations_doc": [
+        "→ labels (через label_id): Метка",
+        "→ vm_static (через vm_id): ВМ",
+        "→ vds_static (через vds_id): Хост"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vfs_config_labels": {
+      "name": "vfs_config_labels",
+      "summary": "Метки в конфигурации SR-IOV VF. Группируют виртуальные функции для назначения сетей",
+      "subgroup": "Tags & Labels",
+      "key_fields": ["vfs_config_id", "label"],
+      "fields_doc": {
+        "vfs_config_id": "Конфигурация VF. Связан с таблицей host_nic_vfs_config через поле id",
+        "label": "Имя метки назначенной VF"
+      },
+      "relations_doc": [
+        "→ host_nic_vfs_config (через vfs_config_id): Конфигурация VF"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "sso_clients": {
+      "name": "sso_clients",
+      "summary": "OAuth2/OIDC клиенты для SSO: callback URLs, scopes, certificates",
+      "subgroup": "SSO & Bookmarks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Порядковый номер клиента",
+        "client_id": "OAuth Client ID",
+        "client_secret": "OAuth Client Secret (хранить осторожно!)",
+        "callback_prefix": "Префикс URL для callback после аутентификации",
+        "certificate_location": "Путь к сертификату клиента",
+        "notification_callback": "URL для уведомлений об изменении токена",
+        "description": "Описание назначения клиента",
+        "email": "Контактный email владельца клиента",
+        "scope": "Разрешенные OAuth scopes через пробел",
+        "trusted": "Доверенный ли клиент (не требует подтверждения пользователем)",
+        "notification_callback_protocol": "Протокол уведомлений: HTTPS, HTTP",
+        "notification_callback_verify_host": "Проверять ли hostname при callback",
+        "notification_callback_verify_chain": "Проверять ли цепочку сертификатов",
+        "encrypted_userinfo": "Шифровать ли userinfo в ответе"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "sso_scope_dependency": {
+      "name": "sso_scope_dependency",
+      "summary": "Зависимости между scope'ами SSO: какие права требуют наличия других прав",
+      "subgroup": "SSO & Bookmarks",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Порядковый номер зависимости",
+        "scope": "Имя scope",
+        "dependencies": "Список зависимых scopes через запятую"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "bookmarks": {
+      "name": "bookmarks",
+      "summary": "Закладки пользователей в веб-интерфейсе: сохраненные поисковые запросы и фильтры",
+      "subgroup": "SSO & Bookmarks",
+      "key_fields": ["bookmark_id"],
+      "fields_doc": {
+        "bookmark_id": "Уникальный идентификатор закладки",
+        "bookmark_name": "Имя закладки отображаемое в UI",
+        "bookmark_value": "Сохраненный поисковый запрос или фильтр в сериализованном виде"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

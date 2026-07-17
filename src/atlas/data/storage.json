@@ -1,0 +1,474 @@
+{
+  "group": "Хранилище",
+  "tables": {
+    "storage_domain_static": {
+      "name": "storage_domain_static",
+      "summary": "Статические параметры доменов хранения: тип (NFS/iSCSI/Gluster), путь, статус и политики очистки",
+      "subgroup": "Core Storage",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор домена хранения",
+        "storage": "Путь или адрес хранилища (NFS path, iSCSI target, Gluster volume)",
+        "storage_name": "Имя домена в интерфейсе oVirt",
+        "storage_domain_type": "Тип домена: 0=Data, 1=ISO, 2=Export, 3=Backup",
+        "storage_type": "Протокол доступа: 0=NFS, 1=FCP, 2=iSCSI, 3=LocalFS, 4=PosixFS, 6=GlusterFS, 7=Cinder",
+        "storage_domain_format_type": "Версия формата домена (V1-V5). Определяет доступные фичи",
+        "recoverable": "Можно ли автоматически восстановить домен после сбоя",
+        "last_time_used_as_master": "Время последнего использования в роли Master Domain (unix timestamp)",
+        "storage_description": "Описание назначения домена",
+        "wipe_after_delete": "Затирать ли данные при удалении диска (безопасное удаление)",
+        "warning_low_space_indicator": "Процент заполнения для предупреждения о нехватке места",
+        "critical_space_action_blocker": "Процент заполнения для блокировки операций записи",
+        "discard_after_delete": "Отправлять ли TRIM/discard команды после удаления (для SSD/Thin Provisioning)",
+        "backup": "Является ли домен резервным (Backup domain)",
+        "block_size": "Размер блока в байтах (512 или 4096 для Advanced Format Drives)",
+        "master_priority": "Приоритет выбора этого домена в качестве Master"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "storage_domain_dynamic": {
+      "name": "storage_domain_dynamic",
+      "summary": "Динамическое состояние домена: свободное место, VDO savings, внешний статус",
+      "subgroup": "Core Storage",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "ID домена. Связан с таблицей storage_domain_static через поле id",
+        "available_disk_size": "Доступное место в ГБ (кэшированное значение)",
+        "used_disk_size": "Использованное место в ГБ",
+        "external_status": "Статус от внешнего монитора: 0=OK, 1=Warning, 2=Error",
+        "confirmed_available_disk_size": "Подтвержденное свободное место после проверки SPM",
+        "vdo_savings": "Экономия места благодаря VDO дедупликации в процентах"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через id): Статическая конфигурация домена"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "storage_pool": {
+      "name": "storage_pool",
+      "summary": "Пулы хранения (Data Centers): объединяют несколько доменов в единый логический объект",
+      "subgroup": "Core Storage",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор пула (Data Center ID)",
+        "name": "Имя Data Center",
+        "description": "Описание назначения DC",
+        "storage_pool_type": "Тип пула: 0=LocalFS, 1=NFS, 2=iSCSI, 3=FCP, 6=GlusterFS",
+        "storage_pool_format_type": "Версия формата пула (определяет совместимость доменов)",
+        "status": "Статус пула: 0=Uninitialized, 1=Up, 2=Maintenance, 3=NotOperational, 4=Problematic",
+        "master_domain_version": "Версия Master Domain пула",
+        "spm_vds_id": "Текущий SPM хост. Связан с таблицей vds_static через поле vds_id",
+        "compatibility_version": "Версия совместимости DC (например 4.10)",
+        "quota_enforcement_type": "Режим квот: 0=Disabled, 1=AuditOnly, 2=Enabled",
+        "is_local": "Флаг локального DC (только один хост)",
+        "managed": "Управляется ли пул движком"
+      },
+      "relations_doc": [
+        "→ vds_static (через spm_vds_id): Текущий SPM хост"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "storage_pool_iso_map": {
+      "name": "storage_pool_iso_map",
+      "summary": "Привязка ISO-доменов к пулам хранения. Определяет откуда брать образы для этого DC",
+      "subgroup": "Core Storage",
+      "key_fields": ["storage_pool_id", "storage_id"],
+      "fields_doc": {
+        "storage_id": "ID ISO-домена. Связан с таблицей storage_domain_static через поле id",
+        "storage_pool_id": "ID пула. Связан с таблицей storage_pool через поле id",
+        "status": "Статус привязки: 0=Active, 1=Inactive"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_id): ISO-домен",
+        "→ storage_pool (через storage_pool_id): Пул хранения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "storage_domains_ovf_info": {
+      "name": "storage_domains_ovf_info",
+      "summary": "OVF-конфигурации хранящиеся на домене для экспорта/импорта ВМ",
+      "subgroup": "Core Storage",
+      "key_fields": ["ovf_disk_id"],
+      "fields_doc": {
+        "storage_domain_id": "Домен где лежит OVF. Связан с таблицей storage_domain_static через поле id",
+        "status": "Статус обновления OVF: 0=OK, 1=Failed",
+        "ovf_disk_id": "ID специального диска с OVF данными. Связан с таблицей base_disks через поле disk_id",
+        "stored_ovfs_ids": "Список ID ВМ чьи конфиги сохранены в этом OVF",
+        "last_updated": "Время последнего обновления OVF store"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Домен хранения",
+        "→ base_disks (через ovf_disk_id): Диск с OVF данными"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "storage_domain_dr": {
+      "name": "storage_domain_dr",
+      "summary": "Настройки Disaster Recovery для домена хранения через Gluster GeoRep",
+      "subgroup": "Core Storage",
+      "key_fields": ["storage_domain_id", "georep_session_id"],
+      "fields_doc": {
+        "storage_domain_id": "Защищаемый домен. Связан с таблицей storage_domain_static через поле id",
+        "georep_session_id": "Сессия репликации. Связан с таблицей gluster_georep_session через поле session_id",
+        "sync_schedule": "Расписание синхронизации DR",
+        "gluster_scheduler_job_id": "ID задачи планировщика Gluster для DR"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Защищаемый домен",
+        "→ gluster_georep_session (через georep_session_id): Сессия GeoRep"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "luns": {
+      "name": "luns",
+      "summary": "Логические UNITы (LUN) на SAN-массиве: WWN, vendor, product ID, размер",
+      "subgroup": "Block Devices",
+      "key_fields": ["lun_id"],
+      "fields_doc": {
+        "lun_id": "Уникальный идентификатор LUN (обычно WWN)",
+        "physical_volume_id": "ID физического тома LVM если LUN используется в VG",
+        "volume_group_id": "ID группы томов LVM куда входит этот LUN",
+        "serial": "Серийный номер LUN от массива",
+        "lun_mapping": "Номер LUN на целевом устройстве",
+        "vendor_id": "Производитель массива (DellEMC, NetApp, HPE)",
+        "product_id": "Модель массива",
+        "device_size": "Размер устройства в секторах",
+        "discard_max_size": "Максимальный размер DISCARD/TRIM операции в байтах"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "storage_server_connections": {
+      "name": "storage_server_connections",
+      "summary": "Подключения к серверам хранения: IP, порт, NFS path, iSCSI target, credentials",
+      "subgroup": "Block Devices",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор подключения",
+        "connection": "Адрес подключения (IP:port для iSCSI, server:/path для NFS)",
+        "user_name": "Имя пользователя для аутентификации (iSCSI CHAP / NFS)",
+        "password": "Пароль для аутентификации (хранится зашифрованным)",
+        "iqn": "IQN iSCSI target",
+        "port": "Порт подключения",
+        "portal": "iSCSI portal (IP:port группа)",
+        "storage_type": "Тип подключения: 0=NFS, 1=FCP, 2=iSCSI, 3=LocalFS, 4=PosixFS, 6=GlusterFS",
+        "mount_options": "Опции монтирования NFS/POSIX",
+        "vfs_type": "Тип файловой системы для POSIX подключений",
+        "nfs_version": "Версия NFS протокола (3, 4, 4.1, 4.2)",
+        "nfs_timeo": "Таймаут NFS операций в децисекундах",
+        "nfs_retrans": "Количество повторных попыток NFS",
+        "gluster_volume_id": "Том Gluster если подключение типа GlusterFS. Связан с таблицей gluster_volumes через поле id"
+      },
+      "relations_doc": [
+        "→ gluster_volumes (через gluster_volume_id): Том GlusterFS"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "lun_storage_server_connection_map": {
+      "name": "lun_storage_server_connection_map",
+      "summary": "Маппинг LUN на подключения к серверам. Один LUN может быть доступен через несколько путей (multipath)",
+      "subgroup": "Block Devices",
+      "key_fields": ["lun_id", "storage_server_connection"],
+      "fields_doc": {
+        "lun_id": "ID LUN. Связан с таблицей luns через поле lun_id",
+        "storage_server_connection": "ID подключения. Связан с таблицей storage_server_connections через поле id"
+      },
+      "relations_doc": [
+        "→ luns (через lun_id): Логический UNIT",
+        "→ storage_server_connections (через storage_server_connection): Путь доступа"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "storage_server_connection_extension": {
+      "name": "storage_server_connection_extension",
+      "summary": "Расширенные параметры подключений: override credentials для конкретных хостов",
+      "subgroup": "Block Devices",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор расширения",
+        "vds_id": "Хост для которого действуют override. Связан с таблицей vds_static через поле vds_id",
+        "iqn": "Override IQN для этого хоста",
+        "user_name": "Override имя пользователя CHAP",
+        "password": "Override пароль CHAP"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Хост с переопределенными параметрами"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "storage_device": {
+      "name": "storage_device",
+      "summary": "Физические устройства хранения на хосте: local disks, HBAs, filesystems",
+      "subgroup": "Block Devices",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор устройства",
+        "name": "Имя устройства в ОС (/dev/sda, /dev/mapper/mpatha)",
+        "device_uuid": "UUID блочного устройства",
+        "filesystem_uuid": "UUID файловой системы если устройство форматировано",
+        "vds_id": "Хост владелец устройства. Связан с таблицей vds_static через поле vds_id",
+        "device_type": "Тип устройства: disk, partition, lvm, multipath",
+        "device_path": "Полный путь к устройству",
+        "filesystem_type": "Тип ФС: xfs, ext4, glusterfs",
+        "mount_point": "Точка монтирования если устройство смонтировано",
+        "size": "Размер устройства в байтах",
+        "is_free": "Свободно ли устройство для использования",
+        "is_gluster_brick": "Используется ли как Gluster brick"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Хост владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "iscsi_bonds": {
+      "name": "iscsi_bonds",
+      "summary": "iSCSI Bonds: группировка сетевых интерфейсов для отказоустойчивого доступа к iSCSI-хранилищу",
+      "subgroup": "iSCSI Advanced",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор bond",
+        "name": "Имя iSCSI bond",
+        "description": "Описание назначения",
+        "storage_pool_id": "DC к которому привязан bond. Связан с таблицей storage_pool через поле id"
+      },
+      "relations_doc": [
+        "→ storage_pool (через storage_pool_id): Data Center владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "iscsi_bonds_networks_map": {
+      "name": "iscsi_bonds_networks_map",
+      "summary": "Сети входящие в состав iSCSI Bond",
+      "subgroup": "iSCSI Advanced",
+      "key_fields": ["iscsi_bond_id", "network_id"],
+      "fields_doc": {
+        "iscsi_bond_id": "iSCSI bond. Связан с таблицей iscsi_bonds через поле id",
+        "network_id": "Логическая сеть. Связан с таблицей network через поле id"
+      },
+      "relations_doc": [
+        "→ iscsi_bonds (через iscsi_bond_id): Родительский bond",
+        "→ network (через network_id): Сеть для iSCSI трафика"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "iscsi_bonds_storage_connections_map": {
+      "name": "iscsi_bonds_storage_connections_map",
+      "summary": "Подключения к хранилищу входящие в состав iSCSI Bond",
+      "subgroup": "iSCSI Advanced",
+      "key_fields": ["iscsi_bond_id", "connection_id"],
+      "fields_doc": {
+        "iscsi_bond_id": "iSCSI bond. Связан с таблицей iscsi_bonds через поле id",
+        "connection_id": "Подключение к хранилищу. Связан с таблицей storage_server_connections через поле id"
+      },
+      "relations_doc": [
+        "→ iscsi_bonds (через iscsi_bond_id): Родительский bond",
+        "→ storage_server_connections (через connection_id): Подключение iSCSI"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "infrastructure_backup": {
+      "name": "infrastructure_backup",
+      "summary": "Резервные копии инфраструктуры Engine: БД, файлы конфигурации, Grafana",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор бэкапа",
+        "name": "Имя задачи бэкапа",
+        "description": "Описание назначения",
+        "file_path": "Путь к файлу бэкапа",
+        "creation_date": "Дата создания бэкапа",
+        "scope_engine_files": "Включены ли файлы конфигурации Engine",
+        "scope_engine_db": "Включена ли БД Engine",
+        "scope_dwh_db": "Включена ли БД DWH",
+        "scope_cinderlib_db": "Включена ли БД CinderLib",
+        "scope_grafana_db": "Включена ли БД Grafana",
+        "nfs_path": "NFS путь для хранения бэкапов",
+        "is_active": "Активна ли задача бэкапа",
+        "schedule": "Расписание выполнения (cron expression)",
+        "is_successful": "Статус последнего выполнения",
+        "max_count": "Максимальное количество хранимых копий (ротация)"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "infrastructure_backup_file_map": {
+      "name": "infrastructure_backup_file_map",
+      "summary": "Файлы входящие в конкретную задачу резервного копирования инфраструктуры",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["backup_id", "file_path"],
+      "fields_doc": {
+        "backup_id": "Задача бэкапа. Связан с таблицей infrastructure_backup через поле id",
+        "file_path": "Путь к файлу копии",
+        "creation_date": "Дата создания файла"
+      },
+      "relations_doc": [
+        "→ infrastructure_backup (через backup_id): Родительская задача"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "engine_backup_log": {
+      "name": "engine_backup_log",
+      "summary": "Логи выполнения резервного копирования движка: время, статус, сообщения",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["done_at", "scope"],
+      "fields_doc": {
+        "scope": "Область бэкапа: db, files, all",
+        "done_at": "Время завершения операции",
+        "is_passed": "Успешно ли выполнен бэкап",
+        "output_message": "Сообщение или ошибка выполнения",
+        "fqdn": "FQDN сервера где выполнялся бэкап",
+        "log_path": "Путь к детальному логу операции"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "engine_filesystem": {
+      "name": "engine_filesystem",
+      "summary": "Файловые системы на сервере Engine: mount points, usage, fstype",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор записи",
+        "mount_point": "Точка монтирования (/var/lib/ovirt-engine, /tmp)",
+        "used": "Использованное пространство",
+        "available": "Доступное пространство"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "repo_file_meta_data": {
+      "name": "repo_file_meta_data",
+      "summary": "Метаданные файлов репозитория ISO-домена: образы ОС, драйверы, инструменты",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["repo_domain_id", "repo_image_id"],
+      "fields_doc": {
+        "repo_domain_id": "ISO-домен. Связан с таблицей storage_domain_static через поле id",
+        "repo_image_id": "ID образа в репозитории",
+        "size": "Размер файла образа в байтах",
+        "date_created": "Дата загрузки образа",
+        "last_refreshed": "Время последней проверки целостности (unix timestamp)",
+        "file_type": "Тип файла: 0=ISO, 1=Floppy, 2=OVA",
+        "repo_image_name": "Имя файла образа"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через repo_domain_id): ISO-домен"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "unregistered_disks": {
+      "name": "unregistered_disks",
+      "summary": "Диски найденные на хранилище но не зарегистрированные в движке (orphaned disks)",
+      "subgroup": "Unregistered",
+      "key_fields": ["disk_id", "storage_domain_id"],
+      "fields_doc": {
+        "disk_id": "ID незарегистрированного диска",
+        "disk_alias": "Имя диска из метаданных",
+        "disk_description": "Описание диска из метаданных",
+        "storage_domain_id": "Домен где найден диск. Связан с таблицей storage_domain_static через поле id",
+        "creation_date": "Дата создания диска",
+        "last_modified": "Дата последнего изменения",
+        "volume_type": "Тип тома: Preallocated / Thin",
+        "volume_format": "Формат: RAW / COW",
+        "actual_size": "Реальный размер на диске в байтах",
+        "size": "Виртуальный размер диска в байтах",
+        "image_id": "ID образа диска"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Домен хранения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "unregistered_disks_to_vms": {
+      "name": "unregistered_disks_to_vms",
+      "summary": "Связь незарегистрированных дисков с ВМ которой они принадлежали",
+      "subgroup": "Unregistered",
+      "key_fields": ["disk_id", "entity_id"],
+      "fields_doc": {
+        "disk_id": "ID незарегистрированного диска. Связан с таблицей unregistered_disks через поле disk_id",
+        "entity_id": "ID ВМ владельца (из метаданных OVF)",
+        "entity_name": "Имя ВМ владельца",
+        "storage_domain_id": "Домен хранения. Связан с таблицей storage_domain_static через поле id"
+      },
+      "relations_doc": [
+        "→ unregistered_disks (через disk_id): Незарегистрированный диск",
+        "→ storage_domain_static (через storage_domain_id): Домен хранения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "unregistered_ovf_of_entities": {
+      "name": "unregistered_ovf_of_entities",
+      "summary": "Незарегистрированные OVF-сущности: ВМ/шаблоны найденные на Export/Backup домене",
+      "subgroup": "Unregistered",
+      "key_fields": ["entity_guid", "storage_domain_id"],
+      "fields_doc": {
+        "entity_guid": "GUID сущности из OVF",
+        "entity_name": "Имя сущности",
+        "entity_type": "Тип: VM, TEMPLATE",
+        "architecture": "Архитектура: 0=x86_64, 1=aarch64",
+        "lowest_comp_version": "Минимальная версия совместимости требуемая для импорта",
+        "storage_domain_id": "Домен где найдена сущность. Связан с таблицей storage_domain_static через поле id",
+        "ovf_data": "Полный XML OVF документа",
+        "ovf_extra_data": "Дополнительные метаданные OVF",
+        "status": "Статус обработки OVF"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Домен хранения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "external_leases": {
+      "name": "external_leases",
+      "summary": "Внешние аренды (leases) для координации доступа к shared storage извне oVirt",
+      "subgroup": "Unregistered",
+      "key_fields": ["lease_id"],
+      "fields_doc": {
+        "lease_id": "Уникальный идентификатор аренды",
+        "storage_domain_id": "Домен хранения аренды. Связан с таблицей storage_domain_static через поле id"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Домен хранения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "cinder_storage": {
+      "name": "cinder_storage",
+      "summary": "Интеграция с OpenStack Cinder: driver options, sensitive credentials",
+      "subgroup": "Integrations",
+      "key_fields": ["storage_domain_id"],
+      "fields_doc": {
+        "storage_domain_id": "Домен хранения Cinder. Связан с таблицей storage_domain_static через поле id",
+        "driver_options": "Параметры драйвера Cinder в формате JSONB",
+        "driver_sensitive_options": "Чувствительные параметры драйвера (пароли, токены)"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Домен хранения Cinder"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

@@ -1,0 +1,369 @@
+{
+  "group": "Системные",
+  "tables": {
+    "schema_version": {
+      "name": "schema_version",
+      "summary": "Версия схемы БД: история примененных миграций и текущее состояние",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Порядковый номер записи миграции",
+        "version": "Номер версии схемы (например 4.10.0)",
+        "script": "Имя SQL-скрипта миграции",
+        "checksum": "Контрольная сумма скрипта для проверки целостности",
+        "installed_by": "Пользователь или процесс установивший версию",
+        "started_at": "Время начала применения миграции",
+        "ended_at": "Время завершения миграции",
+        "state": "Статус: SUCCESS, FAILED, PENDING",
+        "current": "Флаг текущей активной версии схемы",
+        "comment": "Комментарий к миграции"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "vdc_options": {
+      "name": "vdc_options",
+      "summary": "Глобальные настройки движка oVirt: лимиты, таймауты, флаги функциональности",
+      "subgroup": "Config",
+      "key_fields": ["option_id"],
+      "fields_doc": {
+        "option_id": "Уникальный идентификатор опции",
+        "option_name": "Имя параметра (например MaxVmNameLengthGB, SearchResultsLimit)",
+        "option_value": "Текущее значение параметра",
+        "version": "Версия схемы для которой действует опция (general или конкретная версия)",
+        "default_value": "Значение по умолчанию"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "external_variable": {
+      "name": "external_variable",
+      "summary": "Внешние переменные для интеграции с системами управления конфигурацией",
+      "subgroup": "Config",
+      "key_fields": ["var_name"],
+      "fields_doc": {
+        "var_name": "Имя переменной",
+        "var_value": "Значение переменной",
+        "_update_date": "Дата последнего обновления значения"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "engine_sessions": {
+      "name": "engine_sessions",
+      "summary": "Активные сессии пользователей в веб-интерфейсе и API: время входа, IP, роли",
+      "subgroup": "Security",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Порядковый номер сессии (sequence)",
+        "engine_session_id": "Технический ID сессии",
+        "user_id": "ID пользователя сессии. Связан с таблицей users через поле user_id",
+        "user_name": "Логин пользователя",
+        "group_ids": "Список групп пользователя через запятую",
+        "role_ids": "Список назначенных ролей через запятую",
+        "source_ip": "IP-адрес клиента",
+        "authz_name": "Имя провайдера аутентификации (internal, ldap, kerberos)"
+      },
+      "relations_doc": [
+        "→ users (через user_id): Владелец сессии"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "fence_agents": {
+      "name": "fence_agents",
+      "summary": "Агенты фенсинга (STONITH): тип, credentials, параметры подключения к хосту",
+      "subgroup": "Security",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор агента",
+        "vds_id": "Хост управляемый агентом. Связан с таблицей vds_static через поле vds_id",
+        "agent_order": "Порядок вызова агентов при фенсинге (меньше = раньше)",
+        "ip": "IP-адрес интерфейса управления (IPMI/BMC)",
+        "type": "Тип агента: ipmilan, ssh, wti, apc и другие",
+        "agent_user": "Имя пользователя для подключения к BMC",
+        "agent_password": "Пароль для подключения (хранится зашифрованным)",
+        "port": "Порт подключения (обычно 623 для IPMI)",
+        "options": "Дополнительные параметры агента в текстовом формате",
+        "encrypt_options": "Шифровать ли дополнительные параметры"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Управляемый хост"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "libvirt_secrets": {
+      "name": "libvirt_secrets",
+      "summary": "Секреты для libvirt: пароли iSCSI CHAP, ключи шифрования дисков. Хранятся зашифрованными",
+      "subgroup": "Security",
+      "key_fields": ["secret_id"],
+      "fields_doc": {
+        "secret_id": "Уникальный идентификатор секрета",
+        "secret_value": "Зашифрованное значение секрета",
+        "secret_usage_type": "Тип использования: 0=iscsi, 1=ceph, 2=volume",
+        "secret_description": "Описание назначения секрета",
+        "provider_id": "Провайдер которому принадлежит секрет. Связан с таблицей providers через поле id"
+      },
+      "relations_doc": [
+        "→ providers (через provider_id): Владелец секрета"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "quota": {
+      "name": "quota",
+      "summary": "Квоты ресурсов (CPU, RAM, Storage) для пользователей/групп в пределах Data Center",
+      "subgroup": "Quota",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор квоты",
+        "storage_pool_id": "Data Center к которому привязана квота. Связан с таблицей storage_pool через поле id",
+        "quota_name": "Имя квоты",
+        "description": "Описание назначения квоты",
+        "threshold_cluster_percentage": "Процент предупреждения для кластера (по умолчанию 80%)",
+        "threshold_storage_percentage": "Процент предупреждения для хранилища (по умолчанию 80%)",
+        "grace_cluster_percentage": "Grace period для кластера в процентах (по умолчанию 20%)",
+        "grace_storage_percentage": "Grace period для хранилища в процентах (по умолчанию 20%)",
+        "is_default": "Является ли квотой по умолчанию для новых ВМ"
+      },
+      "relations_doc": [
+        "→ storage_pool (через storage_pool_id): Data Center владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "quota_limitation": {
+      "name": "quota_limitation",
+      "summary": "Конкретные лимиты квот по кластерам и доменам хранения",
+      "subgroup": "Quota",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор ограничения",
+        "quota_id": "Родительская квота. Связан с таблицей quota через поле id",
+        "storage_id": "Домен хранения для которого установлен лимит. Связан с таблицей storage_domain_static через поле id",
+        "cluster_id": "Кластер для которого установлен лимит. Связан с таблицей cluster через поле cluster_id",
+        "virtual_cpu": "Лимит vCPU",
+        "mem_size_mb": "Лимит памяти в МБ",
+        "storage_size_gb": "Лимит хранилища в ГБ"
+      },
+      "relations_doc": [
+        "→ quota (через quota_id): Родительская квота",
+        "→ storage_domain_static (через storage_id): Домен хранения",
+        "→ cluster (через cluster_id): Кластер"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "qos": {
+      "name": "qos",
+      "summary": "Параметры QoS: лимиты IOPS, throughput для дисков и сети",
+      "subgroup": "Quota",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор профиля QoS",
+        "qos_type": "Тип: 0=Storage, 1=Network, 2=CPU",
+        "name": "Имя профиля QoS",
+        "description": "Описание назначения",
+        "storage_pool_id": "Data Center к которому привязан профиль. Связан с таблицей storage_pool через поле id",
+        "max_throughput": "Максимальный общий throughput в MB/s",
+        "max_read_throughput": "Максимальный read throughput в MB/s",
+        "max_write_throughput": "Максимальный write throughput в MB/s",
+        "max_iops": "Максимальные общие IOPS",
+        "max_read_iops": "Максимальные read IOPS",
+        "max_write_iops": "Максимальные write IOPS",
+        "cpu_limit": "Лимит CPU в процентах (для CPU QoS)",
+        "inbound_average": "Средний входящий трафик в KB/s",
+        "inbound_peak": "Пиковый входящий трафик в KB/s",
+        "inbound_burst": "Burst входящего трафика в KB",
+        "outbound_average": "Средний исходящий трафик в KB/s",
+        "outbound_peak": "Пиковый исходящий трафик в KB/s",
+        "outbound_burst": "Burst исходящего трафика в KB"
+      },
+      "relations_doc": [
+        "→ storage_pool (через storage_pool_id): Data Center владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "providers": {
+      "name": "providers",
+      "summary": "Внешние провайдеры: SDN (Neutron), Storage (Cinder), Image (Glance). Интеграция с OpenStack",
+      "subgroup": "Provider",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор провайдера",
+        "name": "Имя провайдера",
+        "description": "Описание назначения",
+        "url": "URL API провайдера",
+        "provider_type": "Тип: NETWORK, IMAGE, STORAGE, COMPUTE",
+        "auth_required": "Требуется ли аутентификация",
+        "auth_username": "Имя пользователя для API",
+        "auth_password": "Пароль для API (хранится зашифрованным)",
+        "tenant_name": "Имя tenant/project в OpenStack",
+        "plugin_type": "Тип плагина интеграции",
+        "auth_url": "URL Keystone для аутентификации",
+        "additional_properties": "Дополнительные свойства в JSON формате",
+        "read_only": "Режим только чтения",
+        "is_unmanaged": "Неуправляемый провайдер (только импорт)",
+        "auto_sync": "Автоматическая синхронизация ресурсов",
+        "user_domain_name": "Домен пользователя в Keystone v3",
+        "project_name": "Имя проекта в Keystone v3",
+        "project_domain_name": "Домен проекта в Keystone v3"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "provider_binding_host_id": {
+      "name": "provider_binding_host_id",
+      "summary": "Привязка внешних провайдеров к конкретным хостам для локальной интеграции",
+      "subgroup": "Provider",
+      "key_fields": ["vds_id", "plugin_type"],
+      "fields_doc": {
+        "vds_id": "Хост для привязки. Связан с таблицей vds_static через поле vds_id",
+        "plugin_type": "Тип плагина провайдера",
+        "binding_host_id": "Внешний ID хоста в системе провайдера"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Локальный хост"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "image_transfers": {
+      "name": "image_transfers",
+      "summary": "Активные передачи образов: upload/download диска, backup restore",
+      "subgroup": "Provider",
+      "key_fields": ["command_id"],
+      "fields_doc": {
+        "command_id": "ID команды инициировавшей передачу. Связан с таблицей command_entities через поле command_id",
+        "command_type": "Тип команды передачи",
+        "phase": "Фаза передачи: Initializing, Transferring, Finished, Failed",
+        "last_updated": "Время последнего обновления статуса",
+        "message": "Сообщение о статусе или ошибке",
+        "vds_id": "Хост выполняющий передачу. Связан с таблицей vds_static через поле vds_id",
+        "disk_id": "Передаваемый диск. Связан с таблицей base_disks через поле disk_id",
+        "imaged_ticket_id": "ID тикета imageio для авторизации",
+        "proxy_uri": "URI прокси imageio",
+        "bytes_sent": "Отправлено байт на данный момент",
+        "bytes_total": "Общий объем передачи в байтах",
+        "type": "Тип передачи: 0=Upload, 1=Download, 2=Backup",
+        "active": "Активна ли передача прямо сейчас",
+        "daemon_uri": "URI демона ovirt-imageio",
+        "client_inactivity_timeout": "Таймаут неактивности клиента в секундах",
+        "image_format": "Формат образа: 0=RAW, 1=COW",
+        "backend": "Бэкенд хранения: 0=File, 1=Block",
+        "backup_id": "ID бэкапа если передача связана с резервным копированием",
+        "client_type": "Тип клиента: 0=Browser, 1=CLI, 2=SDK",
+        "shallow": "Поверхностная передача без цепочки снапшотов",
+        "timeout_policy": "Политика таймаута: legacy, strict"
+      },
+      "relations_doc": [
+        "→ command_entities (через command_id): Родительская команда",
+        "→ vds_static (через vds_id): Хост выполнения",
+        "→ base_disks (через disk_id): Передаваемый диск"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vdc_db_log": {
+      "name": "vdc_db_log",
+      "summary": "Лог ошибок уровня БД: stored procedure failures, constraint violations",
+      "subgroup": "Audit",
+      "key_fields": ["error_id"],
+      "fields_doc": {
+        "error_id": "Порядковый номер ошибки",
+        "occured_at": "Время возникновения ошибки",
+        "error_code": "Код ошибки PostgreSQL",
+        "error_message": "Текст сообщения об ошибке",
+        "error_proc": "Имя stored procedure где произошла ошибка",
+        "error_line": "Номер строки в процедуре"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "business_entity_snapshot": {
+      "name": "business_entity_snapshot",
+      "summary": "Снапшоты бизнес-сущностей для аудита изменений и отката операций",
+      "subgroup": "Audit",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор снапшота",
+        "command_id": "Команда вызвавшая изменение. Связан с таблицей command_entities через поле command_id",
+        "command_type": "Тип команды",
+        "entity_id": "ID измененной сущности",
+        "entity_type": "Тип сущности: VM, DISK, NETWORK",
+        "entity_snapshot": "JSON/XML сериализованное состояние сущности до изменения",
+        "snapshot_class": "Java класс сущности",
+        "snapshot_type": "Тип снапшота: BEFORE, AFTER",
+        "insertion_order": "Порядок вставки для восстановления последовательности",
+        "started_at": "Время создания снапшота"
+      },
+      "relations_doc": [
+        "→ command_entities (через command_id): Команда владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "custom_actions": {
+      "name": "custom_actions",
+      "summary": "Пользовательские действия UI: скрипты вызываемые из контекстного меню объектов",
+      "subgroup": "Audit",
+      "key_fields": ["action_id"],
+      "fields_doc": {
+        "action_id": "Уникальный идентификатор действия",
+        "action_name": "Имя действия отображаемое в UI",
+        "path": "Путь к скрипту или URL для вызова",
+        "tab": "Вкладка UI где доступно действие: 0=VM, 1=Host, 2=Cluster",
+        "description": "Описание назначения действия"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "dwh_osinfo": {
+      "name": "dwh_osinfo",
+      "summary": "Справочник гостевых ОС для DWH: коды, названия, семейства",
+      "subgroup": "Audit",
+      "key_fields": ["os_id"],
+      "fields_doc": {
+        "os_id": "Уникальный код ОС (соответствует полю os в vm_static)",
+        "os_name": "Человекочитаемое название ОС"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "object_column_white_list": {
+      "name": "object_column_white_list",
+      "summary": "Белый список колонок объектов для API serialization: какие поля можно отдавать наружу",
+      "subgroup": "Internal & Utils",
+      "key_fields": ["object_name", "column_name"],
+      "fields_doc": {
+        "object_name": "Имя объекта/таблицы",
+        "column_name": "Разрешенная колонка для экспорта"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "object_column_white_list_sql": {
+      "name": "object_column_white_list_sql",
+      "summary": "SQL-правила для динамического белого списка колонок объектов",
+      "subgroup": "Internal & Utils",
+      "key_fields": ["object_name"],
+      "fields_doc": {
+        "object_name": "Имя объекта/таблицы",
+        "sql": "SQL-запрос определяющий разрешенные колонки"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

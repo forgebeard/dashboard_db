@@ -1,0 +1,211 @@
+{
+  "group": "Сети",
+  "tables": {
+    "network": {
+      "name": "network",
+      "summary": "Логические сети oVirt: VLAN, MTU, тип (VM/Display/Migration), QoS и DNS-конфигурация",
+      "subgroup": "Core",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор логической сети",
+        "name": "Имя сети в интерфейсе. Должно быть уникальным в пределах Data Center",
+        "description": "Описание назначения сети",
+        "type": "Тип сети: 0=Legacy, 1=Bridge, 2=OVN",
+        "addr": "IPv4 адрес подсети сети",
+        "subnet": "Маска подсети",
+        "gateway": "Шлюз по умолчанию для этой подсети",
+        "vlan_id": "ID VLAN тегирования. NULL для нетегированных сетей",
+        "stp": "Включен ли Spanning Tree Protocol для предотвращения петель",
+        "storage_pool_id": "Пул хранения к которому привязана сеть (для OVN). Связан с таблицей storage_pool через поле id",
+        "mtu": "MTU сети. Обычно 1500 или 9000 (jumbo frames)",
+        "vm_network": "Флаг сети для ВМ. Если false — сеть только для управления/хранения",
+        "provider_network_provider_id": "Провайдер SDN (Neutron) если сеть внешняя. Связан с таблицей providers через поле id",
+        "provider_network_external_id": "Внешний ID сети в провайдере SDN",
+        "free_text_comment": "Произвольный комментарий администратора",
+        "label": "Метка сети для фильтрации и SR-IOV",
+        "qos_id": "Профиль QoS для ограничения пропускной способности. Связан с таблицей qos через поле id",
+        "dns_resolver_configuration_id": "Конфигурация DNS-резолвера для этой сети. Связан с таблицей dns_resolver_configuration через поле id",
+        "vdsm_name": "Имя сети на уровне VDSM/libvirt",
+        "provider_physical_network_id": "Физическая сеть провайдера если используется external provider",
+        "port_isolation": "Включена ли изоляция портов (запрет L2-трафика между ВМ в одной сети)"
+      },
+      "relations_doc": [
+        "→ storage_pool (через storage_pool_id): Пул хранения для OVN",
+        "→ providers (через provider_network_provider_id): Внешний SDN-провайдер",
+        "→ qos (через qos_id): Профиль QoS",
+        "→ dns_resolver_configuration (через dns_resolver_configuration_id): DNS-настройки сети"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "network_cluster": {
+      "name": "network_cluster",
+      "summary": "Привязка логических сетей к кластерам. Определяет доступность сети хостам кластера",
+      "subgroup": "Core",
+      "key_fields": ["network_id", "cluster_id"],
+      "fields_doc": {
+        "network_id": "Идентификатор логической сети. Связан с таблицей network через поле id",
+        "cluster_id": "Идентификатор кластера. Связан с таблицей cluster через поле cluster_id",
+        "status": "Статус сети в кластере: 0=Operational, 1=NonOperational",
+        "is_display": "Используется ли сеть для трафика консолей (SPICE/VNC)",
+        "required": "Обязательна ли сеть для всех хостов кластера",
+        "migration": "Разрешена ли миграция ВМ через эту сеть",
+        "management": "Является ли сеть управленческой (ovirtmgmt)",
+        "is_gluster": "Используется ли сеть для GlusterFS traffic",
+        "default_route": "Является ли эта сеть маршрутом по умолчанию для хостов кластера"
+      },
+      "relations_doc": [
+        "→ network (через network_id): Логическая сеть",
+        "→ cluster (через cluster_id): Кластер размещения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vnic_profiles": {
+      "name": "vnic_profiles",
+      "summary": "Профили vNIC: набор настроек порта ВМ (QoS, фильтры, port mirroring, passthrough)",
+      "subgroup": "Core",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор профиля vNIC",
+        "name": "Имя профиля",
+        "network_id": "Логическая сеть к которой принадлежит профиль. Связан с таблицей network через поле id",
+        "port_mirroring": "Включено ли зеркалирование порта (SPAN) для отладки",
+        "custom_properties": "Кастомные свойства профиля в формате key=value",
+        "description": "Описание назначения профиля",
+        "network_qos_id": "QoS-профиль для ограничения трафика ВМ. Связан с таблицей qos через поле id",
+        "passthrough": "Режим прямого проброса NIC (SR-IOV VF или macvtap)",
+        "network_filter_id": "Фильтр трафика libvirt (nwfilter). Связан с таблицей network_filter через поле filter_name",
+        "migratable": "Разрешена ли миграция ВМ с этим профилем",
+        "failover_vnic_profile_id": "Резервный профиль при отказе основного. Связан с таблицей vnic_profiles через поле id"
+      },
+      "relations_doc": [
+        "→ network (через network_id): Родительская сеть",
+        "→ qos (через network_qos_id): QoS-профиль",
+        "→ network_filter (через network_filter_id): Фильтр трафика",
+        "→ vnic_profiles (через failover_vnic_profile_id): Резервный профиль"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "network_attachments": {
+      "name": "network_attachments",
+      "summary": "Активные привязки логических сетей к физическим NIC хоста (Setup Networks)",
+      "subgroup": "Physical",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор привязки",
+        "network_id": "Логическая сеть. Связан с таблицей network через поле id",
+        "nic_id": "Физический NIC хоста. Связан с таблицей vds_interface через поле id",
+        "boot_protocol": "Протокол получения IPv4: NONE, STATIC, DHCP",
+        "address": "Статический IPv4 адрес",
+        "netmask": "Маска подсети",
+        "gateway": "Шлюз",
+        "custom_properties": "Кастомные параметры привязки",
+        "ipv6_boot_protocol": "Протокол IPv6: NONE, STATIC, DHCP, AUTOCONF",
+        "ipv6_address": "Статический IPv6 адрес",
+        "ipv6_prefix": "Префикс IPv6 подсети",
+        "ipv6_gateway": "IPv6 шлюз",
+        "dns_resolver_configuration_id": "DNS-конфигурация для этого attachment. Связан с таблицей dns_resolver_configuration через поле id"
+      },
+      "relations_doc": [
+        "→ network (через network_id): Логическая сеть",
+        "→ vds_interface (через nic_id): Физический NIC",
+        "→ dns_resolver_configuration (через dns_resolver_configuration_id): DNS-настройки"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "dns_resolver_configuration": {
+      "name": "dns_resolver_configuration",
+      "summary": "Настройки DNS-резолвера: search domains и список nameservers",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор конфигурации DNS",
+        "search_domains": "Список доменов поиска через запятую",
+        "nameservers": "Список IP-адресов DNS-серверов"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "name_server": {
+      "name": "name_server",
+      "summary": "Отдельные записи DNS-серверов входящие в конфигурацию резолвера",
+      "subgroup": "Config",
+      "key_fields": ["address", "dns_resolver_configuration_id"],
+      "fields_doc": {
+        "address": "IP-адрес DNS-сервера",
+        "position": "Порядковый номер сервера в списке (приоритет)",
+        "dns_resolver_configuration_id": "Конфигурация резолвера. Связан с таблицей dns_resolver_configuration через поле id"
+      },
+      "relations_doc": [
+        "→ dns_resolver_configuration (через dns_resolver_configuration_id): Родительская конфигурация"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "mac_pools": {
+      "name": "mac_pools",
+      "summary": "Пулы MAC-адресов для автоматической выдачи ВМ и интерфейсам",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор пула",
+        "name": "Имя пула",
+        "description": "Описание назначения пула",
+        "allow_duplicate_mac_addresses": "Разрешены ли дубликаты MAC (опасно, только для тестов)",
+        "default_pool": "Является ли этот пул дефолтным для новых ВМ"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "mac_pool_ranges": {
+      "name": "mac_pool_ranges",
+      "summary": "Диапазоны MAC-адресов внутри пула (от и до)",
+      "subgroup": "Config",
+      "key_fields": ["mac_pool_id", "from_mac"],
+      "fields_doc": {
+        "mac_pool_id": "Пул-владелец диапазона. Связан с таблицей mac_pools через поле id",
+        "from_mac": "Начальный MAC-адрес диапазона",
+        "to_mac": "Конечный MAC-адрес диапазона"
+      },
+      "relations_doc": [
+        "→ mac_pools (через mac_pool_id): Пул-владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "network_filter": {
+      "name": "network_filter",
+      "summary": "Фильтры трафика libvirt (nwfilter): правила iptables/ebtables для защиты ВМ на уровне vNIC",
+      "subgroup": "Config",
+      "key_fields": ["filter_name"],
+      "fields_doc": {
+        "filter_name": "Уникальное имя фильтра (например ovirt-mac-spoofing, clean-traffic)",
+        "description": "Описание назначения фильтра и применяемых правил"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "vfs_config_networks": {
+      "name": "vfs_config_networks",
+      "summary": "Связь меток SR-IOV VF с логическими сетями. Определяет какие VF идут в какую сеть",
+      "subgroup": "Config",
+      "key_fields": ["vfs_config_id", "network_id"],
+      "fields_doc": {
+        "vfs_config_id": "Конфигурация VF на физическом NIC. Связан с таблицей host_nic_vfs_config через поле id",
+        "network_id": "Логическая сеть назначенная VF. Связан с таблицей network через поле id"
+      },
+      "relations_doc": [
+        "→ host_nic_vfs_config (через vfs_config_id): Конфигурация VF",
+        "→ network (через network_id): Назначенная сеть"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

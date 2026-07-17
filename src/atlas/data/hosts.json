@@ -1,0 +1,298 @@
+{
+  "group": "Хосты",
+  "tables": {
+    "vds_static": {
+      "name": "vds_static",
+      "summary": "Статические параметры хоста: имя, IP, тип, кластер и настройки подключения",
+      "subgroup": "Core",
+      "key_fields": ["vds_id"],
+      "fields_doc": {
+        "vds_id": "Уникальный идентификатор хоста. Главный ключ для всех таблиц динамики и статистики",
+        "vds_name": "Имя хоста в интерфейсе oVirt. Должно быть уникальным в пределах Data Center",
+        "vds_unique_id": "Глобально уникальный ID хоста (обычно совпадает с DMI System UUID). Используется для идентификации при переустановке",
+        "host_name": "FQDN или IP-адрес хоста для SSH-подключения VDSM",
+        "port": "Порт для подключения к VDSM (по умолчанию 54321)",
+        "cluster_id": "Кластер размещения. Определяет политики CPU, сети и хранения. Связан с таблицей cluster через поле cluster_id",
+        "server_ssl_enabled": "Флаг использования SSL для связи Engine ↔ VDSM",
+        "vds_type": "Тип хоста: 0=Node (стандартный), 1=HostedEngine (хост для HE)",
+        "pm_enabled": "Разрешено ли управление питанием (Power Management) для этого хоста",
+        "vds_spm_priority": "Приоритет хоста при выборе SPM (Storage Pool Manager). Чем выше число, тем выше шанс стать SPM",
+        "recoverable": "Флаг возможности автоматического восстановления после сбоя",
+        "sshkeyfingerprint": "Отпечаток SSH-ключа хоста. Используется для верификации первого подключения",
+        "console_address": "Адрес для прямого подключения к консоли хоста (IPMI/BMC). Отдельно от host_name",
+        "ssh_username": "Имя пользователя для SSH-подключения (обычно root)",
+        "ssh_port": "Нестандартный порт SSH если отличается от 22",
+        "disable_auto_pm": "Запрет автоматического фенсинга. Хост не будет перезагружен при NonOperational",
+        "pm_detect_kdump": "Ждать завершения kdump перед выполнением фенсинга",
+        "host_provider_id": "Внешний провайдер управления хостом (например OpenStack Ironic). Связан с таблицей providers через поле id",
+        "kernel_cmdline": "Текущие параметры ядра хоста",
+        "last_stored_kernel_cmdline": "Последние сохраненные параметры ядра для сравнения после ребута",
+        "reinstall_required": "Флаг необходимости переустановки хоста (например после смены версии ОС)",
+        "vgpu_placement": "Политика размещения vGPU: 0=Disabled, 1=Balanced, 2=Consolidated"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер размещения и политик",
+        "→ providers (через host_provider_id): Внешний провайдер управления"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vds_dynamic": {
+      "name": "vds_dynamic",
+      "summary": "Runtime-состояние хоста: загрузка CPU/RAM, версии ПО, статус миграций и аппаратная информация",
+      "subgroup": "Core",
+      "key_fields": ["vds_id"],
+      "fields_doc": {
+        "vds_id": "Идентификатор хоста. Связан с таблицей vds_static через поле vds_id",
+        "status": "Integer-код состояния: 0=Unassigned, 1=Up, 2=Down, 3=NonOperational, 4=Maintenance, 5=Installing, 6=Reboot, 7=Connecting, 8=Initializing, 9=Error, 10=PendingApproval, 11=InstallingOS, 12=KDumping, 13=ImageLocked, 14=Upgrading, 15=NonResponsive",
+        "cpu_cores": "Количество физических ядер CPU",
+        "cpu_model": "Модель процессора (например Intel Xeon Gold 6248R)",
+        "cpu_speed_mh": "Тактовая частота CPU в МГц",
+        "physical_mem_mb": "Общий объем физической RAM в МБ",
+        "mem_commited": "Зарезервированная память для ВМ (включая overhead)",
+        "vm_active": "Количество запущенных ВМ на хосте",
+        "vm_count": "Общее количество ВМ привязанных к хосту (включая stopped)",
+        "vm_migrating": "Количество ВМ в процессе миграции",
+        "software_version": "Версия пакета vdsm",
+        "version_name": "Человекочитаемое название версии VDSM",
+        "build_name": "Номер сборки VDSM",
+        "previous_status": "Предыдущее состояние хоста. Нужно для триггеров событий",
+        "cpu_flags": "Флаги CPU (vmx/svm, aes, avx и др.). Влияют на совместимость ВМ",
+        "vms_cores_count": "Суммарное количество vCPU всех запущенных ВМ",
+        "pending_vcpus_count": "Количество vCPU ожидающих запуска (queued VMs)",
+        "cpu_sockets": "Количество физических сокетов CPU",
+        "net_config_dirty": "Флаг несохраненных изменений сетевой конфигурации",
+        "supported_cluster_levels": "Список версий кластера которые поддерживает этот хост",
+        "host_os": "Название и версия операционной системы хоста",
+        "kvm_version": "Версия QEMU/KVM",
+        "spice_version": "Версия SPICE сервера",
+        "kernel_version": "Версия ядра Linux",
+        "iscsi_initiator_name": "IQN iSCSI инициатора хоста",
+        "transparent_hugepages_state": "Состояние THP: 0=Never, 1=Always, 2=Madvise",
+        "non_operational_reason": "Код причины NonOperational статуса",
+        "pending_vmem_size": "Объем памяти запрошенный но еще не выделенный ВМ",
+        "rpm_version": "Версия RPM пакета vdsm",
+        "supported_engines": "Список версий oVirt Engine с которыми хост совместим",
+        "libvirt_version": "Версия libvirt",
+        "cpu_threads": "Количество потоков CPU (cores * threads_per_core)",
+        "hw_manufacturer": "Производитель сервера (Dell, HPE, Lenovo)",
+        "hw_product_name": "Модель сервера",
+        "hw_serial_number": "Серийный номер оборудования",
+        "hw_uuid": "UUID оборудования из DMI/SMBIOS",
+        "gluster_version": "Версия GlusterFS если установлен",
+        "controlled_by_pm_policy": "Управляется ли питание политиками кластера",
+        "kdump_status": "Статус настройки kdump: -1=Unknown, 0=Disabled, 1=Enabled",
+        "selinux_enforce_mode": "Режим SELinux: 0=Disabled, 1=Permissive, 2=Enforcing",
+        "auto_numa_balancing": "Статус автоматической NUMA балансировки ядра",
+        "is_numa_supported": "Поддерживает ли хост NUMA топологию",
+        "online_cpus": "Список онлайн CPU ядер",
+        "maintenance_reason": "Текстовая причина перевода в Maintenance",
+        "incoming_migrations": "Количество входящих миграций прямо сейчас",
+        "outgoing_migrations": "Количество исходящих миграций прямо сейчас",
+        "is_update_available": "Доступно ли обновление VDSM/OS",
+        "external_status": "Статус от внешнего монитора (если используется)",
+        "is_hostdev_enabled": "Разрешен ли проброс устройств (PCI passthrough/SR-IOV)",
+        "kernel_args": "Полная строка аргументов ядра при загрузке",
+        "pretty_name": "Красивое название дистрибутива (RED OS 8.6 Mustang)",
+        "hosted_engine_configured": "Настроен ли Hosted Engine на этом хосте",
+        "in_fence_flow": "Выполняется ли сейчас процедура фенсинга",
+        "backup_enabled": "Разрешено ли резервное копирование через этот хост",
+        "tsc_frequency": "Частота TSC счетчика. Важно для точного времени в ВМ",
+        "tsc_scaling": "Разрешено ли масштабирование TSC для миграции между разными CPU",
+        "fips_enabled": "Включен ли режим FIPS 140-2",
+        "nmstate_version": "Версия nmstate для управления сетью"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Статическая конфигурация хоста"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vds_statistics": {
+      "name": "vds_statistics",
+      "summary": "Агрегированная метрика производительности хоста за последний интервал сбора",
+      "subgroup": "Core",
+      "key_fields": ["vds_id"],
+      "fields_doc": {
+        "vds_id": "Идентификатор хоста. Связан с таблицей vds_static через поле vds_id",
+        "cpu_idle": "Процент простоя CPU",
+        "cpu_load": "Средняя загрузка CPU (load average normalized)",
+        "cpu_sys": "Процент времени CPU в kernel mode",
+        "cpu_user": "Процент времени CPU в user mode",
+        "usage_mem_percent": "Утилизация физической памяти в процентах",
+        "usage_cpu_percent": "Общая утилизация CPU в процентах",
+        "usage_network_percent": "Утилизация сетевого интерфейса в процентах",
+        "mem_shared": "Объем共享 памяти через KSM в байтах",
+        "swap_free": "Свободное место в swap в байтах",
+        "swap_total": "Общий объем swap в байтах",
+        "ksm_cpu_percent": "Загрузка CPU процессом ksmd в процентах",
+        "ksm_pages": "Количество страниц объединенных KSM",
+        "ksm_state": "Включен ли KSM (Kernel Samepage Merging)",
+        "mem_free": "Свободная физическая память в байтах",
+        "ha_score": "HA score хоста для алгоритма выбора места миграции",
+        "anonymous_hugepages": "Количество анонимных hugepages",
+        "ha_configured": "Настроена ли HA для этого хоста",
+        "ha_active": "Активна ли HA прямо сейчас",
+        "ha_global_maintenance": "Глобальный режим обслуживания HA",
+        "ha_local_maintenance": "Локальный режим обслуживания HA",
+        "boot_time": "Время последней загрузки хоста (unix timestamp)"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Статистика привязана к конфигурации хоста"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vds_interface": {
+      "name": "vds_interface",
+      "summary": "Сетевые интерфейсы хоста: bond, vlan, physical. Конфигурация и статус",
+      "subgroup": "Network",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор интерфейса",
+        "name": "Имя интерфейса в ОС (eth0, bond0, vlan100)",
+        "network_name": "Имя логической сети oVirt привязанной к интерфейсу",
+        "vds_id": "Хост-владелец интерфейса. Связан с таблицей vds_static через поле vds_id",
+        "mac_addr": "MAC-адрес интерфейса",
+        "is_bond": "Является ли интерфейс bonding устройством",
+        "bond_name": "Имя bond устройства если это slave интерфейс",
+        "bond_type": "Тип bonding: 0=Balance-rr, 1=Active-backup, 2=XOR, 3=Broadcast, 4=802.3ad, 5=TLB, 6=ALB",
+        "bond_opts": "Опции bonding в текстовом формате",
+        "vlan_id": "ID VLAN если это vlan интерфейс",
+        "speed": "Скорость интерфейса в Mbps",
+        "addr": "IPv4 адрес интерфейса",
+        "subnet": "Маска подсети",
+        "gateway": "Шлюз по умолчанию",
+        "boot_protocol": "Протокол получения IP: 0=None, 1=Static, 2=DHCP",
+        "type": "Тип интерфейса: 0=Management, 1=Data, 2=Display, 3=Migration, 4=Storage",
+        "mtu": "MTU интерфейса",
+        "bridged": "Является ли интерфейс мостом (bridge)",
+        "labels": "Метки интерфейса для SR-IOV и фильтрации",
+        "qos_overridden": "Переопределены ли QoS настройки вручную",
+        "base_interface": "Базовый физический интерфейс для vlan/bond",
+        "ipv6_boot_protocol": "Протокол IPv6: 0=None, 1=Static, 2=DHCP, 3=Autoconf",
+        "ipv6_address": "IPv6 адрес интерфейса",
+        "ipv6_prefix": "Префикс IPv6 подсети",
+        "ipv6_gateway": "IPv6 шлюз",
+        "ad_partner_mac": "MAC партнера LACP для bond",
+        "reported_switch_type": "Тип коммутатора обнаруженный LLDP",
+        "ad_aggregator_id": "ID агрегатора LACP",
+        "bond_active_slave": "Активный slave интерфейс в active-backup bond",
+        "ipv4_default_route": "Является ли этот интерфейс маршрутом по умолчанию"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Хост-владелец интерфейса"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vds_interface_statistics": {
+      "name": "vds_interface_statistics",
+      "summary": "Счетчики трафика сетевых интерфейсов хоста: RX/TX bytes, drops, rate",
+      "subgroup": "Network",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Идентификатор интерфейса. Связан с таблицей vds_interface через поле id",
+        "vds_id": "Хост-владелец. Связан с таблицей vds_static через поле vds_id",
+        "rx_rate": "Текущая скорость входящего трафика в bytes/sec",
+        "tx_rate": "Текущая скорость исходящего трафика в bytes/sec",
+        "rx_drop": "Количество dropped incoming packets",
+        "tx_drop": "Количество dropped outgoing packets",
+        "iface_status": "Статус интерфейса: 0=Up, 1=Down, 2=Unknown",
+        "rx_total": "Общий объем полученного трафика в bytes",
+        "tx_total": "Общий объем отправленного трафика в bytes",
+        "sample_time": "Время снятия метрики (double precision timestamp)"
+      },
+      "relations_doc": [
+        "→ vds_interface (через id): Статистика привязана к конкретному интерфейсу",
+        "→ vds_static (через vds_id): Хост-владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "host_nic_vfs_config": {
+      "name": "host_nic_vfs_config",
+      "summary": "Конфигурация SR-IOV Virtual Functions на физических картах хоста",
+      "subgroup": "Network",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор конфигурации VF",
+        "nic_id": "Физический NIC на котором настроены VF. Связан с таблицей vds_interface через поле id",
+        "is_all_networks_allowed": "Разрешено ли назначать любые сети на VF",
+        "_create_date": "Дата создания конфигурации",
+        "_update_date": "Дата последнего обновления"
+      },
+      "relations_doc": [
+        "→ vds_interface (через nic_id): Физический NIC с SR-IOV"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vds_kdump_status": {
+      "name": "vds_kdump_status",
+      "summary": "Статус настройки kdump на хосте для сбора дампов ядра при панике",
+      "subgroup": "Hardware & Config",
+      "key_fields": ["vds_id"],
+      "fields_doc": {
+        "vds_id": "Идентификатор хоста. Связан с таблицей vds_static через поле vds_id",
+        "status": "Статус kdump: Enabled, Disabled, Unknown",
+        "address": "Адрес назначения для дампа (NFS path или SSH target)"
+      },
+      "relations_doc": [
+        "→ vds_static (через vds_id): Хост с настройкой kdump"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vds_spm_id_map": {
+      "name": "vds_spm_id_map",
+      "summary": "Карта SPM ID. Определяет какой хост является Storage Pool Manager для пула",
+      "subgroup": "Hardware & Config",
+      "key_fields": ["storage_pool_id", "vds_id"],
+      "fields_doc": {
+        "storage_pool_id": "Идентификатор пула хранения. Связан с таблицей storage_pool через поле id",
+        "vds_spm_id": "SPM ID выданный этому хосту. Уникален в пределах пула",
+        "vds_id": "Хост выполняющий роль SPM. Связан с таблицей vds_static через поле vds_id"
+      },
+      "relations_doc": [
+        "→ storage_pool (через storage_pool_id): Пул хранения управляемый SPM",
+        "→ vds_static (через vds_id): Хост в роли SPM"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "host_device": {
+      "name": "host_device",
+      "summary": "Физические устройства хоста: PCI, USB, GPU. Для проброса в ВМ и SR-IOV",
+      "subgroup": "Hardware & Config",
+      "key_fields": ["host_id", "device_name"],
+      "fields_doc": {
+        "host_id": "Хост-владелец устройства. Связан с таблицей vds_static через поле vds_id",
+        "device_name": "Уникальное имя устройства в рамках хоста (обычно PCI адрес 0000:01:00.0)",
+        "parent_device_name": "Родительское устройство в дереве PCI",
+        "capability": "Тип capability устройства: pci, usb, scsi, net",
+        "iommu_group": "Номер IOMMU группы для изоляции устройств",
+        "product_name": "Название продукта устройства (NVIDIA Tesla T4)",
+        "product_id": "ID продукта (hex)",
+        "vendor_name": "Название вендора (NVIDIA Corporation)",
+        "vendor_id": "ID вендора (hex)",
+        "physfn": "Имя родительского PF для VF устройств SR-IOV",
+        "total_vfs": "Максимальное количество VF поддерживаемое устройством",
+        "vm_id": "ВМ которой проброшено устройство прямо сейчас. NULL если свободно. Связан с таблицей vm_static через поле vm_guid",
+        "net_iface_name": "Имя сетевого интерфейса если устройство типа net",
+        "driver": "Драйвер ядра используемый устройством",
+        "is_assignable": "Можно ли пробросить устройство в ВМ",
+        "address": "Полный PCI адрес устройства",
+        "mdev_types": "Типы mediated devices поддерживаемые устройством (для vGPU)",
+        "block_path": "Путь к блочному устройству если применимо",
+        "hostdev_spec_params": "Специфичные параметры устройства в XML/JSON формате"
+      },
+      "relations_doc": [
+        "→ vds_static (через host_id): Хост-владелец устройства",
+        "→ vm_static (через vm_id): ВМ которой проброшено устройство"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

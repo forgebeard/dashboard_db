@@ -1,0 +1,156 @@
+{
+  "group": "Диски и образы",
+  "tables": {
+    "base_disks": {
+      "name": "base_disks",
+      "summary": "Базовая информация о дисках: алиас, формат, тип интерфейса, shareable, backup policy",
+      "subgroup": "Core Disks",
+      "key_fields": ["disk_id"],
+      "fields_doc": {
+        "disk_id": "Уникальный идентификатор диска",
+        "disk_alias": "Имя диска отображаемое в UI",
+        "disk_description": "Описание назначения диска",
+        "wipe_after_delete": "Затирать ли данные при удалении (безопасное удаление)",
+        "propagate_errors": "Распространять ли ошибки IO на ВМ: On/Off",
+        "shareable": "Может ли диск быть подключен к нескольким ВМ одновременно",
+        "sgio": "SCSI Generic IO: 0=Unfiltered, 1=Filtered. Для прямого доступа к LUN",
+        "disk_storage_type": "Тип хранения: 0=Image, 1=LUN, 2=Cinder",
+        "cinder_volume_type": "Тип тома Cinder если disk_storage_type=Cinder",
+        "disk_content_type": "Содержимое: 0=Data, 1=ISO, 2=MemoryDump, 3=MemoryMetadata, 4=OvfStore",
+        "backup": "Политика бэкапа: None, Incremental, Full",
+        "backup_mode": "Режим бэкапа для инкрементальных копий"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "images": {
+      "name": "images",
+      "summary": "Физические файлы дисков на хранилище. Связаны с base_disks через цепочку снапшотов",
+      "subgroup": "Core Disks",
+      "key_fields": ["image_guid"],
+      "fields_doc": {
+        "image_guid": "Уникальный GUID образа (filename on storage)",
+        "creation_date": "Дата создания образа",
+        "size": "Виртуальный размер образа в байтах",
+        "it_guid": "ID шаблона образа (template image)",
+        "parentid": "Родительский образ в цепочке снапшотов. NULL для базового слоя",
+        "imagestatus": "Статус: 0=Locked, 1=Available, 2=Invalid",
+        "lastmodified": "Дата последнего изменения содержимого",
+        "vm_snapshot_id": "Снапшот ВМ к которому относится этот образ. Связан с таблицей snapshots через поле snapshot_id",
+        "volume_type": "Тип выделения: 1=Preallocated, 2=Sparse (Thin)",
+        "volume_format": "Формат файла: 1=RAW, 4=COW (QCOW2)",
+        "image_group_id": "Группа образов (логический диск). Связан с таблицей base_disks через поле disk_id",
+        "active": "Является ли этот образ активным (последним в цепочке)",
+        "volume_classification": "Классификация: 0=Base, 1=Snapshot, 2=Leaf",
+        "qcow_compat": "Версия совместимости QCOW2: 0=0.10, 1=1.1"
+      },
+      "relations_doc": [
+        "→ base_disks (через image_group_id): Логический диск",
+        "→ images (через parentid): Родительский слой в цепочке",
+        "→ snapshots (через vm_snapshot_id): Снапшот ВМ"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "disk_image_dynamic": {
+      "name": "disk_image_dynamic",
+      "summary": "Динамика образа: актуальный размер на диске, IOPS, latency, throughput",
+      "subgroup": "Core Disks",
+      "key_fields": ["image_id"],
+      "fields_doc": {
+        "image_id": "ID образа. Связан с таблицей images через поле image_guid",
+        "read_rate": "Текущая скорость чтения в bytes/sec",
+        "write_rate": "Текущая скорость записи в bytes/sec",
+        "actual_size": "Реальный размер файла на хранилище в байтах (для thin provisioning)",
+        "read_latency_seconds": "Средняя задержка чтения в секундах",
+        "write_latency_seconds": "Средняя задержка записи в секундах",
+        "flush_latency_seconds": "Средняя задержка flush операций",
+        "read_ops": "Количество операций чтения за интервал",
+        "write_ops": "Количество операций записи за интервал"
+      },
+      "relations_doc": [
+        "→ images (через image_id): Образ диска"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "disk_profiles": {
+      "name": "disk_profiles",
+      "summary": "Профили дисков: QoS-лимиты IOPS/throughput, привязка к домену хранения",
+      "subgroup": "Profiles & QoS",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор профиля",
+        "name": "Имя профиля диска",
+        "storage_domain_id": "Домен хранения к которому применим профиль. Связан с таблицей storage_domain_static через поле id",
+        "qos_id": "QoS-правила для этого профиля. Связан с таблицей qos через поле id",
+        "description": "Описание назначения профиля"
+      },
+      "relations_doc": [
+        "→ storage_domain_static (через storage_domain_id): Домен хранения",
+        "→ qos (через qos_id): Правила QoS"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "image_storage_domain_map": {
+      "name": "image_storage_domain_map",
+      "summary": "Маппинг образов на домены. Один диск может лежать на нескольких доменах (move/copy)",
+      "subgroup": "Mappings",
+      "key_fields": ["image_id", "storage_domain_id"],
+      "fields_doc": {
+        "image_id": "ID образа. Связан с таблицей images через поле image_guid",
+        "storage_domain_id": "Домен хранения. Связан с таблицей storage_domain_static через поле id",
+        "quota_id": "Квота потребляемая этим образом. Связан с таблицей quota через поле id",
+        "disk_profile_id": "Профиль диска применяемый к этому образу. Связан с таблицей disk_profiles через поле id"
+      },
+      "relations_doc": [
+        "→ images (через image_id): Образ диска",
+        "→ storage_domain_static (через storage_domain_id): Домен хранения",
+        "→ quota (через quota_id): Квота ресурсов",
+        "→ disk_profiles (через disk_profile_id): Профиль диска"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "disk_lun_map": {
+      "name": "disk_lun_map",
+      "summary": "Связь блочных дисков с физическими LUN. Только для direct-LUN дисков",
+      "subgroup": "Mappings",
+      "key_fields": ["disk_id", "lun_id"],
+      "fields_doc": {
+        "disk_id": "Логический диск. Связан с таблицей base_disks через поле disk_id",
+        "lun_id": "Физический LUN. Связан с таблицей luns через поле lun_id"
+      },
+      "relations_doc": [
+        "→ base_disks (через disk_id): Логический диск",
+        "→ luns (через lun_id): Физический LUN"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "disk_vm_element": {
+      "name": "disk_vm_element",
+      "summary": "Связь дисков с ВМ: порядок загрузки, тип интерфейса, кэширование, discard",
+      "subgroup": "Mappings",
+      "key_fields": ["disk_id", "vm_id"],
+      "fields_doc": {
+        "disk_id": "Диск подключаемый к ВМ. Связан с таблицей base_disks через поле disk_id",
+        "vm_id": "ВМ владелец. Связан с таблицей vm_static через поле vm_guid",
+        "is_boot": "Является ли диск загрузочным",
+        "disk_interface": "Тип контроллера: VirtIO, IDE, SATA, SPAPR_VSCSI",
+        "is_using_scsi_reservation": "Используется ли SCSI reservation (для clustered filesystems)",
+        "pass_discard": "Передавать ли TRIM/discard команды гостевой ОС на хранилище",
+        "disk_cache": "Режим кэширования: none, writethrough, writeback, directsync",
+        "disk_io": "Режим IO: native, threads, io_uring"
+      },
+      "relations_doc": [
+        "→ base_disks (через disk_id): Подключаемый диск",
+        "→ vm_static (через vm_id): ВМ владелец"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}

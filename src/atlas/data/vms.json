@@ -1,0 +1,443 @@
+{
+  "group": "Виртуальные машины",
+  "tables": {
+    "vm_static": {
+      "name": "vm_static",
+      "summary": "Статическая конфигурация ВМ: ресурсы, шаблон, политики миграции и загрузочные параметры",
+      "subgroup": "Core",
+      "key_fields": ["vm_guid"],
+      "fields_doc": {
+        "vm_guid": "Уникальный идентификатор ВМ. Главный ключ для всех таблиц динамики и статистики",
+        "vm_name": "Имя ВМ в интерфейсе. Должно быть уникальным в пределах кластера",
+        "mem_size_mb": "Настроенный объем RAM в МБ. Базовое значение до работы Balloon",
+        "max_memory_size_mb": "Максимальный объем RAM для HotPlug/Balloon. Если больше mem_size_mb, память можно добавлять на лету",
+        "num_of_sockets": "Количество виртуальных сокетов CPU",
+        "cpu_per_socket": "Количество ядер на сокет. Итоговое vCPU = sockets * cpu_per_socket * threads_per_cpu",
+        "threads_per_cpu": "Количество потоков на ядро (SMT/HyperThreading). Обычно 1 или 2",
+        "vmt_guid": "Идентификатор шаблона, от которого создана ВМ. Связан с таблицей vm_static через поле vm_guid. NULL для standalone-машин",
+        "cluster_id": "Кластер размещения. Определяет совместимость CPU и доступные сети. Связан с таблицей cluster через поле cluster_id",
+        "os": "Integer-код гостевой ОС из таблицы dwh_osinfo. Влияет на драйверы и оптимизации",
+        "vm_type": "Тип ВМ: 0=Server, 1=Desktop, 2=HighPerf. Влияет на дефолтные настройки SPICE/VNC",
+        "is_stateless": "Флаг бездисковой ВМ. При каждом старте диск сбрасывается к состоянию шаблона",
+        "is_run_once": "Флаг временных изменений. Параметры применяются один раз и сбрасываются после остановки",
+        "auto_startup": "Автозапуск ВМ при старте хоста или кластера (для HA-сценариев)",
+        "migration_support": "Режим миграции: 0=Disabled, 1=Manual, 2=Auto. Разрешает или запрещает live migration",
+        "is_delete_protected": "Защита от удаления. ВМ нельзя удалить через UI/API пока флаг активен",
+        "is_disabled": "Административная блокировка. ВМ нельзя запустить даже если она исправна",
+        "balloon_enabled": "Разрешает динамическое управление памятью через virtio-balloon",
+        "cpu_pinning": "Явная привязка vCPU к физическим ядрам хоста в формате 0;1;2-3. Отключает миграцию",
+        "sso_method": "Метод Single Sign-On: guest_agent через QGA или disabled",
+        "bios_type": "Тип BIOS: 0=SeaBIOS (Legacy), 1=OVMF (UEFI). Критично для Secure Boot",
+        "custom_emulated_machine": "Переопределение типа эмулируемой машины (q35, pc-i440fx) для тонкой настройки совместимости",
+        "lease_sd_id": "Домен хранения для lease-файла блокировки SAN. Связан с таблицей storage_domain_static через поле id",
+        "resume_behavior": "Поведение после сбоя хоста: AUTO_RESUME, KILL, LEAVE_ALONE. Политика HA"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер размещения и политик",
+        "→ vm_static (через vmt_guid): Родительский шаблон",
+        "→ storage_domain_static (через lease_sd_id): Домен для SAN-блокировок",
+        "→ providers (через provider_id): Внешний провайдер OpenStack/AWS если импортирована"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_dynamic": {
+      "name": "vm_dynamic",
+      "summary": "Runtime-состояние ВМ: текущий хост, статус, IP-адреса Guest Agent и параметры консоли",
+      "subgroup": "Core",
+      "key_fields": ["vm_guid"],
+      "fields_doc": {
+        "vm_guid": "Идентификатор ВМ. Связан с таблицей vm_static через поле vm_guid",
+        "status": "Integer-код состояния: 0=Down, 1=PoweringUp, 2=PoweringDown, 3=Up, 4=Paused, 5=Suspended, 7=MigratingFrom, 8=MigratingTo, 9=Unknown, 10=NotResponding, 11=WaitForLaunch, 12=RebootInProgress, 13=SavingState, 14=RestoringState, 15=ImageLocked",
+        "run_on_vds": "Хост где ВМ выполняется прямо сейчас. NULL если Down. Связан с таблицей vds_static через поле vds_id",
+        "migrating_to_vds": "Целевой хост миграции. Заполнен только во время live migration. Связан с таблицей vds_static через поле vds_id",
+        "vm_ip": "Основной IP-адрес ВМ. Получается от Guest Agent или DHCP lease",
+        "guest_cur_user_name": "Имя активного пользователя внутри гостевой ОС через QGA или Spice agent",
+        "exit_status": "Код завершения ВМ: 0=OK, 1=Error, 2=UserShutdown, 3=MigrateFailed, 4=Down, 5=Reboot",
+        "pause_status": "Причина паузы: 0=None, 1=EIO ошибка диска, 2=ENOSPC нет места, 3=EPERM, 4=Migration",
+        "console_user_id": "Пользователь подключенный к графической консоли SPICE/VNC. Связан с таблицей users через поле user_id",
+        "spice_port": "Порт SPICE-консоли на хосте. Используется для прямого подключения в обход Engine",
+        "vnc_port": "Порт VNC-консоли на хосте",
+        "qemu_guest_agent_status": "Статус QGA: 0=Disconnected, 1=Connected, 2=Unresponsive. Критичен для получения IP и freeze/snapshot",
+        "is_update_available": "Флаг доступного обновления конфигурации. ВМ требует перезапуска для применения изменений",
+        "volatile_run": "Флаг запуска без сохранения состояния для Stateless ВМ",
+        "downtime": "Допустимое время простоя при миграции в мс. Превышение приводит к abort migration"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_guid): Конфигурация ВМ",
+        "→ vds_static (через run_on_vds): Текущий хост выполнения",
+        "→ vds_static (через migrating_to_vds): Целевой хост миграции",
+        "→ users (через console_user_id): Активный пользователь консоли"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_statistics": {
+      "name": "vm_statistics",
+      "summary": "Агрегированная метрика производительности ВМ за последний интервал сбора",
+      "subgroup": "Core",
+      "key_fields": ["vm_guid"],
+      "fields_doc": {
+        "vm_guid": "Идентификатор ВМ. Связан с таблицей vm_static через поле vm_guid",
+        "usage_cpu_percent": "Утилизация CPU гостевой ОС в процентах. Учитывает steal time",
+        "usage_mem_percent": "Утилизация памяти гостевой ОС в процентах. Может отличаться от host-side из-за ballooning",
+        "usage_network_percent": "Утилизация сетевого интерфейса в процентах",
+        "disks_usage": "JSON-строка с утилизацией каждого диска: read/write IOPS и latency",
+        "guest_mem_buffered": "Объем буферизованной памяти в гостевой ОС в KB",
+        "guest_mem_cached": "Объем кэшированной памяти в гостевой ОС в KB",
+        "elapsed_time": "Время прошедшее с последнего сброса счетчиков в секундах. Для нормализации rates"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_guid): Статистика привязана к конфигурации ВМ"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_device": {
+      "name": "vm_device",
+      "summary": "Виртуальные устройства ВМ: диски, NIC, контроллеры со специфичными параметрами каждого девайса",
+      "subgroup": "Storage",
+      "key_fields": ["device_id", "vm_id"],
+      "fields_doc": {
+        "device_id": "Уникальный идентификатор устройства в рамках ВМ",
+        "vm_id": "ВМ-владелец устройства. Связан с таблицей vm_static через поле vm_guid",
+        "type": "Тип устройства: disk, interface, controller, graphics, watchdog, rng, sound, channel",
+        "device": "Подтип устройства: virtio, ide, scsi, e1000, virtio-scsi и другие",
+        "address": "PCI-адрес или путь в дереве устройств например 0x00000000,0x00,0x1f,0x0",
+        "spec_params": "XML или JSON со специфичными параметрами: размер диска, MAC, очередь SCSI",
+        "is_managed": "Управляется ли устройство движком true или добавлено вручную в libvirt false",
+        "is_plugged": "Подключено ли устройство к работающей ВМ. Статус hotplug",
+        "snapshot_id": "Снапшот к которому привязано устройство для disk-only snapshot. Связан с таблицей snapshots через поле snapshot_id",
+        "host_device": "Имя физического устройства хоста для PCI passthrough например 0000:01:00.0"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): ВМ-владелец устройства",
+        "→ snapshots (через snapshot_id): Снапшот для disk-only снимков"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_interface": {
+      "name": "vm_interface",
+      "summary": "Сетевые интерфейсы ВМ (vNIC): MAC-адрес, профиль сети, статус синхронизации",
+      "subgroup": "Network",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор vNIC",
+        "vm_guid": "ВМ-владелец интерфейса. Связан с таблицей vm_static через поле vm_guid",
+        "mac_addr": "MAC-адрес интерфейса. Выдается из mac_pool или задан вручную",
+        "name": "Имя интерфейса в ВМ: eth0, ens3 и тому подобное",
+        "vnic_profile_id": "Профиль сети с QoS, фильтрами и port mirroring. Связан с таблицей vnic_profiles через поле id",
+        "linked": "Логическая связь с сетью кластера. Если false интерфейс отключен от логической сети",
+        "synced": "Синхронизирован ли интерфейс с хостом. False означает pending change",
+        "speed": "Скорость интерфейса в Mbps. 0 означает auto/negotiated"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_guid): ВМ-владелец",
+        "→ vnic_profiles (через vnic_profile_id): Профиль сетевых настроек"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_interface_statistics": {
+      "name": "vm_interface_statistics",
+      "summary": "Счетчики трафика vNIC: RX/TX bytes, drops, rate",
+      "subgroup": "Network",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Идентификатор vNIC. Связан с таблицей vm_interface через поле id",
+        "rx_rate": "Текущая скорость входящего трафика в bytes/sec",
+        "tx_rate": "Текущая скорость исходящего трафика в bytes/sec",
+        "rx_drop": "Количество dropped incoming packets",
+        "tx_drop": "Количество dropped outgoing packets",
+        "rx_total": "Общий объем полученного трафика в bytes. Монотонно растет",
+        "tx_total": "Общий объем отправленного трафика в bytes",
+        "iface_status": "Статус интерфейса: 0=Up, 1=Down, 2=Unknown"
+      },
+      "relations_doc": [
+        "→ vm_interface (через id): Статистика привязана к конкретному vNIC"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_interface_filter_parameters": {
+      "name": "vm_interface_filter_parameters",
+      "summary": "Параметры фильтрации трафика для конкретного vNIC (nwfilter rules)",
+      "subgroup": "Network",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор параметра фильтра",
+        "vm_interface_id": "Идентификатор vNIC. Связан с таблицей vm_interface через поле id",
+        "name": "Имя параметра фильтра (например allowed-ips-mac, dhcp-server-ip-address)",
+        "value": "Значение параметра фильтра"
+      },
+      "relations_doc": [
+        "→ vm_interface (через vm_interface_id): vNIC к которому применен фильтр"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_guest_agent_interfaces": {
+      "name": "vm_guest_agent_interfaces",
+      "summary": "Реальные сетевые интерфейсы гостевой ОС полученные через QGA. Отличаются от vNIC конфигом",
+      "subgroup": "Network",
+      "key_fields": ["vm_id", "interface_name"],
+      "fields_doc": {
+        "vm_id": "ВМ-владелец. Связан с таблицей vm_static через поле vm_guid",
+        "interface_name": "Имя интерфейса в guest OS: ens3, eth0",
+        "mac_address": "Реальный MAC-адрес. Может отличаться от configured из-за bonding/team",
+        "ipv4_addresses": "JSON-массив IPv4 адресов с масками",
+        "ipv6_addresses": "JSON-массив IPv6 адресов"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): ВМ-владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_init": {
+      "name": "vm_init",
+      "summary": "Параметры Cloud-Init и Sysprep: hostname, SSH-ключи, сеть, пароли. Применяются при первом старте",
+      "subgroup": "Config",
+      "key_fields": ["vm_id"],
+      "fields_doc": {
+        "vm_id": "Идентификатор ВМ. One-to-one связь с таблицей vm_static через поле vm_guid",
+        "host_name": "Hostname гостевой ОС",
+        "authorized_keys": "SSH public keys для root/user разделенные новой строкой",
+        "regenerate_keys": "Перегенерировать SSH host keys при первом старте для безопасности",
+        "dns_servers": "Список DNS-серверов через запятую",
+        "networks": "JSON или YAML конфигурация сетей гостевой ОС",
+        "password": "Пароль root или administrator. Хранится в plaintext",
+        "winkey": "Product key для активации Windows",
+        "custom_script": "Shell или Batch скрипт для post-install настройки",
+        "cloud_init_network_protocol": "Протокол инициализации сети: NoCloud, ConfigDrive2, OpenStackMetadata"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): Параметры инициализации конкретной ВМ"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_external_data": {
+      "name": "vm_external_data",
+      "summary": "Внешние метаданные ВМ: TPM данные и attestation info от внешних провайдеров",
+      "subgroup": "Config",
+      "key_fields": ["device_id", "vm_id"],
+      "fields_doc": {
+        "device_id": "Устройство к которому привязаны данные. Связан с таблицей vm_device через поле device_id",
+        "vm_id": "ВМ-владелец. Связан с таблицей vm_static через поле vm_guid",
+        "tpm_data": "Данные TPM: PCR values, quotes. Для remote attestation",
+        "tpm_hash": "SHA256 хэш TPM данных для верификации целостности"
+      },
+      "relations_doc": [
+        "→ vm_device (через device_id): Устройство с внешними данными",
+        "→ vm_static (через vm_id): ВМ-владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_host_pinning_map": {
+      "name": "vm_host_pinning_map",
+      "summary": "Жесткая привязка ВМ к хосту. Запрещает миграцию и scheduling на другие хосты",
+      "subgroup": "Config",
+      "key_fields": ["vm_id", "vds_id"],
+      "fields_doc": {
+        "vm_id": "Идентификатор закрепленной ВМ. Связан с таблицей vm_static через поле vm_guid",
+        "vds_id": "Единственный разрешенный хост. Связан с таблицей vds_static через поле vds_id"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): Закрепленная ВМ",
+        "→ vds_static (через vds_id): Единственный хост размещения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_vds_numa_node_map": {
+      "name": "vm_vds_numa_node_map",
+      "summary": "Привязка NUMA-узлов ВМ к NUMA-узлам хоста для оптимизации memory locality",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор маппинга",
+        "vm_numa_node_id": "Идентификатор NUMA-узла ВМ. Связан с таблицей numa_node через поле numa_node_id",
+        "vds_numa_node_index": "Индекс NUMA-узла хоста (0, 1...). Соответствует топологии хоста"
+      },
+      "relations_doc": [
+        "→ numa_node (через vm_numa_node_id): NUMA-узел ВМ"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_pool_map": {
+      "name": "vm_pool_map",
+      "summary": "Членство ВМ в пуле",
+      "subgroup": "Config",
+      "key_fields": ["vm_guid"],
+      "fields_doc": {
+        "vm_guid": "Идентификатор ВМ в пуле. Связан с таблицей vm_static через поле vm_guid",
+        "vm_pool_id": "Пул-владелец. Связан с таблицей vm_pools через поле vm_pool_id"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_guid): ВМ в пуле",
+        "→ vm_pools (через vm_pool_id): Пул-владелец"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_pools": {
+      "name": "vm_pools",
+      "summary": "Пулы ВМ: Stateless и Prestarted. Группа идентичных ВМ из одного шаблона",
+      "subgroup": "Config",
+      "key_fields": ["vm_pool_id"],
+      "fields_doc": {
+        "vm_pool_id": "Уникальный идентификатор пула",
+        "vm_pool_name": "Имя пула",
+        "vm_pool_type": "Тип пула: 0=Manual, 1=Automatic с авто-стартом при подключении пользователя",
+        "prestarted_vms": "Количество заранее запущенных ВМ в пуле для мгновенного старта",
+        "max_assigned_vms_per_user": "Лимит одновременных назначений на одного пользователя",
+        "cluster_id": "Кластер размещения пула. Связан с таблицей cluster через поле cluster_id",
+        "stateful": "Флаг stateful пула. Если false ВМ сбрасываются после logout (VDI scenario)",
+        "is_being_destroyed": "Флаг удаления пула. ВМ помечены для уничтожения"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster_id): Кластер размещения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_groups": {
+      "name": "vm_groups",
+      "summary": "Логические группы ВМ для массовых операций, RBAC и placement policies",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор группы",
+        "name": "Имя группы",
+        "description": "Описание назначения группы"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "vm_backup_disk_map": {
+      "name": "vm_backup_disk_map",
+      "summary": "Диски включенные в задачу бэкапа",
+      "subgroup": "Storage",
+      "key_fields": ["backup_id", "disk_id"],
+      "fields_doc": {
+        "backup_id": "Идентификатор задачи бэкапа. Связан с таблицей vm_backups через поле backup_id",
+        "disk_id": "Идентификатор диска для копирования. Связан с таблицей base_disks через поле disk_id",
+        "backup_url": "URL назначения для этого диска если отличается от дефолтного"
+      },
+      "relations_doc": [
+        "→ vm_backups (через backup_id): Задача бэкапа",
+        "→ base_disks (через disk_id): Копируемый диск"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_backups": {
+      "name": "vm_backups",
+      "summary": "Задачи резервного копирования ВМ: фазы, типы, привязка к чекпоинтам",
+      "subgroup": "Storage",
+      "key_fields": ["backup_id"],
+      "fields_doc": {
+        "backup_id": "Уникальный идентификатор задачи бэкапа",
+        "vm_id": "Идентификатор копируемой ВМ. Связан с таблицей vm_static через поле vm_guid",
+        "from_checkpoint_id": "Начальный чекпоинт для инкрементального бэкапа. Связан с таблицей vm_checkpoints через поле checkpoint_id",
+        "to_checkpoint_id": "Конечный чекпоинт. Связан с таблицей vm_checkpoints через поле checkpoint_id",
+        "phase": "Фаза бэкапа: Starting, InProgress, Finished, Failed",
+        "is_live_backup": "Флаг live backup без остановки ВМ. Требует QGA и поддержку чекпоинтов",
+        "host_id": "Хост выполняющий backup для distributed backup. Связан с таблицей vds_static через поле vds_id"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): Копируемая ВМ",
+        "→ vm_checkpoints (через from_checkpoint_id): Стартовый чекпоинт",
+        "→ vm_checkpoints (через to_checkpoint_id): Финальный чекпоинт"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_checkpoint_disk_map": {
+      "name": "vm_checkpoint_disk_map",
+      "summary": "Маппинг дисков в чекпоинте: какие диски включены в снимок",
+      "subgroup": "Storage",
+      "key_fields": ["checkpoint_id", "disk_id"],
+      "fields_doc": {
+        "checkpoint_id": "Идентификатор чекпоинта. Связан с таблицей vm_checkpoints через поле checkpoint_id",
+        "disk_id": "Идентификатор диска включенного в чекпоинт. Связан с таблицей base_disks через поле disk_id"
+      },
+      "relations_doc": [
+        "→ vm_checkpoints (через checkpoint_id): Чекпоинт",
+        "→ base_disks (через disk_id): Диск в снимке"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_ovf_generations": {
+      "name": "vm_ovf_generations",
+      "summary": "Версии OVF-конфигурации ВМ для экспорта и импорта. Хранятся на storage pool",
+      "subgroup": "Storage",
+      "key_fields": ["vm_guid"],
+      "fields_doc": {
+        "vm_guid": "ВМ-владелец. Связан с таблицей vm_static через поле vm_guid",
+        "storage_pool_id": "Пул хранения где лежит OVF. Связан с таблицей storage_pool через поле id",
+        "ovf_generation": "Версия генерации OVF. Инкрементируется при каждом изменении конфига",
+        "ovf_data": "Полный XML OVF-документ. Содержит всю конфигурацию ВМ для portable export"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_guid): ВМ-владелец",
+        "→ storage_pool (через storage_pool_id): Пул хранения OVF"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_icons": {
+      "name": "vm_icons",
+      "summary": "Кастомные иконки ВМ в формате PNG/SVG base64. Отображаются в UI вместо дефолтных",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор иконки",
+        "data_url": "Base64-encoded изображение в формате data:image/png;base64,..."
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
+    },
+    "vm_icon_defaults": {
+      "name": "vm_icon_defaults",
+      "summary": "Маппинг типов ОС на иконки по умолчанию",
+      "subgroup": "Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор маппинга",
+        "os_id": "Integer-код ОС. Соответствует полю os в таблице vm_static",
+        "small_icon_id": "Иконка 16x16 для списков. Связан с таблицей vm_icons через поле id",
+        "large_icon_id": "Иконка 64x64 для детального просмотра. Связан с таблицей vm_icons через поле id"
+      },
+      "relations_doc": [
+        "→ vm_icons (через small_icon_id): Маленькая иконка",
+        "→ vm_icons (через large_icon_id): Большая иконка"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "vm_nvram_data": {
+      "name": "vm_nvram_data",
+      "summary": "Данные NVRAM (UEFI variables) для ВМ с UEFI boot. Сохраняются между рестартами",
+      "subgroup": "Config",
+      "key_fields": ["vm_id"],
+      "fields_doc": {
+        "vm_id": "One-to-one связь с ВМ. Связан с таблицей vm_static через поле vm_guid",
+        "nvram_data": "Binary blob UEFI variables: Secure Boot keys, boot order",
+        "nvram_hash": "SHA256 хэш nvram_data для верификации целостности"
+      },
+      "relations_doc": [
+        "→ vm_static (через vm_id): ВМ с UEFI boot"
+      ],
+      "columns": [],
+      "relations": []
+    }
+  }
+}
