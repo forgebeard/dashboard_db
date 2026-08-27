@@ -1,12 +1,34 @@
 # src/app.py
 """Точка входа Streamlit: подключение к дампу и ленивый рендер одного раздела."""
 
+import logging
 import os
 import sys
+from pathlib import Path
 
 import streamlit as st
 
+# streamlit run src/app.py: корень пакетов — каталог src/
 sys.path.append(os.path.dirname(__file__))
+
+
+def _configure_logging() -> None:
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    log_dir = Path(__file__).resolve().parent.parent / "logs"
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_dir / "app.log", encoding="utf-8"))
+    except OSError:
+        pass
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        handlers=handlers,
+        force=True,
+    )
+
+
+_configure_logging()
 
 from core.config import APP_TITLE, APP_LAYOUT, FONT_SIZE_CSS
 from core.db_utils import get_available_databases
@@ -92,11 +114,11 @@ def _render_section(section_id: str, db_name: str, cluster_meta: dict) -> None:
         st.divider()
         render_gluster_diagnostics(db_name)
     elif section_id == "tasks":
-        render_tasks_list(db_name)
+        render_tasks_list(db_name, cluster_meta)
         st.divider()
         render_tasks_diagnostics(db_name)
     elif section_id == "audit":
-        render_audit_log(db_name)
+        render_audit_log(db_name, cluster_meta)
         st.divider()
         render_audit_diagnostics(db_name)
     elif section_id == "cert":

@@ -162,7 +162,8 @@ docker compose logs -f  :: Смотреть логи
 ├── start.sh                    # Интерактивный запуск и настройка (Linux/macOS)
 ├── start.bat                   # Интерактивный запуск и настройка (Windows)
 ├── .env.example                # Шаблон переменных окружения
-├── requirements.txt            # Зависимости Python
+├── requirements.txt            # Runtime-зависимости Python
+├── requirements-dev.txt        # pytest, ruff (не ставятся в Docker-образ)
 │
 └── src/
     ├── app.py                  # Точка входа: маршрутизация вкладок

@@ -84,3 +84,21 @@ def test_load_cluster_metadata_empty_db(mock_db_dependencies):
     assert result['clusters'] == {}
     assert result['hosts'] == {}
     mock_db_dependencies["engine"].dispose.assert_not_called()
+
+
+def test_build_infra_filter_maps_from_cluster_meta():
+    from core.data_loader import build_infra_filter_maps
+
+    maps = build_infra_filter_maps(
+        {
+            "datacenters": {"dc-1": "DC_PROD"},
+            "clusters": {"cl-1": "Cluster_A"},
+            "hosts": {"h-1": "Host_A"},
+            "dc_to_clusters": {"dc-1": ["cl-1"]},
+            "cluster_to_hosts": {"cl-1": ["h-1"]},
+        }
+    )
+    assert maps["dc_id_to_name"] == {"dc-1": "DC_PROD"}
+    assert maps["cluster_to_hosts"] == {"cl-1": ["h-1"]}
+    assert maps["host_to_vms"] == {}
+    assert maps["vm_id_to_name"] == {}

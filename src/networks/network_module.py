@@ -5,30 +5,15 @@
 с инспектором для глубокого анализа конкретной сети.
 """
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
-import pandas as pd         # Работа с табличными данными и подготовка DataFrame для отображения
-from sqlalchemy import text # Безопасное формирование параметризованных SQL-запросов
+import streamlit as st
+import pandas as pd
+from sqlalchemy import text
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os                   # Доступ к переменным окружения и путям файловой системы
-import sys                  # Управление путями поиска модулей (sys.path)
-
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Добавляем корень src/ в путь поиска
-from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
-from core.ui_utils import fix_uuid_columns       # Функция конвертации UUID-объектов в строки для UI
+from core.db_utils import get_sqlalchemy_engine
+from core.ui_utils import fix_uuid_columns
 
 def render_networks_list(active_db, cluster_meta):
-    
-    # Загружаем имена Дата-центров (Storage Pools) напрямую
-    dc_map = {}
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df_dcs = pd.read_sql("SELECT id::text, name FROM storage_pool", engine)
-        dc_map = dict(zip(df_dcs['id'], df_dcs['name']))
-    except Exception as e:
-        st.warning(f"Не удалось загрузить список ДЦ: {e}")
+    dc_map = {str(k): v for k, v in (cluster_meta or {}).get("datacenters", {}).items()}
 
     # --- ФИЛЬТРЫ ---
     col_dc, col_search = st.columns([1, 2])

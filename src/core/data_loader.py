@@ -150,3 +150,32 @@ def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
                 f"SD={len(metadata.get('storage_domains', {}))}")
                 
     return metadata
+
+
+def build_infra_filter_maps(cluster_meta: dict) -> dict[str, dict | list]:
+    """
+    Справочники фильтров UI из уже загруженного cluster_meta.
+    Не ходит в БД (в отличие от load_audit_infrastructure_maps / load_host_infrastructure_maps).
+    """
+    meta = cluster_meta or {}
+
+    def _str_map(raw: dict) -> dict[str, str]:
+        return {str(k): v for k, v in (raw or {}).items() if k is not None}
+
+    def _str_list_map(raw: dict) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
+        for key, values in (raw or {}).items():
+            if key is None:
+                continue
+            result[str(key)] = [str(v) for v in (values or []) if v is not None]
+        return result
+
+    return {
+        "dc_id_to_name": _str_map(meta.get("datacenters", {})),
+        "cluster_id_to_name": _str_map(meta.get("clusters", {})),
+        "host_id_to_name": _str_map(meta.get("hosts", {})),
+        "dc_to_clusters": _str_list_map(meta.get("dc_to_clusters", {})),
+        "cluster_to_hosts": _str_list_map(meta.get("cluster_to_hosts", {})),
+        "host_to_vms": {},
+        "vm_id_to_name": {},
+    }

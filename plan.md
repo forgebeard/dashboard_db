@@ -4,22 +4,22 @@ overview: "Поэтапный ремонт RED Virt Analytics: сначала б
 todos:
   - id: p1-docker-dispose
     content: localhost bind + убрать engine.dispose и поправить тесты
-    status: pending
+    status: completed
   - id: p2-readonly-sql
     content: PG read-only session + фильтр/LIMIT в SQL-редакторе
-    status: pending
+    status: completed
   - id: p3-lazy-nav
     content: Рендер одного раздела; подключить network_diagnostics
-    status: pending
+    status: completed
   - id: p4-table-preview
     content: Общий table_preview вместо копипасты диагностики
-    status: pending
+    status: completed
   - id: p5-inspectors
     content: Перевести оставшиеся inspector_sql на InspectorBase
-    status: pending
+    status: completed
   - id: p6-cleanup
     content: Метаданные, sys.path, requirements, логи, тесты
-    status: pending
+    status: completed
 isProject: false
 ---
 

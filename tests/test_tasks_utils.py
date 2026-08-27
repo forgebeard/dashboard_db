@@ -157,63 +157,58 @@ class TestTaskInspector:
         dt = datetime(2024, 5, 1, 10, 30, 0)
         assert _fmt_date(dt) == "01.05.2024 10:30:00"
 
-    @patch.dict(os.environ, {"DB_USER": "u", "DB_PASSWORD": "p", "DB_HOST": "localhost"})
-    @patch('tasks.task_inspector_sql.psycopg2.connect')
-    def test_report_task_not_found(self, mock_connect):
+    @patch("tasks.task_inspector_sql.InspectorBase")
+    def test_report_task_not_found(self, mock_ib):
         """Задача не найдена -> возврат error dict."""
-        mock_conn = MagicMock()
-        mock_cur = MagicMock()
-        mock_cur.fetchone.return_value = None
-        mock_conn.cursor.return_value = mock_cur
-        mock_connect.return_value = mock_conn
-        
+        mock_insp = MagicMock()
+        mock_insp.fetch_one.return_value = None
+        mock_ib.return_value.__enter__.return_value = mock_insp
+
         result = get_task_inspector_report("db", "non-existent-id")
-        
+
         assert "error" in result
         assert "не найдена" in result["error"].lower()
-        mock_conn.close.assert_called_once()
 
-    @patch.dict(os.environ, {"DB_USER": "u", "DB_PASSWORD": "p", "DB_HOST": "localhost"})
-    @patch('tasks.task_inspector_sql.psycopg2.connect')
-    def test_report_success_with_audit_logs(self, mock_connect):
+    @patch("tasks.task_inspector_sql.InspectorBase")
+    def test_report_success_with_audit_logs(self, mock_ib):
         """Успешная генерация отчета с сопутствующими событиями."""
-        mock_conn = MagicMock()
-        mock_cur = MagicMock()
-        
-        # Данные задачи
         task_data = {
-            'task_id': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-            'action_type': 100, 'status': 1, 'result': 0,
-            'started_at': datetime(2024, 6, 15, 12, 0, 0),
-            'storage_pool_id': 'sp-uuid', 'task_type': 'VDSM',
-            'vdsm_task_id': 'vdsm-uuid', 'root_command_id': 'cmd-uuid',
-            'user_id': 'user-uuid', 'command_type': 'CreateSnapshot',
-            'cmd_status': 1, 'created_at': datetime(2024, 6, 15, 11, 59, 0),
-            'command_parameters': '{"vmId": "123"}', 'data': None
+            "task_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "action_type": 100,
+            "status": 1,
+            "result": 0,
+            "started_at": datetime(2024, 6, 15, 12, 0, 0),
+            "storage_pool_id": "sp-uuid",
+            "task_type": "VDSM",
+            "vdsm_task_id": "vdsm-uuid",
+            "root_command_id": "cmd-uuid",
+            "user_id": "user-uuid",
+            "command_type": "CreateSnapshot",
+            "cmd_status": 1,
+            "created_at": datetime(2024, 6, 15, 11, 59, 0),
+            "command_parameters": '{"vmId": "123"}',
+            "data": None,
         }
-        
-        # Данные аудита
         audit_logs = [
             {
-                'log_time': datetime(2024, 6, 15, 12, 0, 30),
-                'log_type_name': 'USER_CREATE_SNAPSHOT',
-                'vm_name': 'TestVM', 'vds_name': 'Host1', 'message': 'Started'
+                "log_time": datetime(2024, 6, 15, 12, 0, 30),
+                "log_type_name": "USER_CREATE_SNAPSHOT",
+                "vm_name": "TestVM",
+                "vds_name": "Host1",
+                "message": "Started",
             }
         ]
-        
-        mock_cur.fetchone.return_value = task_data
-        mock_cur.fetchall.return_value = audit_logs
-        mock_conn.cursor.return_value = mock_cur
-        mock_connect.return_value = mock_conn
-        
+        mock_insp = MagicMock()
+        mock_insp.fetch_one.return_value = task_data
+        mock_insp.fetch_all.return_value = audit_logs
+        mock_ib.return_value.__enter__.return_value = mock_insp
+
         result = get_task_inspector_report("db", "aaaa...")
-        
+
         assert "report_text" in result
         report = result["report_text"]
         assert "TASK-INSPECTOR" in report
         assert "CreateSnapshot" in report
         assert "USER_CREATE_SNAPSHOT" in report
         assert "TestVM" in report
-        assert "... (данные обрезаны)" not in report  # Параметры короткие
-        
-        mock_conn.close.assert_called_once()
+        assert "... (данные обрезаны)" not in report

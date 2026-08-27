@@ -15,10 +15,8 @@ from .audit_utils import (
     fetch_audit_logs                 # Выполнение параметризованного SQL-запроса к audit_log
 )
 
-def render_audit_log(active_db):
-    
-    # Загружаем только справочники для Хостов и Кластеров (ВМ будем искать текстом)
-    maps = load_audit_infrastructure_maps(active_db)
+def render_audit_log(active_db, cluster_meta=None):
+    maps = load_audit_infrastructure_maps(active_db, cluster_meta)
     
     # --- СТРОКА 1: ФИЛЬТРЫ ИНФРАСТРУКТУРЫ И ПОИСК ---
     c1, c2, c3, c4 = st.columns([1, 1, 2, 1])
@@ -107,4 +105,4 @@ def render_audit_log(active_db):
     
     # Экспорт
     csv = show_df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 Скачать CSV", csv, f"audit_{datetime.now():%Y%m%d}.csv", mime="text/csv")
+    st.download_button("Скачать CSV", csv, f"audit_{datetime.now():%Y%m%d}.csv", mime="text/csv")

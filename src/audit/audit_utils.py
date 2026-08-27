@@ -1,96 +1,49 @@
 # src/audit/audit_utils.py
 """
 Утилиты для работы с журналом событий (Audit Log).
-Отвечает за: загрузку связей инфраструктуры, построение SQL-запросов 
-и кэшированную выборку данных аудита.
 """
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os               # Доступ к переменным окружения и путям файловой системы
-import sys              # Управление путями поиска модулей (sys.path)
+import pandas as pd
+from sqlalchemy import text
+import streamlit as st
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import pandas as pd     # Работа с табличными данными и выполнение SQL-запросов
-from sqlalchemy import text  # Безопасное формирование параметризованных SQL-запросов
-import streamlit as st  # Фреймворк UI (используется для кэширования @st.cache_data и вывода ошибок)
+from core.db_utils import get_sqlalchemy_engine
+from core.data_loader import build_infra_filter_maps
 
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Добавляем корень src/ в путь поиска
-from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
+def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
+    """Справочники фильтров: из cluster_meta, без полного скана audit_log."""
+    if cluster_meta:
+        return build_infra_filter_maps(cluster_meta)
 
-def load_audit_infrastructure_maps(active_db):
-    """Загружает маппинги ДЦ, Кластеров, Хостов и ВМ для каскадных фильтров."""
-    maps = {
-        "dc_to_clusters": {},
-        "cluster_to_hosts": {},
-        "host_to_vms": {},
-        "dc_id_to_name": {},
-        "cluster_id_to_name": {},
-        "host_id_to_name": {},
-        "vm_id_to_name": {}
-    }
-    
+    maps = build_infra_filter_maps({})
     try:
         engine = get_sqlalchemy_engine(active_db)
-        
-        # 1. DC -> Cluster & Names
         df_dc_cl = pd.read_sql(text("""
-            SELECT sp.id::text as dc_id, sp.name as dc_name, 
+            SELECT sp.id::text as dc_id, sp.name as dc_name,
                    c.cluster_id::text as cl_id, c.name as cl_name
             FROM storage_pool sp
             LEFT JOIN cluster c ON sp.id = c.storage_pool_id
         """), engine)
-        
         for _, r in df_dc_cl.iterrows():
-            # Защита от None
-            dc_name = str(r['dc_name']) if r['dc_name'] else f"DC-{str(r['dc_id'])[:8]}"
-            cl_name = str(r['cl_name']) if r['cl_name'] else f"Cluster-{str(r['cl_id'])[:8]}"
-            
-            maps["dc_id_to_name"][r['dc_id']] = dc_name
-            maps["cluster_id_to_name"][r['cl_id']] = cl_name
-            
-            if r['cl_id']:
-                maps["dc_to_clusters"].setdefault(r['dc_id'], []).append(r['cl_id'])
-                
-        # 2. Cluster -> Host & Names
+            dc_name = str(r["dc_name"]) if r["dc_name"] else f"DC-{str(r['dc_id'])[:8]}"
+            cl_name = str(r["cl_name"]) if r["cl_name"] else f"Cluster-{str(r['cl_id'])[:8]}"
+            maps["dc_id_to_name"][r["dc_id"]] = dc_name
+            maps["cluster_id_to_name"][r["cl_id"]] = cl_name
+            if r["cl_id"]:
+                maps["dc_to_clusters"].setdefault(r["dc_id"], []).append(r["cl_id"])
+
         df_cl_host = pd.read_sql(text("""
             SELECT c.cluster_id::text as cl_id, v.vds_id::text as h_id, v.vds_name as h_name
             FROM cluster c
             LEFT JOIN vds_static v ON c.cluster_id = v.cluster_id
         """), engine)
-        
         for _, r in df_cl_host.iterrows():
-            # ЗАЩИТА ОТ NONE: Если имени нет, генерируем заглушку
-            host_name = str(r['h_name']) if r['h_name'] else f"Host-{str(r['h_id'])[:8]}"
-            
-            maps["host_id_to_name"][r['h_id']] = host_name
-            
-            if r['h_id']:
-                maps["cluster_to_hosts"].setdefault(r['cl_id'], []).append(r['h_id'])
-                
-        # 3. Host -> VMs (из audit_log)
-        df_h_vm = pd.read_sql(text("""
-            SELECT DISTINCT vds_id::text as h_id, vm_id::text as vm_id, vm_name 
-            FROM audit_log 
-            WHERE vds_id IS NOT NULL AND vm_id IS NOT NULL 
-              AND vds_id != '00000000-0000-0000-0000-000000000000'
-              AND vm_name IS NOT NULL
-        """), engine)
-        
-        for _, r in df_h_vm.iterrows():
-            vm_name = str(r['vm_name']) if r['vm_name'] else f"VM-{str(r['vm_id'])[:8]}"
-            maps["vm_id_to_name"][r['vm_id']] = vm_name
-            
-            if r['h_id']:
-                maps["host_to_vms"].setdefault(r['h_id'], set()).add(r['vm_id'])
-                
-        # Превращаем sets в sorted lists для UI
-        for k, v in maps["host_to_vms"].items():
-            maps["host_to_vms"][k] = sorted(list(v))
-
+            host_name = str(r["h_name"]) if r["h_name"] else f"Host-{str(r['h_id'])[:8]}"
+            maps["host_id_to_name"][r["h_id"]] = host_name
+            if r["h_id"]:
+                maps["cluster_to_hosts"].setdefault(r["cl_id"], []).append(r["h_id"])
     except Exception as e:
         st.warning(f"Не удалось загрузить связи для журнала: {e}")
-        
     return maps
 
 @st.cache_data(ttl=60)

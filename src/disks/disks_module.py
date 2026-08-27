@@ -4,17 +4,10 @@
 Отвечает за: отрисовку фильтров, таблицы дисков и взаимодействие с инспектором.
 """
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
-import pandas as pd         # Работа с табличными данными
-from sqlalchemy import text # Безопасное формирование SQL-запросов
+import streamlit as st
+import pandas as pd
+from sqlalchemy import text
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os                   # Доступ к переменным окружения
-import sys                  # Управление путями поиска модулей
-
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-sys.path.append(os.path.dirname(__file__))
 from core.db_utils import get_sqlalchemy_engine
 from core.ui_utils import fix_uuid_columns
 from disks.disks_utils import process_disks_dataframe

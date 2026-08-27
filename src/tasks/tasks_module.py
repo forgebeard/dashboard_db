@@ -16,10 +16,8 @@ from .task_inspector_sql import get_task_inspector_report  # Генерация 
 from core.db_utils import get_sqlalchemy_engine                 # Утилита создания подключений к PostgreSQL
 from audit.audit_utils import load_audit_infrastructure_maps  # Загрузка связей инфраструктуры для каскадных фильтров
 
-def render_tasks_list(active_db):
-    
-    # Загружаем карты инфраструктуры для фильтров
-    maps = load_audit_infrastructure_maps(active_db)
+def render_tasks_list(active_db, cluster_meta=None):
+    maps = load_audit_infrastructure_maps(active_db, cluster_meta)
     
     # --- СТРОКА 1: ФИЛЬТРЫ ИНФРАСТРУКТУРЫ ---
     c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
@@ -164,7 +162,7 @@ def render_tasks_list(active_db):
         
         # Экспорт
         csv = show_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Скачать CSV", csv, f"tasks_{datetime.now():%Y%m%d}.csv", mime="text/csv")
+        st.download_button("Скачать CSV", csv, f"tasks_{datetime.now():%Y%m%d}.csv", mime="text/csv")
         
         # --- ИНСПЕКТОР ---
         if event.selection.rows:

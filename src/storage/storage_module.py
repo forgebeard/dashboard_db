@@ -4,20 +4,13 @@
 Отвечает за: отрисовку фильтров, таблицы доменов и взаимодействие с инспектором.
 """
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
-import pandas as pd         # Работа с табличными данными и подготовка DataFrame для отображения
-from sqlalchemy import text # Безопасное формирование параметризованных SQL-запросов
+import streamlit as st
+import pandas as pd
+from sqlalchemy import text
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os                   # Доступ к переменным окружения и путям файловой системы
-import sys                  # Управление путями поиска модулей (sys.path)
-
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-sys.path.append(os.path.dirname(__file__))  # Добавляем текущую директорию в путь поиска
-from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
-from core.ui_utils import fix_uuid_columns       # Функция конвертации UUID-объектов в строки для UI
-from storage.storage_utils import load_storage_maps  # Загрузка связей ДЦ/Кластеры/Хосты для фильтрации хранилищ
+from core.db_utils import get_sqlalchemy_engine
+from core.ui_utils import fix_uuid_columns
+from storage.storage_utils import load_storage_maps
 from core.constants import (
     STORAGE_DOMAIN_TYPE_MAP,  # Справочник типов доменов хранения (Data, ISO, Export...)
     STORAGE_TYPE_MAP,         # Справочник физических подключений (NFS, iSCSI, FCP...)
@@ -25,8 +18,12 @@ from core.constants import (
 )
 
 def render_storage_list(active_db, cluster_meta):
-    # --- ЗАГРУЗКА МАППИНГОВ ---
-    dc_id_to_name, dc_names_set = load_storage_maps(active_db)
+    dc_id_to_name = {
+        str(k): v for k, v in (cluster_meta or {}).get("datacenters", {}).items()
+    }
+    dc_names_set = set(dc_id_to_name.values())
+    if not dc_id_to_name:
+        dc_id_to_name, dc_names_set = load_storage_maps(active_db)
 
     # --- СТРОКА 1: ФИЛЬТРЫ ---
     col_dc, col_search = st.columns([1, 3])

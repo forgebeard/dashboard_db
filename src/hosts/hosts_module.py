@@ -10,9 +10,8 @@ import pandas as pd     # Работа с табличными данными и
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
 from hosts.hosts_utils import (
-    load_host_infrastructure_maps,  # Загрузка связей ДЦ/Кластеры для каскадных фильтров хостов
-    fetch_hosts_data,               # Выполнение SQL-запроса к хостам с учетом выбранных фильтров
-    process_host_dataframe          # Обработка сырого DataFrame: статусы, имена, фильтрация проблемных
+    fetch_hosts_data,
+    process_host_dataframe,
 )
 
 def render_hosts_list(active_db, cluster_meta):
@@ -20,9 +19,12 @@ def render_hosts_list(active_db, cluster_meta):
     
     # Приводим ключи к строкам для надежности
     clusters = {str(k): v for k, v in clusters_raw.items()}
-    
-    # --- ЗАГРУЗКА ДОПОЛНИТЕЛЬНЫХ СВЯЗЕЙ ИЗ БД ---
-    dc_to_clusters, dc_id_to_name, dc_names_set = load_host_infrastructure_maps(active_db)
+    dc_id_to_name = {str(k): v for k, v in cluster_meta.get("datacenters", {}).items()}
+    dc_to_clusters = {
+        str(k): [str(x) for x in v]
+        for k, v in cluster_meta.get("dc_to_clusters", {}).items()
+    }
+    dc_names_set = set(dc_id_to_name.values())
 
     # --- СТРОКА 1: ФИЛЬТРЫ ---
     col_dc, col_cl, col_search, col_prob = st.columns([1, 1, 2, 1])
@@ -88,7 +90,7 @@ def render_hosts_list(active_db, cluster_meta):
         
     with col_btn:
         csv = display_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Скачать CSV", csv, "hosts_list.csv", "text/csv", key='download-hosts-csv', use_container_width=True)
+        st.download_button("Скачать CSV", csv, "hosts_list.csv", "text/csv", key="download-hosts-csv", width="stretch")
 
     # --- ТАБЛИЦА ХОСТОВ ---
     def status_color(val):

@@ -1,23 +1,14 @@
 # src/hosts/hosts_utils.py
 """
 Утилиты для работы с данными Хостов.
-Отвечает за: загрузку связей инфраструктуры, построение SQL-запросов 
-и подготовку DataFrame для отображения.
 """
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os               # Доступ к переменным окружения и путям файловой системы
-import sys              # Управление путями поиска модулей (sys.path)
+import pandas as pd
+from sqlalchemy import text
+import streamlit as st
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import pandas as pd     # Работа с табличными данными и выполнение SQL-запросов
-from sqlalchemy import text  # Безопасное формирование параметризованных SQL-запросов
-import streamlit as st  # Фреймворк UI (используется для вывода ошибок/предупреждений при загрузке)
-
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))  # Добавляем корень src/ в путь поиска
-from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
-from core.constants import HOST_STATUS_MAP       # Глобальный справочник статусов хостов (код -> читаемое название)
+from core.db_utils import get_sqlalchemy_engine
+from core.constants import HOST_STATUS_MAP
 
 def load_host_infrastructure_maps(active_db):
     """Загружает маппинги ДЦ и Кластеров для фильтрации хостов."""
