@@ -87,9 +87,7 @@ def load_audit_infrastructure_maps(active_db):
         # Превращаем sets в sorted lists для UI
         for k, v in maps["host_to_vms"].items():
             maps["host_to_vms"][k] = sorted(list(v))
-            
-        engine.dispose()
-        
+
     except Exception as e:
         st.warning(f"Не удалось загрузить связи для журнала: {e}")
         
@@ -139,8 +137,7 @@ def fetch_audit_logs(active_db, filters, limit_val):
     try:
         engine = get_sqlalchemy_engine(active_db)
         df = pd.read_sql(text(sql), engine, params=params)
-        engine.dispose()
-        
+
         if not df.empty:
             df['log_time'] = pd.to_datetime(df['log_time']).dt.strftime('%d.%m.%Y %H:%M:%S')
         return df

@@ -26,7 +26,6 @@ def render_networks_list(active_db, cluster_meta):
     try:
         engine = get_sqlalchemy_engine(active_db)
         df_dcs = pd.read_sql("SELECT id::text, name FROM storage_pool", engine)
-        engine.dispose()
         dc_map = dict(zip(df_dcs['id'], df_dcs['name']))
     except Exception as e:
         st.warning(f"Не удалось загрузить список ДЦ: {e}")
@@ -73,7 +72,6 @@ def render_networks_list(active_db, cluster_meta):
         # Используем text() для безопасности и передачи параметров
         query = text(base_sql)
         df = pd.read_sql(query, engine, params=sql_params if sql_params else None)
-        engine.dispose()
     except Exception as e:
         st.error(f"Ошибка загрузки сетей: {e}")
         return

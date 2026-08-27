@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 DB_SCHEMA = "public"              # Схема по умолчанию для oVirt Engine
 CONNECT_TIMEOUT = 10              # Таймаут соединения в секундах
 ENGINE_CACHE_MAXSIZE = 8          # Максимум кэшированных движков (для локальных дампов достаточно)
+# Сессия PostgreSQL только на чтение (диагностика дампов, без DML).
+PG_READ_ONLY_OPTIONS = "-c default_transaction_read_only=on"
 
 
 def get_db_params(db_name: str | None = None) -> dict[str, str | int]:
@@ -51,7 +53,14 @@ def get_db_params(db_name: str | None = None) -> dict[str, str | int]:
         "dbname": db_name or os.getenv("DB_NAME", "postgres"),
         "user": os.getenv("DB_USER", "postgres"),
         "password": password,
+        "options": PG_READ_ONLY_OPTIONS,
     }
+
+
+def get_psycopg2_connect_kwargs(db_name: str | None = None) -> dict:
+    """Параметры psycopg2.connect: те же, что get_db_params, плюс таймаут."""
+    params = get_db_params(db_name)
+    return {**params, "connect_timeout": CONNECT_TIMEOUT}
 
 
 @st.cache_resource(max_entries=ENGINE_CACHE_MAXSIZE)
@@ -62,6 +71,7 @@ def get_sqlalchemy_engine(db_name: str):
     Используется st.cache_resource вместо lru_cache для корректной интеграции 
     с жизненным циклом Streamlit (очистка при рестарте сервера).
     Имя БД нормализуется к нижнему регистру для предотвращения дублирования кэша.
+    Возвращённый Engine нельзя dispose(): это уничтожит общий пул для всего приложения.
     
     Args:
         db_name: Имя базы данных (дампа)
@@ -88,10 +98,13 @@ def get_sqlalchemy_engine(db_name: str):
     
     return create_engine(
         db_url,
-        pool_pre_ping=True,           # Проверка живости соединения перед каждым запросом
-        connect_args={"connect_timeout": CONNECT_TIMEOUT},  # Явный таймаут подключения
-        pool_size=5,                    # Размер пула соединений
-        max_overflow=10                 # Максимум дополнительных соединений
+        pool_pre_ping=True,
+        connect_args={
+            "connect_timeout": CONNECT_TIMEOUT,
+            "options": PG_READ_ONLY_OPTIONS,
+        },
+        pool_size=5,
+        max_overflow=10,
     )
 
 
@@ -107,8 +120,8 @@ def get_available_databases() -> list[str]:
     
     for sys_db in system_dbs:
         try:
-            params = get_db_params(sys_db)
-            with psycopg2.connect(**params, connect_timeout=CONNECT_TIMEOUT) as conn:
+            params = get_psycopg2_connect_kwargs(sys_db)
+            with psycopg2.connect(**params) as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT datname FROM pg_database 

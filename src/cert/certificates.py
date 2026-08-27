@@ -1,15 +1,8 @@
 # src/cert/certificates.py
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine
-import os
 
-def get_engine(db_name):
-    user = os.getenv('DB_USER', 'postgres')
-    password = os.getenv('DB_PASSWORD')
-    host = os.getenv('DB_HOST', 'localhost')
-    port = os.getenv('DB_PORT', '5432')
-    return create_engine(f"postgresql://{user}:{password}@{host}:{port}/{db_name}")
+from core.db_utils import get_sqlalchemy_engine
 
 def render_certificates(db_name):
     st.header("Мониторинг сертификатов")
@@ -31,9 +24,8 @@ def render_certificates(db_name):
     """
 
     try:
-        engine = get_engine(db_name)
+        engine = get_sqlalchemy_engine(db_name)
         df = pd.read_sql_query(query, engine)
-        engine.dispose()
 
         if df.empty:
             st.info("Сертификаты не найдены.")

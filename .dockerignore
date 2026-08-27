@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.envrc
+.venv
+__pycache__
+*.pyc
+logs/
+tests/
+README.md
+start.sh
+start.bat
+docker-compose.yml
+.dockerignore

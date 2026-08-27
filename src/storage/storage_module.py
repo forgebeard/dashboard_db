@@ -91,7 +91,6 @@ def render_storage_list(active_db, cluster_meta):
     try:
         engine = get_sqlalchemy_engine(active_db)
         raw_df = pd.read_sql(text(base_sql), engine, params=params if params else None)
-        engine.dispose()
     except Exception as e:
         st.error(f"Ошибка загрузки хранилищ: {e}")
         return

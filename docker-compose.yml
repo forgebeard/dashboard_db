@@ -1,0 +1,21 @@
+services:
+  ovirt-analyzer:
+    build: .
+    container_name: ovirt-dump-analyzer
+    restart: unless-stopped
+    ports:
+      # Только loopback хоста: с LAN дашборд недоступен.
+      # Внутри контейнера Streamlit слушает 0.0.0.0:8501 (см. .streamlit/config.toml).
+      - "127.0.0.1:8502:8501"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./src:/app/src
+      - ./.streamlit:/app/.streamlit
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

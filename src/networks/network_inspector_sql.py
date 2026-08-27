@@ -5,13 +5,12 @@
 с кластерами, профилями vNIC и физическими интерфейсами хостов.
 """
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os               # Доступ к переменным окружения (DB_USER, DB_PASSWORD и др.)
-from datetime import datetime  # Работа с датой/временем для форматирования отчетов
+from datetime import datetime
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import psycopg2         # Драйвер PostgreSQL для прямого подключения к БД
-from psycopg2.extras import RealDictCursor  # Курсор, возвращающий строки как словари (удобно для доступа по имени колонки)
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+from core.db_utils import get_psycopg2_connect_kwargs
 
 def _fmt_date(dt):
     if not dt: return "—"
@@ -19,16 +18,8 @@ def _fmt_date(dt):
     return naive_dt.strftime('%d.%m.%Y %H:%M:%S')
 
 def get_network_inspector_report(db_name: str, network_id: str) -> str:
-    conn_params = {
-        "dbname": db_name,
-        "user": os.getenv("DB_USER"),
-        "password": os.getenv("DB_PASSWORD"),
-        "host": os.getenv("DB_HOST", "localhost"),
-        "port": os.getenv("DB_PORT", "5432"),
-    }
-
     try:
-        conn = psycopg2.connect(**conn_params)
+        conn = psycopg2.connect(**get_psycopg2_connect_kwargs(db_name))
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         # 1. Основная информация о сети

@@ -59,11 +59,13 @@ def render_tasks_list(active_db):
 
     # --- ЛОГИКА КОСВЕННОЙ ФИЛЬТРАЦИИ ЧЕРЕЗ AUDIT_LOG ---
     allowed_correlation_ids = None
+    filters_applied = False
     
     # Если выбран Хост или ВМ, пытаемся найти связанные correlation_id
     host_id = next((k for k,v in maps["host_id_to_name"].items() if v == sel_host), None)
     
     if host_id or search_vm:
+        filters_applied = True
         audit_sql = "SELECT DISTINCT correlation_id FROM audit_log WHERE correlation_id IS NOT NULL AND deleted = false"
         audit_params = {}
         
@@ -85,11 +87,11 @@ def render_tasks_list(active_db):
         try:
             engine_temp = get_sqlalchemy_engine(active_db)
             df_corr = pd.read_sql(text(audit_sql), engine_temp, params=audit_params)
-            engine_temp.dispose()
-            if not df_corr.empty:
-                allowed_correlation_ids = df_corr['correlation_id'].tolist()
+            # Присваиваем список даже если он пуст, чтобы корректно отработал фильтр AND 1=0
+            allowed_correlation_ids = df_corr['correlation_id'].tolist() if not df_corr.empty else []
         except Exception:
-            pass # Если не удалось связать, показываем все задачи
+            # При ошибке БД сбрасываем фильтры, чтобы показать хоть что-то
+            allowed_correlation_ids = None
 
     # --- ОСНОВНОЙ ЗАПРОС К ASYNC_TASKS ---
     sql = """
@@ -132,8 +134,7 @@ def render_tasks_list(active_db):
     try:
         engine = get_sqlalchemy_engine(active_db)
         df = pd.read_sql(text(sql), engine, params=params)
-        engine.dispose()
-        
+
         if df.empty:
             st.info("Задач не найдено по заданным критериям.")
             return

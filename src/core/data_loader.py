@@ -84,70 +84,65 @@ def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
     
     engine: Engine = get_sqlalchemy_engine(db_name)
     metadata: dict[str, dict | list] = {}
-    
+
+    # 1. Кластеры
+    metadata['clusters'] = _safe_load_dict(
+        engine, 
+        "SELECT cluster_id::text, COALESCE(name, 'Unknown') as name FROM cluster",
+        'cluster_id', 'name'
+    )
+
+    # 2. Хранилища (Storage Domains)
+    metadata['storage_domains'] = _safe_load_dict(
+        engine, 
+        "SELECT id::text, COALESCE(storage_name, 'Unknown') as storage_name FROM storage_domain_static",
+        'id', 'storage_name'
+    )
+
+    # 3. Хосты (VDS)
+    metadata['hosts'] = _safe_load_dict(
+        engine, 
+        "SELECT vds_id::text, COALESCE(vds_name, 'Unknown') as vds_name FROM vds_static",
+        'vds_id', 'vds_name'
+    )
+
+    # 4. Дата-центры (Storage Pools)
+    metadata['datacenters'] = _safe_load_dict(
+        engine, 
+        "SELECT id::text, COALESCE(name, 'Unknown') as name FROM storage_pool",
+        'id', 'name'
+    )
+
+    # 5. Связи: ДЦ -> Кластеры
     try:
-        # 1. Кластеры
-        metadata['clusters'] = _safe_load_dict(
-            engine, 
-            "SELECT cluster_id::text, COALESCE(name, 'Unknown') as name FROM cluster",
-            'cluster_id', 'name'
+        df_dc_cl = pd.read_sql(
+            text("SELECT storage_pool_id::text as spid, cluster_id::text as cid FROM cluster"),
+            engine
         )
+        dc_to_clusters: dict[str, list[str]] = {}
+        if not df_dc_cl.empty:
+            for _, row in df_dc_cl.iterrows():
+                dc_to_clusters.setdefault(row['spid'], []).append(row['cid'])
+        metadata['dc_to_clusters'] = dc_to_clusters
+    except Exception as e:
+        logger.warning(f"Ошибка загрузки связей ДЦ->Кластеры: {e}")
+        metadata['dc_to_clusters'] = {}
 
-        # 2. Хранилища (Storage Domains)
-        metadata['storage_domains'] = _safe_load_dict(
-            engine, 
-            "SELECT id::text, COALESCE(storage_name, 'Unknown') as storage_name FROM storage_domain_static",
-            'id', 'storage_name'
+    # 6. Связи: Кластер -> Хосты
+    try:
+        df_cl_h = pd.read_sql(
+            text("SELECT cluster_id::text as cid, vds_id::text as vid FROM vds_static"),
+            engine
         )
+        cluster_to_hosts: dict[str, list[str]] = {}
+        if not df_cl_h.empty:
+            for _, row in df_cl_h.iterrows():
+                cluster_to_hosts.setdefault(row['cid'], []).append(row['vid'])
+        metadata['cluster_to_hosts'] = cluster_to_hosts
+    except Exception as e:
+        logger.warning(f"Ошибка загрузки связей Кластер->Хосты: {e}")
+        metadata['cluster_to_hosts'] = {}
 
-        # 3. Хосты (VDS)
-        metadata['hosts'] = _safe_load_dict(
-            engine, 
-            "SELECT vds_id::text, COALESCE(vds_name, 'Unknown') as vds_name FROM vds_static",
-            'vds_id', 'vds_name'
-        )
-
-        # 4. Дата-центры (Storage Pools)
-        metadata['datacenters'] = _safe_load_dict(
-            engine, 
-            "SELECT id::text, COALESCE(name, 'Unknown') as name FROM storage_pool",
-            'id', 'name'
-        )
-
-        # 5. Связи: ДЦ -> Кластеры
-        try:
-            df_dc_cl = pd.read_sql(
-                text("SELECT storage_pool_id::text as spid, cluster_id::text as cid FROM cluster"),
-                engine
-            )
-            dc_to_clusters: dict[str, list[str]] = {}
-            if not df_dc_cl.empty:
-                for _, row in df_dc_cl.iterrows():
-                    dc_to_clusters.setdefault(row['spid'], []).append(row['cid'])
-            metadata['dc_to_clusters'] = dc_to_clusters
-        except Exception as e:
-            logger.warning(f"Ошибка загрузки связей ДЦ->Кластеры: {e}")
-            metadata['dc_to_clusters'] = {}
-
-        # 6. Связи: Кластер -> Хосты
-        try:
-            df_cl_h = pd.read_sql(
-                text("SELECT cluster_id::text as cid, vds_id::text as vid FROM vds_static"),
-                engine
-            )
-            cluster_to_hosts: dict[str, list[str]] = {}
-            if not df_cl_h.empty:
-                for _, row in df_cl_h.iterrows():
-                    cluster_to_hosts.setdefault(row['cid'], []).append(row['vid'])
-            metadata['cluster_to_hosts'] = cluster_to_hosts
-        except Exception as e:
-            logger.warning(f"Ошибка загрузки связей Кластер->Хосты: {e}")
-            metadata['cluster_to_hosts'] = {}
-            
-    finally:
-        # Гарантированное освобождение ресурсов даже при ошибке
-        engine.dispose()
-        
     logger.info(f"Метаданные для '{db_name}' загружены: "
                 f"DC={len(metadata.get('datacenters', {}))}, "
                 f"Clusters={len(metadata.get('clusters', {}))}, "

@@ -5,15 +5,15 @@
 Все SQL-запросы используют только подтвержденные имена столбцов из information_schema.
 """
 
-# --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os               # Доступ к переменным окружения (DB_USER, DB_PASSWORD и др.)
-from datetime import datetime  # Работа с датой/временем для форматирования
-import html             # Экранирование спецсимволов для безопасности отчета
-import json             # Парсинг JSONB свойств пользователя
+from datetime import datetime
+import html
+import json
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
 import psycopg2         # Драйвер PostgreSQL для прямого подключения к БД
-from psycopg2.extras import RealDictCursor  # Курсор, возвращающий строки как словари
+from psycopg2.extras import RealDictCursor
+
+from core.db_utils import get_psycopg2_connect_kwargs
 
 
 def _safe_text(value: str | None) -> str:
@@ -35,17 +35,9 @@ def get_user_inspector_report(db_name: str, user_id: str) -> dict:
         Словарь с ключами: report_text, nav_data, error (при неудаче)
     """
     uid_search = str(user_id).strip().lower()
-    
-    conn_params = {
-        "dbname": db_name,
-        "user": os.getenv("DB_USER"),
-        "password": os.getenv("DB_PASSWORD"),
-        "host": os.getenv("DB_HOST", "localhost"),
-        "port": os.getenv("DB_PORT", "5432"),
-    }
 
     try:
-        with psycopg2.connect(**conn_params) as conn:
+        with psycopg2.connect(**get_psycopg2_connect_kwargs(db_name)) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 now_naive = datetime.now().replace(tzinfo=None)
 

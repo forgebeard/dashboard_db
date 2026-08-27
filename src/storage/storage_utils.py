@@ -32,7 +32,6 @@ def load_storage_maps(active_db):
         for _, row in df_dcs.iterrows():
             dc_id_to_name[row['dc_id']] = row['dc_name']
             dc_names_set.add(row['dc_name'])
-        engine.dispose()
     except Exception as e:
         st.warning(f"Не удалось загрузить связи ДЦ: {e}")
         
@@ -62,14 +61,18 @@ def process_storage_dataframe(df):
     
     df['free_gb'] = (total_gb - used_gb).round(0)
 
-    display_df = df[[
-        'storage_name', 'sd_id', 'domain_type_label', 'storage_type_label', 
-        'status_label', 'dc_name', 'used_pct', 'available_disk_size', 'free_gb'
-    ]].copy()
-    
-    display_df.columns = [
-        'Имя домена', 'UUID', 'Тип домена', 'Тип хранилища', 
-        'Статус', 'Дата-центр', 'Заполнено (%)', 'Всего (ГБ)', 'Свободно (ГБ)'
-    ]
+    # ВАЖНО: Используем приведенные total_gb/used_gb, а не сырые колонки
+    # чтобы избежать отображения мусора ('not_a_number') в UI
+    display_df = pd.DataFrame({
+        'Имя домена': df['storage_name'],
+        'UUID': df['sd_id'],
+        'Тип домена': df['domain_type_label'],
+        'Тип хранилища': df['storage_type_label'],
+        'Статус': df['status_label'],
+        'Дата-центр': df['dc_name'],
+        'Заполнено (%)': df['used_pct'],
+        'Всего (ГБ)': total_gb.round(0),      # Берем очищенное значение
+        'Свободно (ГБ)': df['free_gb']
+    })
     
     return display_df

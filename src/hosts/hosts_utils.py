@@ -44,8 +44,6 @@ def load_host_infrastructure_maps(active_db):
         for _, row in df_dcs.iterrows():
             dc_id_to_name[row['dc_id']] = row['dc_name']
             dc_names_set.add(row['dc_name'])
-            
-        engine.dispose()
     except Exception as e:
         st.warning(f"Не удалось загрузить связи инфраструктуры хостов: {e}")
         
@@ -99,7 +97,6 @@ def fetch_hosts_data(active_db, filters, clusters, dc_id_to_name):
     try:
         engine = get_sqlalchemy_engine(active_db)
         df = pd.read_sql(text(base_sql), engine, params=sql_params if sql_params else None)
-        engine.dispose()
         return df
     except Exception as e:
         st.error(f"Ошибка загрузки хостов: {e}")
