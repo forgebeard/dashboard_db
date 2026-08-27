@@ -27,7 +27,8 @@ def test_process_host_dataframe_basic():
         'status_code': [3, 4],  # 3=Up, 4=Maintenance (пример)
         'vm_active': [5, None], # None должен стать 0
         'cluster_id': ['c1', 'c2'],
-        'storage_pool_id': ['dc1', 'dc2']
+        'storage_pool_id': ['dc1', 'dc2'],
+        'is_spm': [True, False],
     })
     
     clusters = {'c1': 'Cluster-One', 'c2': 'Cluster-Two'}
@@ -36,27 +37,49 @@ def test_process_host_dataframe_basic():
     result = process_host_dataframe(df, clusters, dc_map, show_problems=False)
     
     # Проверка колонок
-    assert list(result.columns) == ['Имя хоста', 'FQDN', 'ID', 'Статус', 'Активные ВМ', 'Кластер', 'Дата-центр']
+    assert list(result.columns) == [
+        'Имя хоста', 'FQDN', 'ID', 'Статус', '_status_code',
+        'SPM', 'Активные ВМ', 'Кластер', 'Дата-центр',
+    ]
     
     # Проверка данных
     row1 = result.iloc[0]
     assert row1['Имя хоста'] == 'host1'
-    assert row1['Статус'] == '3 (Up)'  # Предполагаем, что 3 есть в HOST_STATUS_MAP
+    assert row1['Статус'] == 'Up'
+    assert row1['_status_code'] == 3
     assert row1['Активные ВМ'] == 5
     assert row1['Кластер'] == 'Cluster-One'
     assert row1['Дата-центр'] == 'DC-One'
+    assert row1['SPM'] == 'SPM'
     
     row2 = result.iloc[1]
     assert row2['Активные ВМ'] == 0  # None -> 0
-    assert row2['Статус'].startswith('4 (') # Статус 4 должен быть обработан
+    assert row2['Статус'] == 'NonResponsive'
+    assert row2['SPM'] == '—'
 
-def test_process_host_dataframe_filter_problems():
-    """Тест фильтрации только проблемных хостов."""
+
+def test_process_host_dataframe_health_filter_maintenance():
     df = pd.DataFrame({
         'vds_id': ['h1', 'h2', 'h3'],
-        'vds_name': ['up_host', 'maint_host', 'down_host'],
+        'vds_name': ['up_host', 'nr_host', 'maint_host'],
         'fqdn': ['f1', 'f2', 'f3'],
-        'status_code': [3, 4, 2], # 3=Up, остальные - проблемы
+        'status_code': [3, 4, 2],
+        'vm_active': [1, 0, 0],
+        'cluster_id': ['c1', 'c1', 'c1'],
+        'storage_pool_id': ['dc1', 'dc1', 'dc1'],
+    })
+    result = process_host_dataframe(
+        df, {'c1': 'C1'}, {'dc1': 'DC1'}, health_filter="maintenance"
+    )
+    assert list(result['Имя хоста']) == ['maint_host']
+
+def test_process_host_dataframe_filter_problems():
+    """Maintenance не считается проблемой; в фильтр попадают только problem-статусы."""
+    df = pd.DataFrame({
+        'vds_id': ['h1', 'h2', 'h3'],
+        'vds_name': ['up_host', 'nr_host', 'maint_host'],
+        'fqdn': ['f1', 'f2', 'f3'],
+        'status_code': [3, 4, 2],  # Up, NonResponsive, Maintenance
         'vm_active': [1, 0, 0],
         'cluster_id': ['c1', 'c1', 'c1'],
         'storage_pool_id': ['dc1', 'dc1', 'dc1']
@@ -67,11 +90,10 @@ def test_process_host_dataframe_filter_problems():
     
     result = process_host_dataframe(df, clusters, dc_map, show_problems=True)
     
-    # Должны остаться только h2 и h3 (статусы != 3)
-    assert len(result) == 2
+    assert len(result) == 1
+    assert result.iloc[0]['Имя хоста'] == 'nr_host'
+    assert 'maint_host' not in result['Имя хоста'].values
     assert 'up_host' not in result['Имя хоста'].values
-    assert 'maint_host' in result['Имя хоста'].values
-    assert 'down_host' in result['Имя хоста'].values
 
 def test_process_host_dataframe_empty():
     """Тест пустого DataFrame."""
@@ -106,6 +128,9 @@ def test_fetch_hosts_data_no_filters(mock_get_engine, mock_read_sql):
     # Точнее: если условий нет, WHERE не добавляется вообще в коде: if conditions: base_sql += " WHERE ..."
     # Значит WHERE не должно быть
     assert "WHERE" not in sql_text
+    assert "is_spm" in sql_text
+    assert "spm_vds_id" in sql_text
+    assert "storage_pool" in sql_text
 
 @patch("hosts.hosts_utils.pd.read_sql")
 @patch("hosts.hosts_utils.get_sqlalchemy_engine")

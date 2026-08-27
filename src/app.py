@@ -60,29 +60,41 @@ from users.users_module import render_users_list
 from users.users_diagnostics import render_users_diagnostics
 from atlas.atlas_module import render_schema_atlas
 
-# id -> подпись. Иконки Material Symbols (не эмодзи).
-SECTIONS: list[tuple[str, str]] = [
-    ("hosts", ":material/dns: Хосты"),
-    ("vms", ":material/computer: Виртуальные машины"),
-    ("snapshots", ":material/photo_camera: Снапшоты"),
-    ("clusters", ":material/hub: Кластеры"),
-    ("networks", ":material/lan: Сети"),
-    ("storage", ":material/storage: Хранилища"),
-    ("disks", ":material/hard_drive: Диски и образы"),
-    ("gluster", ":material/grid_view: Gluster"),
-    ("tasks", ":material/pending_actions: Задачи"),
-    ("audit", ":material/history: Журнал событий"),
-    ("cert", ":material/key: Сертификаты"),
-    ("system", ":material/settings: Системные"),
-    ("users", ":material/group: Пользователи и права"),
-    ("atlas", ":material/menu_book: Справочник"),
+# Разделы с собственным page header (фаза A).
+_SHELL_SECTIONS = frozenset({"hosts", "vms"})
+
+SECTIONS: list[tuple[str, str, str]] = [
+    ("hosts", "Хосты", ":material/dns:"),
+    ("vms", "Виртуальные машины", ":material/computer:"),
+    ("snapshots", "Снапшоты", ":material/photo_camera:"),
+    ("clusters", "Кластеры", ":material/hub:"),
+    ("networks", "Сети", ":material/lan:"),
+    ("storage", "Хранилища", ":material/storage:"),
+    ("disks", "Диски и образы", ":material/hard_drive:"),
+    ("gluster", "Gluster", ":material/grid_view:"),
+    ("tasks", "Задачи", ":material/pending_actions:"),
+    ("audit", "Журнал событий", ":material/history:"),
+    ("cert", "Сертификаты", ":material/key:"),
+    ("system", "Системные", ":material/settings:"),
+    ("users", "Пользователи и права", ":material/group:"),
+    ("atlas", "Справочник", ":material/menu_book:"),
 ]
-SECTION_IDS = [item[0] for item in SECTIONS]
 SECTION_LABELS = {item[0]: item[1] for item in SECTIONS}
+
+NAV_GROUPS: dict[str, list[str]] = {
+    "Инфраструктура": ["hosts", "vms", "snapshots", "clusters"],
+    "Хранение и сеть": ["networks", "storage", "disks", "gluster"],
+    "Операции": ["tasks", "audit"],
+    "Система": ["cert", "system", "users"],
+    "Справочник": ["atlas"],
+}
 
 
 def _render_section(section_id: str, db_name: str, cluster_meta: dict) -> None:
     """Вызывает UI только выбранного раздела (диагностика рядом, если есть)."""
+    if section_id not in _SHELL_SECTIONS:
+        st.subheader(SECTION_LABELS[section_id])
+
     if section_id == "hosts":
         render_hosts_list(db_name, cluster_meta)
         st.divider()
@@ -133,6 +145,34 @@ def _render_section(section_id: str, db_name: str, cluster_meta: dict) -> None:
         render_schema_atlas()
 
 
+def _make_section_page(section_id: str, icon: str):
+    def _page() -> None:
+        st.session_state["section"] = section_id
+        db_name = st.session_state.get("active_db")
+        if not db_name:
+            st.error("База данных не выбрана.")
+            return
+        try:
+            _render_section(
+                section_id,
+                db_name,
+                st.session_state.get("cluster_meta", {}),
+            )
+        except Exception as exc:
+            st.error(f"Ошибка при отрисовке раздела «{SECTION_LABELS[section_id]}»: {exc}")
+            st.exception(exc)
+
+    _page.__name__ = f"page_{section_id}"
+    _page.__qualname__ = f"page_{section_id}"
+    return st.Page(
+        _page,
+        title=SECTION_LABELS[section_id],
+        icon=icon,
+        url_path=section_id,
+        default=section_id == "hosts",
+    )
+
+
 st.set_page_config(page_title=APP_TITLE, layout=APP_LAYOUT)
 
 st.markdown(
@@ -168,37 +208,16 @@ if st.session_state.get("active_db") != selected_db:
 
 active_display_db = st.session_state.get("active_db", selected_db)
 st.sidebar.markdown(f"Текущая БД: `{active_display_db}`")
+st.sidebar.caption("READ ONLY")
 
-meta = st.session_state.get("cluster_meta", {})
-if meta:
-    with st.sidebar.expander("Инфраструктура", expanded=True):
-        st.markdown(f"Хостов: **{len(meta.get('hosts', {}))}**")
-        st.markdown(f"Кластеров: **{len(meta.get('clusters', {}))}**")
-        st.markdown(f"СХД: **{len(meta.get('storage_domains', {}))}**")
-        st.markdown(f"Дата-центров: **{len(meta.get('datacenters', {}))}**")
-
-st.sidebar.divider()
-selected_section = st.sidebar.radio(
-    "Раздел",
-    options=SECTION_IDS,
-    format_func=lambda section_id: SECTION_LABELS[section_id],
-    key="section_selector",
-)
+icon_by_id = {item[0]: item[2] for item in SECTIONS}
+nav_spec = {
+    group: [_make_section_page(section_id, icon_by_id[section_id]) for section_id in ids]
+    for group, ids in NAV_GROUPS.items()
+}
+page = st.navigation(nav_spec, position="sidebar")
 
 with st.expander("SQL-редактор", expanded=False):
     render_global_sql(active_display_db)
 
-st.subheader(SECTION_LABELS[selected_section])
-
-if not active_display_db:
-    st.error("База данных не выбрана.")
-else:
-    try:
-        _render_section(
-            selected_section,
-            active_display_db,
-            st.session_state.get("cluster_meta", {}),
-        )
-    except Exception as e:
-        st.error(f"Ошибка при отрисовке раздела «{SECTION_LABELS[selected_section]}»: {e}")
-        st.exception(e)
+page.run()

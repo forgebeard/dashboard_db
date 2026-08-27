@@ -1,23 +1,29 @@
 # src/hosts/hosts_module.py
-"""
-Модуль отображения списка хостов oVirt Engine (UI).
-Отвечает за: отрисовку фильтров, таблицы и взаимодействие с инспектором.
-"""
+"""Список хостов: фильтры, сводка, таблица и текстовый инспектор."""
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st  # Фреймворк для построения веб-интерфейса дашборда
-import pandas as pd     # Работа с табличными данными и подготовка DataFrame для отображения
+import streamlit as st
 
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-from hosts.hosts_utils import (
-    fetch_hosts_data,
-    process_host_dataframe,
+from core.constants import host_health_counts, host_status_tone
+from core.ui_utils import (
+    dataframe_height,
+    filters_are_active,
+    render_clear_filters_button,
+    render_health_filter,
+    render_page_header,
+    style_status_column,
 )
+from hosts.hosts_utils import fetch_hosts_data, process_host_dataframe
+
+HOST_FILTER_DEFAULTS = {
+    "host_dc_filter": "Все ДЦ",
+    "host_cluster_filter": "Все кластеры",
+    "host_search": "",
+    "host_health_filter": "all",
+}
+
 
 def render_hosts_list(active_db, cluster_meta):
-    clusters_raw = cluster_meta.get('clusters', {})
-    
-    # Приводим ключи к строкам для надежности
+    clusters_raw = cluster_meta.get("clusters", {})
     clusters = {str(k): v for k, v in clusters_raw.items()}
     dc_id_to_name = {str(k): v for k, v in cluster_meta.get("datacenters", {}).items()}
     dc_to_clusters = {
@@ -26,119 +32,139 @@ def render_hosts_list(active_db, cluster_meta):
     }
     dc_names_set = set(dc_id_to_name.values())
 
-    # --- СТРОКА 1: ФИЛЬТРЫ ---
-    col_dc, col_cl, col_search, col_prob = st.columns([1, 1, 2, 1])
-    
-    with col_dc:
-        selected_dc_name = st.selectbox(
-            "Дата-центр:", 
-            ['Все ДЦ'] + sorted(list(dc_names_set)), 
-            key="host_dc_filter"
+    header_box = st.container()
+    show_clear = filters_are_active(HOST_FILTER_DEFAULTS)
+    if show_clear:
+        health_col, dc_col, cl_col, search_col, clear_col = st.columns(
+            [1.7, 1, 1, 1.6, 0.9], vertical_alignment="bottom"
         )
-        
-    with col_cl:
-        cl_options = ['Все кластеры']
-        target_dc_id = None
-        
-        if selected_dc_name != 'Все ДЦ':
-            target_dc_id = next((k for k, v in dc_id_to_name.items() if v == selected_dc_name), None)
-            
+    else:
+        health_col, dc_col, cl_col, search_col = st.columns(
+            [1.7, 1, 1, 2.0], vertical_alignment="bottom"
+        )
+        clear_col = None
+
+    with dc_col:
+        selected_dc_name = st.selectbox(
+            "Дата-центр:",
+            ["Все ДЦ"] + sorted(list(dc_names_set)),
+            key="host_dc_filter",
+        )
+    with cl_col:
+        cl_options = ["Все кластеры"]
+        if selected_dc_name != "Все ДЦ":
+            target_dc_id = next(
+                (k for k, v in dc_id_to_name.items() if v == selected_dc_name), None
+            )
             if target_dc_id and target_dc_id in dc_to_clusters:
                 valid_cids = dc_to_clusters[target_dc_id]
-                valid_names = [clusters.get(cid, f"Cluster-{cid[:8]}") for cid in valid_cids]
+                valid_names = [
+                    clusters.get(cid, f"Cluster-{cid[:8]}") for cid in valid_cids
+                ]
                 cl_options += sorted(valid_names)
             else:
                 cl_options += sorted(set(clusters.values()))
         else:
             cl_options += sorted(set(clusters.values()))
-            
-        selected_cluster_name = st.selectbox("Кластер:", cl_options, key="host_cluster_filter")
-
-    with col_search:
+        selected_cluster_name = st.selectbox(
+            "Кластер:", cl_options, key="host_cluster_filter"
+        )
+    with search_col:
         search_term = st.text_input(
-            "Поиск (Имя / FQDN):", 
-            placeholder="Введите имя хоста или FQDN...", 
-            key="host_search"
+            "Поиск (Имя / FQDN):",
+            placeholder="Введите имя хоста или FQDN...",
+            key="host_search",
         )
+    if clear_col is not None:
+        with clear_col:
+            render_clear_filters_button(HOST_FILTER_DEFAULTS, key="host_clear_filters")
 
-    with col_prob:
-        show_problems = st.checkbox(
-            "Только проблемные", 
-            key="host_prob_filter", 
-            help="Скрыть стабильные Up/Maintenance"
-        )
-
-    # --- ПОЛУЧЕНИЕ И ОБРАБОТКА ДАННЫХ ---
     filters = (selected_dc_name, selected_cluster_name, search_term)
     raw_df = fetch_hosts_data(active_db, filters, clusters, dc_id_to_name)
-    
+    counts = host_health_counts(raw_df["status_code"] if not raw_df.empty else [])
+
+    health = "all"
+    if not raw_df.empty:
+        with health_col:
+            health = render_health_filter(
+                (
+                    ("all", f"Все ({counts['total']})"),
+                    ("up", f"Up ({counts['up']})"),
+                    ("maintenance", f"Maintenance ({counts['maintenance']})"),
+                    ("problems", f"Проблемы ({counts['problems']})"),
+                ),
+                key="host_health_filter",
+            )
+
+    display_df = (
+        process_host_dataframe(raw_df, clusters, dc_id_to_name, health_filter=health)
+        if not raw_df.empty
+        else raw_df
+    )
+    csv_download = None
+    if not display_df.empty:
+        csv_df = display_df.drop(columns=["_status_code"], errors="ignore")
+        csv_download = {
+            "label": "Скачать CSV",
+            "data": csv_df.to_csv(index=False).encode("utf-8-sig"),
+            "file_name": "hosts_list.csv",
+            "key": "download-hosts-csv",
+        }
+
+    with header_box:
+        render_page_header(
+            "Хосты",
+            active_db,
+            details=[
+                f"{counts['total']} хостов",
+                f"{counts['problems']} проблем",
+            ],
+            download=csv_download,
+        )
+
     if raw_df.empty:
         st.info("Хосты не найдены.")
         return
-
-    display_df = process_host_dataframe(raw_df, clusters, dc_id_to_name, show_problems)
-    
     if display_df.empty:
-        st.info("Нет хостов, соответствующих критериям (например, только проблемные).")
+        st.info("Нет хостов, соответствующих выбранному состоянию.")
         return
 
-    # --- СТРОКА 2: ИТОГИ И ЭКСПОРТ ---
-    col_info, col_spacer, col_btn = st.columns([2, 6, 1])
-    
-    with col_info:
-        st.markdown(f"**Хостов:** {len(display_df)}")
-        
-    with col_btn:
-        csv = display_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("Скачать CSV", csv, "hosts_list.csv", "text/csv", key="download-hosts-csv", width="stretch")
-
-    # --- ТАБЛИЦА ХОСТОВ ---
-    def status_color(val):
-        val_str = str(val)
-        if '▶️ Up' in val_str: return 'color: green; font-weight: bold'
-        if '⏹️ Down' in val_str: return 'color: gray'
-        if any(x in val_str for x in ['Error', 'NonResponsive', 'NonOperational', 'InstallFailed', 'Kdumping']): 
-            return 'color: red; font-weight: bold'
-        if 'Maintenance' in val_str or 'Reboot' in val_str: return 'color: orange'
-        return ''
-
-    styled_df = display_df.style.map(status_color, subset=['Статус'])
-
-    column_config = {
-        "Имя хоста": st.column_config.TextColumn(width="small"),
-        "FQDN": st.column_config.TextColumn(width="small"),
-        "ID": st.column_config.TextColumn(width="medium"),
-        "Статус": st.column_config.TextColumn(width="small"),
-        "Активные ВМ": st.column_config.NumberColumn(width="small"),
-        "Кластер": st.column_config.TextColumn(width="small"),
-        "Дата-центр": st.column_config.TextColumn(width="small"),
-    }
-
     event = st.dataframe(
-        styled_df, 
-        width='stretch', 
+        style_status_column(display_df, host_status_tone),
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
-        column_config=column_config,
-        height=500
+        column_config={
+            "Имя хоста": st.column_config.TextColumn(),
+            "FQDN": st.column_config.TextColumn(),
+            "ID": st.column_config.TextColumn(width=220),
+            "Статус": st.column_config.TextColumn(width=110),
+            "SPM": st.column_config.TextColumn(
+                width=70,
+                help="Текущий Storage Pool Manager дата-центра (storage_pool.spm_vds_id)",
+            ),
+            "Активные ВМ": st.column_config.NumberColumn(width=90),
+            "Кластер": st.column_config.TextColumn(width=120),
+            "Дата-центр": st.column_config.TextColumn(width=120),
+            "_status_code": None,
+        },
+        height=dataframe_height(len(display_df)),
     )
 
-    # --- ИНСПЕКТОР ---
-    
     if event.selection.rows:
         idx = event.selection.rows[0]
-        selected_id = display_df.iloc[idx]['ID']
-        # Ищем исходные данные по ID для передачи в инспектор
-        row = raw_df[raw_df['vds_id'] == selected_id].iloc[0]
-        
-        st.markdown(f"#### 🔍 Инспектор хоста: {row['vds_name']}")
-        st.caption(f"ID: `{row['vds_id']}` | FQDN: {row['fqdn']} | Кластер: {row['cluster_name']} | ДЦ: {row['dc_name']}")
-        
+        selected = display_df.iloc[idx]
+        selected_id = selected["ID"]
+        st.markdown(f"#### 🔍 Инспектор хоста: {selected['Имя хоста']}")
+        st.caption(
+            f"ID: `{selected_id}` | FQDN: {selected['FQDN']} | "
+            f"Кластер: {selected['Кластер']} | ДЦ: {selected['Дата-центр']}"
+        )
         with st.spinner("Генерация полного отчета Host-Inspector..."):
             from hosts.host_inspector_sql import get_host_inspector_report
-            result = get_host_inspector_report(active_db, str(row['vds_id']))
-            
+
+            result = get_host_inspector_report(active_db, str(selected_id))
         if "error" in result:
             st.error(result["error"])
         else:

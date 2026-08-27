@@ -70,6 +70,22 @@ def test_process_vm_dataframe_logic_problems():
     assert 'Down_VM' in result_prob['Имя ВМ'].values
     assert 'Locked_VM' in result_prob['Имя ВМ'].values
 
+
+def test_process_vm_dataframe_health_filter_paused():
+    df = pd.DataFrame({
+        'vm_guid': ['v1', 'v2'],
+        'vm_name': ['Up_VM', 'Paused_VM'],
+        'cluster_id': ['c1', 'c1'],
+        'vm_status_code': [1, 4],
+        'run_on_vds': [None, None],
+        'storage_pool_id': ['dc1', 'dc1'],
+        'has_bad_images': [False, False],
+    })
+    result = process_vm_dataframe(
+        df, {'c1': 'C1'}, {}, {'dc1': 'DC1'}, health_filter="paused"
+    )
+    assert list(result['Имя ВМ']) == ['Paused_VM']
+
 def test_process_vm_dataframe_empty():
     df = pd.DataFrame()
     result = process_vm_dataframe(df, {}, {}, {}, False)

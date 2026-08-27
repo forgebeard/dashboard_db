@@ -17,14 +17,16 @@ MAX_ROW_LIMIT = 2000        # Жесткий потолок защиты от п
 ROW_STEP = 10               # Шаг изменения лимита в виджете number_input
 
 # --- НАСТРОЙКИ ОТОБРАЖЕНИЯ (UI) ---
-DATAFRAME_HEIGHT = 500      # Фиксированная высота контейнера таблицы (px)
+DATAFRAME_HEIGHT = 500      # Потолок высоты st.dataframe (px)
+DATAFRAME_ROW_PX = 36       # Оценка высоты строки таблицы
+DATAFRAME_HEADER_PX = 40    # Оценка высоты шапки таблицы
+DATAFRAME_HEIGHT_PAD = 16   # Запас под рамку/скролл
 FONT_SIZE_CSS = "0.85rem"   # Размер шрифта внутри st.dataframe для компактности
 
-# --- ЦВЕТОВАЯ ПАЛИТРА СТАТУСОВ ---
-STATUS_COLORS = {
-    "up": "green",          # Активный / Успешный статус
-    "down": "gray",         # Выключен / Неактивен
-    "error": "red",         # Критическая ошибка
-    "warning": "orange",    # Предупреждение / Деградация
-    "maintenance": "orange" # Режим обслуживания
+# CSS для семантических тонов статуса (не использовать green/red в модулях).
+STATUS_TONE_CSS = {
+    "success": "color: #2ecc71; font-weight: bold;",
+    "warning": "color: #e67e22; font-weight: bold;",
+    "critical": "color: #e74c3c; font-weight: bold;",
+    "neutral": "color: #95a5a6;",
 }

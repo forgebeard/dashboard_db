@@ -12,7 +12,13 @@ import streamlit as st       # Фреймворк UI (используется �
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА (CORE) ---
 from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
-from core.constants import VM_STATUS_MAP         # Глобальный справочник статусов ВМ
+from core.constants import (
+    VM_STATUS_DOWN,
+    VM_STATUS_MAP,
+    VM_STATUS_PAUSED,
+    VM_STATUS_UP,
+    vm_is_problem,
+)
 
 
 def fetch_vms_data(
@@ -101,60 +107,56 @@ def fetch_vms_data(
         return pd.DataFrame()
 
 
+def _resolve_health_filter(show_problems: bool, health_filter: str | None) -> str:
+    if health_filter:
+        return health_filter
+    return "problems" if show_problems else "all"
+
+
 def process_vm_dataframe(
     df: pd.DataFrame, 
     clusters: dict[str, str], 
     hosts: dict[str, str], 
     dc_id_to_name: dict[str, str], 
-    show_problems: bool
+    show_problems: bool = False,
+    health_filter: str | None = None,
 ) -> pd.DataFrame:
     """
     Обрабатывает сырой DataFrame: добавляет статусы, имена и фильтрует проблемы.
     Добавляет скрытый столбец '_status_code' для корректной подсветки в UI.
-    
-    Args:
-        df: Сырой DataFrame из fetch_vms_data
-        clusters: Словарь {cluster_id: cluster_name}
-        hosts: Словарь {host_id: host_name}
-        dc_id_to_name: Словарь {dc_id: dc_name}
-        show_problems: Флаг фильтрации только проблемных ВМ
-        
-    Returns:
-        Отформатированный DataFrame для отображения в таблице
     """
     if df.empty:
         return pd.DataFrame()
 
-    # Сохраняем числовой код статуса в скрытом столбце для подсветки
     df['_status_code'] = df['vm_status_code']
-    
-    # Форматируем отображаемый статус через глобальную константу
     df['status_display'] = df['vm_status_code'].apply(
         lambda x: VM_STATUS_MAP.get(x, f"Code {x}")
     )
-    
-    # Обогащаем данными из метаданных
     df['cluster_name'] = df['cluster_id'].map(clusters).fillna('Unknown Cluster')
     df['host_name'] = df['run_on_vds'].map(hosts).fillna('—')
     df['dc_name'] = df['storage_pool_id'].map(dc_id_to_name).fillna('Unknown DC')
-    
-    # Помечаем проблемные ВМ (не Up или есть битые образы)
-    df['is_problematic'] = df.apply(
-        lambda row: row['vm_status_code'] != 1 or row['has_bad_images'], axis=1
-    )
+    bad_flags = df['has_bad_images'].fillna(False).astype(bool)
+    df['is_problematic'] = [
+        vm_is_problem(code, bool(bad))
+        for code, bad in zip(df['vm_status_code'], bad_flags)
+    ]
 
-    if show_problems:
+    kind = _resolve_health_filter(show_problems, health_filter)
+    if kind == "up":
+        df = df[df['vm_status_code'] == VM_STATUS_UP].copy()
+    elif kind == "down":
+        df = df[df['vm_status_code'] == VM_STATUS_DOWN].copy()
+    elif kind == "paused":
+        df = df[df['vm_status_code'] == VM_STATUS_PAUSED].copy()
+    elif kind == "problems":
         df = df[df['is_problematic']].copy()
 
-    # Формируем итоговый набор колонок для UI
     display_df = df[[
         'vm_name', 'vm_guid', 'status_display', '_status_code', 
         'host_name', 'cluster_name', 'dc_name'
     ]].copy()
-    
     display_df.columns = [
         'Имя ВМ', 'UUID', 'Статус', '_status_code', 
         'Хост', 'Кластер', 'Дата-центр'
     ]
-    
     return display_df

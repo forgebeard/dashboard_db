@@ -7,7 +7,20 @@
 обратные словари для удобного поиска и фильтрации.
 """
 
-from typing import Dict, Union
+from collections.abc import Iterable
+from typing import Dict, Literal
+
+StatusTone = Literal["success", "warning", "critical", "neutral"]
+
+HOST_STATUS_UP = 3
+HOST_MAINTENANCE_CODES = frozenset({2, 8, 9})  # Maintenance, Reboot, PreparingForMaintenance
+HOST_CRITICAL_CODES = frozenset({4, 5, 7, 10, 15})  # NonResponsive, Error, InstallFailed, NonOperational, Kdumping
+HOST_NEUTRAL_CODES = frozenset({0, 1})  # Unassigned, Down
+
+VM_STATUS_UP = 1
+VM_STATUS_DOWN = 0
+VM_STATUS_PAUSED = 4
+VM_CRITICAL_CODES = frozenset({7, 8, 14, 15})  # Unknown, NotResponding, ImageIllegal, ImageLocked
 
 # --- СТАТУСЫ ВИРТУАЛЬНЫХ МАШИН (VmStatus.java) ---
 VM_STATUS_MAP: Dict[int, str] = {
@@ -91,3 +104,85 @@ SHARED_STATUS_MAP: Dict[int, str] = {
     2: "Maintenance",# В обслуживании
     3: "Problem"     # Проблемы с доступностью
 }
+
+
+def _as_int_code(code: object) -> int | None:
+    if code is None:
+        return None
+    try:
+        return int(code)
+    except (TypeError, ValueError):
+        return None
+
+
+def host_is_healthy(status_code: object) -> bool:
+    return _as_int_code(status_code) == HOST_STATUS_UP
+
+
+def host_is_maintenance(status_code: object) -> bool:
+    code = _as_int_code(status_code)
+    return code in HOST_MAINTENANCE_CODES if code is not None else False
+
+
+def host_is_problem(status_code: object) -> bool:
+    """Проблема: не Up и не регламентное обслуживание."""
+    if host_is_healthy(status_code) or host_is_maintenance(status_code):
+        return False
+    return _as_int_code(status_code) is not None
+
+
+def host_status_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == HOST_STATUS_UP:
+        return "success"
+    if code in HOST_MAINTENANCE_CODES:
+        return "warning"
+    if code in HOST_CRITICAL_CODES:
+        return "critical"
+    if code in HOST_NEUTRAL_CODES:
+        return "neutral"
+    return "warning"
+
+
+def vm_is_problem(status_code: object, has_bad_images: bool = False) -> bool:
+    return _as_int_code(status_code) != VM_STATUS_UP or bool(has_bad_images)
+
+
+def vm_status_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == VM_STATUS_UP:
+        return "success"
+    if code == VM_STATUS_DOWN:
+        return "neutral"
+    if code in VM_CRITICAL_CODES:
+        return "critical"
+    return "warning"
+
+
+def host_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
+    codes = list(status_codes)
+    return {
+        "total": len(codes),
+        "up": sum(1 for c in codes if host_is_healthy(c)),
+        "maintenance": sum(1 for c in codes if host_is_maintenance(c)),
+        "problems": sum(1 for c in codes if host_is_problem(c)),
+    }
+
+
+def vm_health_counts(
+    status_codes: Iterable[object],
+    bad_images: Iterable[object] | None = None,
+) -> dict[str, int]:
+    codes = list(status_codes)
+    flags = list(bad_images) if bad_images is not None else [False] * len(codes)
+    if len(flags) != len(codes):
+        flags = [False] * len(codes)
+    return {
+        "total": len(codes),
+        "up": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_UP),
+        "down": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_DOWN),
+        "paused": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_PAUSED),
+        "problems": sum(
+            1 for c, bad in zip(codes, flags) if vm_is_problem(c, bool(bad))
+        ),
+    }
