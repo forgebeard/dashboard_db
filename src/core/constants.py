@@ -10,6 +10,8 @@
 from collections.abc import Iterable
 from typing import Dict, Literal
 
+from core.action_type_map import ACTION_TYPE_MAP
+
 StatusTone = Literal["success", "warning", "critical", "neutral"]
 
 HOST_STATUS_UP = 3
@@ -111,6 +113,50 @@ MIGRATE_ON_ERROR_MAP: Dict[int, str] = {
     0: "DoNothing",
     1: "Migrate",
     2: "Shutdown",
+}
+
+# --- ЖУРНАЛ (AuditLogSeverity) ---
+# Коды как в Engine PostgreSQL (audit_log.severity).
+# Источник:
+#   oVirt Engine AuditLogSeverity.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/AuditLogSeverity.java
+# Дамп: 0 Normal, 1 Warning, 2 Error, 3 Alert. Прочие коды не угадывать.
+AUDIT_SEVERITY_NORMAL = 0
+AUDIT_SEVERITY_WARNING = 1
+AUDIT_SEVERITY_ERROR = 2
+AUDIT_SEVERITY_ALERT = 3
+AUDIT_SEVERITY_MAP: Dict[int, str] = {
+    AUDIT_SEVERITY_NORMAL: "Normal",
+    AUDIT_SEVERITY_WARNING: "Warning",
+    AUDIT_SEVERITY_ERROR: "Error",
+    AUDIT_SEVERITY_ALERT: "Alert",
+}
+
+# --- ASYNC-ЗАДАЧИ (AsyncTaskStatusEnum) ---
+# Коды как в Engine (async_tasks.status), явные значения из Java, не ordinal().
+# Источник:
+#   oVirt Engine AsyncTaskStatusEnum.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/AsyncTaskStatusEnum.java
+ASYNC_TASK_STATUS_MAP: Dict[int, str] = {
+    0: "unknown",
+    1: "init",
+    2: "running",
+    3: "finished",
+    4: "aborting",
+    5: "cleaning",
+}
+
+# --- РЕЗУЛЬТАТ ASYNC-ЗАДАЧИ (AsyncTaskResultEnum) ---
+# Коды как в Engine (async_tasks.result), ordinal enum.
+# Источник:
+#   oVirt Engine AsyncTaskResultEnum.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/AsyncTaskResultEnum.java
+ASYNC_TASK_RESULT_MAP: Dict[int, str] = {
+    0: "success",
+    1: "failure",
+    2: "cleanSuccess",
+    3: "cleanFailure",
+    4: "unknown",
 }
 
 # --- ТИПЫ ДОМЕНОВ ХРАНЕНИЯ (StorageDomainType) ---
@@ -265,6 +311,40 @@ def cluster_status_tone(status_code: object) -> StatusTone:
     if code == CLUSTER_STATUS_PROBLEMS:
         return "critical"
     return "neutral"
+
+
+def mapped_code_label(code: object, mapping: Dict[int, str]) -> str:
+    parsed = _as_int_code(code)
+    if parsed is None:
+        return "—"
+    return mapping.get(parsed, f"Code {parsed}")
+
+
+def audit_severity_label(status_code: object) -> str:
+    return mapped_code_label(status_code, AUDIT_SEVERITY_MAP)
+
+
+def audit_severity_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == AUDIT_SEVERITY_NORMAL:
+        return "neutral"
+    if code == AUDIT_SEVERITY_WARNING:
+        return "warning"
+    if code in (AUDIT_SEVERITY_ERROR, AUDIT_SEVERITY_ALERT):
+        return "critical"
+    return "neutral"
+
+
+def async_task_status_label(status_code: object) -> str:
+    return mapped_code_label(status_code, ASYNC_TASK_STATUS_MAP)
+
+
+def async_task_result_label(status_code: object) -> str:
+    return mapped_code_label(status_code, ASYNC_TASK_RESULT_MAP)
+
+
+def action_type_label(status_code: object) -> str:
+    return mapped_code_label(status_code, ACTION_TYPE_MAP)
 
 
 def cluster_health_counts(status_codes: Iterable[object]) -> dict[str, int]:

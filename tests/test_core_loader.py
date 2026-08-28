@@ -102,3 +102,28 @@ def test_build_infra_filter_maps_from_cluster_meta():
     assert maps["cluster_to_hosts"] == {"cl-1": ["h-1"]}
     assert maps["host_to_vms"] == {}
     assert maps["vm_id_to_name"] == {}
+
+
+def test_host_ids_for_infra_filters():
+    from core.data_loader import host_ids_for_infra_filters
+
+    maps = {
+        "dc_id_to_name": {"dc-1": "DC_PROD", "dc-empty": "DC_EMPTY"},
+        "cluster_id_to_name": {"cl-1": "Cluster_A", "cl-empty": "Cluster_Empty"},
+        "host_id_to_name": {"h-1": "Host_A", "h-2": "Host_B"},
+        "dc_to_clusters": {"dc-1": ["cl-1"], "dc-empty": ["cl-empty"]},
+        "cluster_to_hosts": {"cl-1": ["h-1", "h-2"], "cl-empty": []},
+    }
+
+    assert host_ids_for_infra_filters(maps, "Все ДЦ", "Все кластеры", "Все хосты") is None
+    assert host_ids_for_infra_filters(maps, "DC_PROD", "Все кластеры", "Все хосты") == [
+        "h-1",
+        "h-2",
+    ]
+    assert host_ids_for_infra_filters(maps, "DC_PROD", "Cluster_A", "Все хосты") == [
+        "h-1",
+        "h-2",
+    ]
+    assert host_ids_for_infra_filters(maps, "DC_PROD", "Cluster_A", "Host_B") == ["h-2"]
+    assert host_ids_for_infra_filters(maps, "DC_EMPTY", "Все кластеры", "Все хосты") == []
+    assert host_ids_for_infra_filters(maps, "Все ДЦ", "Cluster_Empty", "Все хосты") == []

@@ -106,3 +106,42 @@ def test_architecture_and_bios_maps():
     assert ARCHITECTURE_MAP[1] == "x86_64"
     assert ARCHITECTURE_MAP[0] == "undefined"
     assert BIOS_TYPE_MAP[3] == "Q35 OVMF"
+
+
+def test_audit_severity_tones_and_labels():
+    from core.constants import (
+        AUDIT_SEVERITY_MAP,
+        audit_severity_label,
+        audit_severity_tone,
+    )
+
+    assert AUDIT_SEVERITY_MAP[0] == "Normal"
+    assert AUDIT_SEVERITY_MAP[1] == "Warning"
+    assert AUDIT_SEVERITY_MAP[2] == "Error"
+    assert AUDIT_SEVERITY_MAP[3] == "Alert"
+    assert audit_severity_tone(0) == "neutral"
+    assert audit_severity_tone(1) == "warning"
+    assert audit_severity_tone(2) == "critical"
+    assert audit_severity_tone(3) == "critical"
+    assert audit_severity_label(4) == "Code 4"
+    assert audit_severity_label(10) == "Code 10"
+
+
+def test_async_task_status_map():
+    from core.constants import (
+        ACTION_TYPE_MAP,
+        ASYNC_TASK_RESULT_MAP,
+        ASYNC_TASK_STATUS_MAP,
+        action_type_label,
+        async_task_result_label,
+        async_task_status_label,
+    )
+
+    assert ASYNC_TASK_STATUS_MAP[1] == "init"
+    assert ASYNC_TASK_STATUS_MAP[2] == "running"
+    assert ASYNC_TASK_STATUS_MAP[3] == "finished"
+    assert async_task_status_label(99) == "Code 99"
+    assert ASYNC_TASK_RESULT_MAP[0] == "success"
+    assert async_task_result_label(1) == "failure"
+    assert ACTION_TYPE_MAP[261] == "ConvertDisk"
+    assert action_type_label(261) == "ConvertDisk"

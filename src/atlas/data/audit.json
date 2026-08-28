@@ -19,7 +19,7 @@
         "log_time": "Время возникновения события",
         "log_type_name": "Человекочитаемое имя типа события (USER_ADD_VM, VM_DOWN)",
         "log_type": "Integer-код типа события (ссылка на event_map)",
-        "severity": "Уровень важности: 0=Info, 1=Warning, 2=Error",
+        "severity": "Код AuditLogSeverity (constants.AUDIT_SEVERITY_MAP): 0=Normal, 1=Warning, 2=Error, 3=Alert",
         "message": "Текст сообщения события с подставленными параметрами",
         "processed": "Обработано ли событие системой уведомлений",
         "storage_pool_id": "ID пула хранения связанного с событием",

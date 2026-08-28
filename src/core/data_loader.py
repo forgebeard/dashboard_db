@@ -179,3 +179,56 @@ def build_infra_filter_maps(cluster_meta: dict) -> dict[str, dict | list]:
         "host_to_vms": {},
         "vm_id_to_name": {},
     }
+
+
+def _id_by_name(name_map: dict, selected: str) -> str | None:
+    return next((key for key, value in (name_map or {}).items() if value == selected), None)
+
+
+def host_ids_for_infra_filters(
+    maps: dict,
+    selected_dc: str,
+    selected_cluster: str,
+    selected_host: str,
+    *,
+    all_dc: str = "Все ДЦ",
+    all_cluster: str = "Все кластеры",
+    all_host: str = "Все хосты",
+) -> list[str] | None:
+    """
+    Срез vds_id по каскаду ДЦ / кластер / хост.
+
+    None — ограничение по хостам не нужно (все «Все»).
+    [] — выбран ДЦ или кластер без хостов (пустой результат, не весь лог).
+    """
+    maps = maps or {}
+    host_names = maps.get("host_id_to_name") or {}
+    cluster_names = maps.get("cluster_id_to_name") or {}
+    dc_names = maps.get("dc_id_to_name") or {}
+    dc_to_clusters = maps.get("dc_to_clusters") or {}
+    cluster_to_hosts = maps.get("cluster_to_hosts") or {}
+
+    if selected_host != all_host:
+        host_id = _id_by_name(host_names, selected_host)
+        return [host_id] if host_id else []
+
+    if selected_cluster != all_cluster:
+        cluster_id = _id_by_name(cluster_names, selected_cluster)
+        if not cluster_id:
+            return []
+        return list(cluster_to_hosts.get(cluster_id) or [])
+
+    if selected_dc != all_dc:
+        dc_id = _id_by_name(dc_names, selected_dc)
+        if not dc_id:
+            return []
+        host_ids: list[str] = []
+        seen: set[str] = set()
+        for cluster_id in dc_to_clusters.get(dc_id) or []:
+            for host_id in cluster_to_hosts.get(cluster_id) or []:
+                if host_id and host_id not in seen:
+                    seen.add(host_id)
+                    host_ids.append(host_id)
+        return host_ids
+
+    return None

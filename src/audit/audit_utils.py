@@ -46,10 +46,9 @@ def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
         st.warning(f"Не удалось загрузить связи для журнала: {e}")
     return maps
 
-@st.cache_data(ttl=60)
-def fetch_audit_logs(active_db, filters, limit_val):
-    """Выполняет параметризованный запрос к audit_log."""
-    
+
+def build_audit_logs_sql(filters: dict, limit_val: int) -> tuple[str, dict]:
+    """Параметризованный SELECT из audit_log. host_ids: None | [] | [id, ...]."""
     sql = """
         SELECT 
             audit_log_id, log_time, log_type_name, severity, message,
@@ -57,42 +56,47 @@ def fetch_audit_logs(active_db, filters, limit_val):
         FROM audit_log
         WHERE deleted = false
     """
-    params = {}
-    
-    # Фильтр по Хосту
-    if filters.get("host_id"):
-        sql += " AND vds_id = :host_id"
-        params["host_id"] = filters["host_id"]
-        
-    # Фильтр по ВМ (поиск по подстроке в имени или UUID)
+    params: dict = {}
+
+    host_ids = filters.get("host_ids")
+    if host_ids is not None:
+        if not host_ids:
+            sql += " AND 1=0"
+        else:
+            sql += " AND vds_id::text IN :host_ids"
+            params["host_ids"] = tuple(host_ids)
+
     if filters.get("vm_search"):
         term = f"%{filters['vm_search']}%"
         sql += " AND (LOWER(vm_name) LIKE LOWER(:vm_term) OR vm_id::text LIKE LOWER(:vm_term))"
         params["vm_term"] = term
-        
-    # Фильтр по важности
-    if filters.get("severity") == "errors":
-        sql += " AND severity >= 3"
-    elif filters.get("severity") == "warnings":
-        sql += " AND severity >= 2"
-        
-    # Фильтры по времени
+
+    if filters.get("severity_code") is not None:
+        sql += " AND severity = :sev_code"
+        params["sev_code"] = int(filters["severity_code"])
+
     if filters.get("start_dt"):
         sql += " AND log_time >= :start_dt"
         params["start_dt"] = filters["start_dt"]
     if filters.get("end_dt"):
         sql += " AND log_time <= :end_dt"
         params["end_dt"] = filters["end_dt"]
-        
+
     sql += " ORDER BY log_time DESC LIMIT :lim"
     params["lim"] = limit_val
-    
+    return sql, params
+
+
+@st.cache_data(ttl=60)
+def fetch_audit_logs(active_db, filters, limit_val):
+    """Выполняет параметризованный запрос к audit_log."""
+    sql, params = build_audit_logs_sql(filters, limit_val)
     try:
         engine = get_sqlalchemy_engine(active_db)
         df = pd.read_sql(text(sql), engine, params=params)
 
         if not df.empty:
-            df['log_time'] = pd.to_datetime(df['log_time']).dt.strftime('%d.%m.%Y %H:%M:%S')
+            df["log_time"] = pd.to_datetime(df["log_time"]).dt.strftime("%d.%m.%Y %H:%M:%S")
         return df
     except Exception as e:
         st.error(f"Ошибка чтения audit_log: {e}")

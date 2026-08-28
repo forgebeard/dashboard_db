@@ -85,9 +85,9 @@
       "key_fields": ["task_id"],
       "fields_doc": {
         "task_id": "Уникальный идентификатор async-задачи",
-        "action_type": "Тип действия VDSM",
-        "status": "Статус задачи: Active, Finished, Failed",
-        "result": "Код результата выполнения",
+        "action_type": "Код ActionType (constants.ACTION_TYPE_MAP), например 261=ConvertDisk",
+        "status": "Код AsyncTaskStatusEnum (constants.ASYNC_TASK_STATUS_MAP): 0=unknown, 1=running, 2=finished, 3=aborting, 4=cleaning, 5=waiting",
+        "result": "Код AsyncTaskResultEnum (constants.ASYNC_TASK_RESULT_MAP): 0=success, 1=failure, 2=cleanSuccess, 3=cleanFailure, 4=unknown",
         "step_id": "Связанный шаг Engine. Связан с таблицей step через поле step_id",
         "command_id": "Команда Engine инициировавшая задачу. Связан с таблицей command_entities через поле command_id",
         "started_at": "Время запуска задачи на VDSM",
@@ -113,7 +113,7 @@
       "key_fields": ["command_id"],
       "fields_doc": {
         "command_id": "Уникальный идентификатор команды",
-        "command_type": "Тип команды (integer enum)",
+        "command_type": "Код ActionType (constants.ACTION_TYPE_MAP), тот же enum что async_tasks.action_type",
         "root_command_id": "Корневая команда в дереве вызовов",
         "command_parameters": "Параметры команды в сериализованном виде",
         "command_params_class": "Java класс параметров команды",
