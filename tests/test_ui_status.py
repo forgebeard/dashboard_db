@@ -7,6 +7,7 @@ from core.constants import (
     host_status_tone,
     vm_health_counts,
     vm_is_problem,
+    vm_layer_tone,
     vm_status_tone,
 )
 
@@ -38,10 +39,12 @@ def test_host_health_counts():
     assert counts == {"total": 4, "up": 2, "maintenance": 1, "problems": 1}
 
 
-def test_vm_problem_down_or_bad_images():
-    assert vm_is_problem(1, False) is False
-    assert vm_is_problem(0, False) is True
-    assert vm_is_problem(1, True) is True
+def test_vm_problem_excludes_up_and_down():
+    assert vm_is_problem(1) is False
+    assert vm_is_problem(0) is False
+    assert vm_is_problem(4) is True
+    assert vm_is_problem(8) is True
+    assert vm_is_problem(None) is False
 
 
 def test_vm_status_tones():
@@ -49,6 +52,14 @@ def test_vm_status_tones():
     assert vm_status_tone(0) == "neutral"
     assert vm_status_tone(4) == "warning"
     assert vm_status_tone(8) == "critical"
+
+
+def test_vm_layer_tones():
+    assert vm_layer_tone(None) is None
+    assert vm_layer_tone(1) is None
+    assert vm_layer_tone(2) == "warning"
+    assert vm_layer_tone(4) == "warning"
+    assert vm_layer_tone(3) == "critical"
 
 
 def test_dataframe_height_fits_few_rows():
@@ -61,9 +72,5 @@ def test_dataframe_height_fits_few_rows():
 
 
 def test_vm_health_counts():
-    counts = vm_health_counts([1, 0, 4, 1], [False, False, False, True])
-    assert counts["total"] == 4
-    assert counts["up"] == 2
-    assert counts["down"] == 1
-    assert counts["paused"] == 1
-    assert counts["problems"] == 3
+    counts = vm_health_counts([1, 0, 4, 1])
+    assert counts == {"total": 4, "up": 2, "down": 1, "problems": 1}

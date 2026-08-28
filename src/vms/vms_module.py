@@ -3,7 +3,7 @@
 
 import streamlit as st
 
-from core.constants import vm_health_counts, vm_status_tone
+from core.constants import vm_health_counts, vm_layer_tone, vm_status_tone
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
@@ -35,11 +35,11 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
     show_clear = filters_are_active(VM_FILTER_DEFAULTS)
     if show_clear:
         health_col, dc_col, cl_col, host_col, search_col, clear_col = st.columns(
-            [1.5, 0.9, 0.9, 0.9, 1.4, 0.8], vertical_alignment="bottom"
+            [2.2, 0.65, 0.85, 0.85, 1.2, 0.7], vertical_alignment="bottom"
         )
     else:
         health_col, dc_col, cl_col, host_col, search_col = st.columns(
-            [1.5, 1, 1, 1, 1.6], vertical_alignment="bottom"
+            [2.2, 0.7, 0.9, 0.9, 1.4], vertical_alignment="bottom"
         )
         clear_col = None
 
@@ -95,10 +95,9 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
 
     filters = (selected_dc_name, selected_cluster_name, selected_host_name, search_term)
     raw_df = fetch_vms_data(active_db, filters, clusters, hosts, dc_id_to_name)
-    if raw_df.empty:
-        counts = vm_health_counts([])
-    else:
-        counts = vm_health_counts(raw_df["vm_status_code"], raw_df["has_bad_images"])
+    counts = vm_health_counts(
+        raw_df["vm_status_code"] if not raw_df.empty else []
+    )
 
     health = "all"
     if not raw_df.empty:
@@ -108,8 +107,7 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
                     ("all", f"Все ({counts['total']})"),
                     ("up", f"Up ({counts['up']})"),
                     ("down", f"Down ({counts['down']})"),
-                    ("paused", f"Paused ({counts['paused']})"),
-                    ("problems", f"Проблемы ({counts['problems']})"),
+                    ("problems", f"Остальное ({counts['problems']})"),
                 ),
                 key="vm_health_filter",
             )
@@ -126,10 +124,7 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
         render_page_header(
             "Виртуальные машины",
             active_db,
-            details=[
-                f"{counts['total']} ВМ",
-                f"{counts['problems']} проблем",
-            ],
+            details=[f"{counts['total']} ВМ"],
         )
 
     if raw_df.empty:
@@ -140,7 +135,11 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
         return
 
     event = st.dataframe(
-        style_status_column(display_df, vm_status_tone),
+        style_status_column(
+            display_df,
+            vm_status_tone,
+            extra=(("Слои", "_layer_code", vm_layer_tone),),
+        ),
         width="stretch",
         hide_index=True,
         on_select="rerun",
@@ -149,10 +148,12 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
             "Имя ВМ": st.column_config.TextColumn(),
             "UUID": st.column_config.TextColumn(width=220),
             "Статус": st.column_config.TextColumn(width=110),
+            "Слои": st.column_config.TextColumn(width=100),
             "Хост": st.column_config.TextColumn(width=160),
             "Кластер": st.column_config.TextColumn(width=120),
             "Дата-центр": st.column_config.TextColumn(width=120),
             "_status_code": None,
+            "_layer_code": None,
         },
         height=dataframe_height(len(display_df)),
     )

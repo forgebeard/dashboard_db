@@ -109,12 +109,22 @@ STORAGE_TYPE_MAP: Dict[int, str] = {
 }
 
 # --- СТАТУСЫ ОБРАЗОВ ДИСКОВ (ImageStatus) ---
+IMAGE_STATUS_OK = 1
+IMAGE_STATUS_LOCKED = 2
+IMAGE_STATUS_ILLEGAL = 3
+IMAGE_STATUS_MERGING = 4
 IMAGE_STATUS_MAP: Dict[int, str] = {
-    1: "OK",
-    2: "LOCKED",     # Заблокирован операцией (snapshot, migrate)
-    3: "ILLEGAL",    # Поврежден или несогласован
-    4: "MERGING"     # Идет слияние снапшотов
+    IMAGE_STATUS_OK: "OK",
+    IMAGE_STATUS_LOCKED: "LOCKED",     # Заблокирован операцией (snapshot, migrate)
+    IMAGE_STATUS_ILLEGAL: "ILLEGAL",    # Поврежден или несогласован
+    IMAGE_STATUS_MERGING: "MERGING",    # Идет слияние снапшотов
 }
+# Хуже → лучше: ILLEGAL, LOCKED, MERGING.
+IMAGE_LAYER_ISSUE_ORDER: tuple[int, ...] = (
+    IMAGE_STATUS_ILLEGAL,
+    IMAGE_STATUS_LOCKED,
+    IMAGE_STATUS_MERGING,
+)
 
 # --- СТАТУСЫ ОБЩИХ ДОМЕНОВ (SharedStatus) ---
 SHARED_STATUS_MAP: Dict[int, str] = {
@@ -163,8 +173,11 @@ def host_status_tone(status_code: object) -> StatusTone:
     return "warning"
 
 
-def vm_is_problem(status_code: object, has_bad_images: bool = False) -> bool:
-    return _as_int_code(status_code) != VM_STATUS_UP or bool(has_bad_images)
+def vm_is_problem(status_code: object) -> bool:
+    """Остальное: не Up и не Down."""
+    if _as_int_code(status_code) in (VM_STATUS_UP, VM_STATUS_DOWN):
+        return False
+    return _as_int_code(status_code) is not None
 
 
 def vm_status_tone(status_code: object) -> StatusTone:
@@ -178,6 +191,15 @@ def vm_status_tone(status_code: object) -> StatusTone:
     return "warning"
 
 
+def vm_layer_tone(status_code: object) -> StatusTone | None:
+    code = _as_int_code(status_code)
+    if code == IMAGE_STATUS_ILLEGAL:
+        return "critical"
+    if code in (IMAGE_STATUS_LOCKED, IMAGE_STATUS_MERGING):
+        return "warning"
+    return None
+
+
 def host_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
     codes = list(status_codes)
     return {
@@ -188,20 +210,11 @@ def host_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
     }
 
 
-def vm_health_counts(
-    status_codes: Iterable[object],
-    bad_images: Iterable[object] | None = None,
-) -> dict[str, int]:
+def vm_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
     codes = list(status_codes)
-    flags = list(bad_images) if bad_images is not None else [False] * len(codes)
-    if len(flags) != len(codes):
-        flags = [False] * len(codes)
     return {
         "total": len(codes),
         "up": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_UP),
         "down": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_DOWN),
-        "paused": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_PAUSED),
-        "problems": sum(
-            1 for c, bad in zip(codes, flags) if vm_is_problem(c, bool(bad))
-        ),
+        "problems": sum(1 for c in codes if vm_is_problem(c)),
     }

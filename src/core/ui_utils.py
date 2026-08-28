@@ -38,25 +38,52 @@ def fix_uuid_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def style_status_column(
     df: pd.DataFrame,
-    tone_fn: Callable[[Any], StatusTone],
+    tone_fn: Callable[[Any], StatusTone | None],
     *,
     status_col: str = "Статус",
     code_col: str = "_status_code",
+    extra: Sequence[
+        tuple[str, str, Callable[[Any], StatusTone | None]]
+    ] = (),
+    missing_css: str | None = None,
 ):
-    """Раскрашивает колонку статуса по числовому коду, не по тексту ячейки."""
-    if df.empty or status_col not in df.columns or code_col not in df.columns:
+    """Раскрашивает колонки по числовому коду, не по тексту ячейки."""
+    if df.empty:
         return df
 
-    codes = df[code_col]
+    specs: list[tuple[str, str, Callable[[Any], StatusTone | None], str]] = []
+    default_css = (
+        STATUS_TONE_CSS["neutral"] if missing_css is None else missing_css
+    )
+    if status_col in df.columns and code_col in df.columns:
+        specs.append((status_col, code_col, tone_fn, default_css))
+    for col, extra_code_col, extra_tone_fn in extra:
+        if col in df.columns and extra_code_col in df.columns:
+            specs.append((col, extra_code_col, extra_tone_fn, ""))
+    if not specs:
+        return df
 
-    def _css(_series: pd.Series) -> list[str]:
-        styles: list[str] = []
-        for code in codes.loc[_series.index]:
-            tone = tone_fn(code)
-            styles.append(STATUS_TONE_CSS.get(tone, STATUS_TONE_CSS["neutral"]))
-        return styles
+    styled = None
+    for col, coded, fn, fallback in specs:
+        codes = df[coded]
 
-    return df.style.apply(_css, subset=[status_col])
+        def _css(
+            _series: pd.Series,
+            _codes: pd.Series = codes,
+            _fn: Callable[[Any], StatusTone | None] = fn,
+            _fallback: str = fallback,
+        ) -> list[str]:
+            styles: list[str] = []
+            for code in _codes.loc[_series.index]:
+                tone = _fn(code)
+                styles.append(STATUS_TONE_CSS.get(tone, _fallback) if tone else _fallback)
+            return styles
+
+        if styled is None:
+            styled = df.style.apply(_css, subset=[col])
+        else:
+            styled = styled.apply(_css, subset=[col])
+    return styled if styled is not None else df
 
 
 def render_page_header(
