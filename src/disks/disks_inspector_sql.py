@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import (
+    DISK_CONTENT_TYPE_MAP,
     IMAGE_STATUS_MAP,
     VM_STATUS_MAP,
     action_type_label,
@@ -39,7 +40,7 @@ def _vm_status_label(code: Any) -> str:
 def _content_type_label(code: Any) -> str:
     if code in (None, ""):
         return "—"
-    return mapped_code_label(code, {})
+    return mapped_code_label(code, DISK_CONTENT_TYPE_MAP)
 
 
 def _storage_line(names: list[str]) -> str:
@@ -76,6 +77,8 @@ def format_disk_report(payload: dict[str, Any]) -> str:
         lines.append(_kv("вирт. размер", _fmt_size_bytes(selected.get("virt_size"))))
         lines.append(_kv("факт. размер", _fmt_size_bytes(selected.get("actual_size"))))
         lines.append(_kv("хранилище", selected.get("storage_name") or "—"))
+        if section_errors.get("storage"):
+            lines.append(f"  ошибка чтения ({section_errors['storage']})")
         snap_id = selected.get("snapshot_id")
         snap_line = _id_text(snap_id) or "—"
         snap_name = selected.get("snap_name")
@@ -162,7 +165,7 @@ def format_disk_report(payload: dict[str, Any]) -> str:
 
 def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
     """Отчёт по выбранному слою диска (image_guid)."""
-    img_search = str(image_guid).strip()
+    img_search = str(image_guid).strip().lower()
 
     try:
         with InspectorBase(db_name) as insp:
@@ -190,7 +193,7 @@ def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
                 JOIN base_disks bd ON i.image_group_id = bd.disk_id
                 LEFT JOIN disk_image_dynamic did ON i.image_guid = did.image_id
                 LEFT JOIN snapshots vs ON i.vm_snapshot_id = vs.snapshot_id
-                WHERE i.image_guid::text = :image_guid
+                WHERE LOWER(i.image_guid::text) = :image_guid
                 LIMIT 1
                 """,
                 {"image_guid": img_search},

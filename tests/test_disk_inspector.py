@@ -137,3 +137,20 @@ def test_no_problems_section():
     assert "ПРОБЛЕМЫ" not in text
     assert "ДИАГНОСТИКА" not in text
     assert "критичных проблем" not in text
+
+
+def test_disk_content_type_from_engine_map():
+    text = format_disk_report(_payload())
+    disk = text.split("ДИСК")[1].split("ПРИВЯЗКИ")[0]
+    assert "DATA" in disk
+    payload = _payload()
+    payload["selected"]["disk_content_type"] = 99
+    text = format_disk_report(payload)
+    disk = text.split("ДИСК")[1].split("ПРИВЯЗКИ")[0]
+    assert "Code 99" in disk
+
+
+def test_storage_section_error_is_visible():
+    text = format_disk_report(_payload(section_errors={"storage": "timeout"}))
+    header = text.split("ДИСК")[0]
+    assert "ошибка чтения (timeout)" in header

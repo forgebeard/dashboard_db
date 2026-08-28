@@ -164,7 +164,7 @@ def get_gluster_volume_report(db_name: str, volume_id: str) -> dict:
                     vd.free_space
                 FROM gluster_volumes_view v
                 LEFT JOIN gluster_volume_details vd ON v.id::text = vd.volume_id::text
-                WHERE v.id::text = :volume_id
+                WHERE LOWER(v.id::text) = :volume_id
                 LIMIT 1
                 """,
                 {"volume_id": vid_search},

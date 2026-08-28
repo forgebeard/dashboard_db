@@ -328,7 +328,7 @@ def get_snapshot_inspector_report(
                         i.vm_snapshot_id::text,
                         i.size,
                         did.actual_size,
-                        sd.storage_name
+                        string_agg(DISTINCT sd.storage_name, ', ') AS storage_name
                     FROM vm_device vd
                     JOIN base_disks bd ON bd.disk_id = vd.device_id
                     JOIN images i ON i.image_group_id = bd.disk_id
@@ -336,6 +336,18 @@ def get_snapshot_inspector_report(
                     LEFT JOIN image_storage_domain_map m ON m.image_id = i.image_guid
                     LEFT JOIN storage_domain_static sd ON sd.id = m.storage_domain_id
                     WHERE vd.vm_id = :vm_guid AND vd.type = 'disk'
+                    GROUP BY
+                        bd.disk_alias,
+                        i.image_guid,
+                        i.parentid,
+                        i.active,
+                        i.imagestatus,
+                        i.volume_type,
+                        i.volume_format,
+                        i.vm_snapshot_id,
+                        i.size,
+                        did.actual_size,
+                        i.creation_date
                     ORDER BY bd.disk_alias, i.creation_date
                     """,
                     params,

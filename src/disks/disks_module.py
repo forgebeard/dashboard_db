@@ -11,7 +11,7 @@ from core.ui_utils import (
     render_page_header,
     style_status_column,
 )
-from disks.disks_utils import fetch_disks_data, process_disks_dataframe
+from disks.disks_utils import fetch_disks_data, prepare_disk_rows, process_disks_dataframe
 
 DISK_FILTER_DEFAULTS = {
     "disk_search_name": "",
@@ -58,9 +58,10 @@ def render_disks_list(active_db, cluster_meta):
             render_clear_filters_button(DISK_FILTER_DEFAULTS, key="disk_clear_filters")
 
     raw_df = fetch_disks_data(active_db, (search_disk, search_vm, search_sd))
-    counts = image_health_counts(
-        raw_df["imagestatus"] if not raw_df.empty else []
-    )
+    if raw_df.empty:
+        counts = image_health_counts([])
+    else:
+        counts = image_health_counts(prepare_disk_rows(raw_df)["_status_code"])
 
     health = "all"
     if not raw_df.empty:
@@ -80,11 +81,16 @@ def render_disks_list(active_db, cluster_meta):
         else raw_df
     )
 
+    no_search = not any([search_disk, search_vm, search_sd])
     with header_box:
         render_page_header(
             "Диски и образы",
             active_db,
-            details=[f"{counts['total']} образов"],
+            details=[
+                f"последние {counts['total']}"
+                if no_search
+                else f"{counts['total']} дисков"
+            ],
         )
 
     if raw_df.empty:
@@ -102,14 +108,14 @@ def render_disks_list(active_db, cluster_meta):
         selection_mode="single-row",
         column_config={
             "Имя диска": st.column_config.TextColumn(),
-            "UUID образа": st.column_config.TextColumn(width=220),
+            "UUID диска": st.column_config.TextColumn(width=220),
             "Статус": st.column_config.TextColumn(width=90),
             "ВМ": st.column_config.TextColumn(),
             "Хранилище": st.column_config.TextColumn(width=120),
             "Вирт. размер": st.column_config.TextColumn(width=100),
             "Факт. размер": st.column_config.TextColumn(width=100),
-            "Активен": st.column_config.CheckboxColumn(width=80),
             "_status_code": None,
+            "_inspect_image_guid": None,
         },
         height=dataframe_height(len(display_df)),
     )
@@ -117,9 +123,9 @@ def render_disks_list(active_db, cluster_meta):
     if event.selection.rows:
         idx = event.selection.rows[0]
         selected = display_df.iloc[idx]
-        selected_uuid = selected["UUID образа"]
+        selected_uuid = selected["_inspect_image_guid"]
         st.markdown(f"#### 🔍 Инспектор диска: {selected['Имя диска']}")
-        st.caption(f"UUID: `{selected_uuid}` | ВМ: {selected['ВМ']}")
+        st.caption(f"Диск: `{selected['UUID диска']}` | ВМ: {selected['ВМ']}")
         with st.spinner("Генерация полного отчета DISK-Inspector..."):
             from disks.disks_inspector_sql import get_disk_inspector_report
 

@@ -74,7 +74,7 @@ def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
         )
     with search_col:
         search_term = st.text_input(
-            "Поиск (Имя ВМ / UUID):",
+            "Поиск (Имя ВМ / UUID снапшота / слоя):",
             placeholder="Введите имя или UUID...",
             key="snap_search",
         )
@@ -109,7 +109,7 @@ def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
 
     with header_box:
         render_page_header(
-            "Снапшоты",
+            "Снапшоты и слои",
             active_db,
             details=[f"{counts['total']} снапшотов"],
         )
@@ -130,6 +130,7 @@ def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
         column_config={
             "Имя ВМ": st.column_config.TextColumn(),
             "UUID снапшота": st.column_config.TextColumn(width=220),
+            "UUID слоёв": st.column_config.TextColumn(width=220),
             "Дата создания": st.column_config.DatetimeColumn(
                 format="DD.MM.YYYY HH:mm", width=140
             ),
@@ -150,15 +151,28 @@ def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
         snap_id = selected["UUID снапшота"]
         snap_type = selected["Тип"]
         st.markdown(f"#### 🔍 Инспектор: {vm_name}")
-        st.caption(
-            f"ВМ UUID: `{selected['_vm_id']}` | снапшот: `{snap_id}` ({snap_type})"
+        layer_cell = str(selected["UUID слоёв"])
+        layer_guid = layer_cell.split(",")[0].strip()
+        missing_snap = snap_id in ("—", "", None) or str(snap_id).strip().lower() in (
+            "",
+            "00000000-0000-0000-0000-000000000000",
         )
-        with st.spinner("Генерация полного отчета Snapshot-Inspector..."):
-            from snapshots.snapshot_inspector_sql import get_snapshot_inspector_report
+        if missing_snap:
+            st.caption(f"ВМ UUID: `{selected['_vm_id']}` | слой без снапшота: `{layer_guid}`")
+            with st.spinner("Генерация отчета DISK-Inspector..."):
+                from disks.disks_inspector_sql import get_disk_inspector_report
 
-            result = get_snapshot_inspector_report(
-                active_db, str(selected["_vm_id"]), str(snap_id)
+                result = get_disk_inspector_report(active_db, layer_guid)
+        else:
+            st.caption(
+                f"ВМ UUID: `{selected['_vm_id']}` | снапшот: `{snap_id}` ({snap_type})"
             )
+            with st.spinner("Генерация полного отчета Snapshot-Inspector..."):
+                from snapshots.snapshot_inspector_sql import get_snapshot_inspector_report
+
+                result = get_snapshot_inspector_report(
+                    active_db, str(selected["_vm_id"]), str(snap_id)
+                )
         if "error" in result:
             st.error(result["error"])
         else:

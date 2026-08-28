@@ -43,7 +43,7 @@ def fetch_networks_data(
     if search_term:
         conditions.append(
             "(LOWER(n.name) LIKE LOWER(:search) OR n.vlan_id::text LIKE LOWER(:search) "
-            "OR n.id::text LIKE LOWER(:search))"
+            "OR LOWER(n.id::text) LIKE LOWER(:search))"
         )
         sql_params["search"] = f"%{search_term}%"
 

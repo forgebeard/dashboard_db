@@ -43,6 +43,23 @@ def test_two_images_same_snapshot_collapse():
     assert result.iloc[0]["Хранилище"] == "data01, data02"
     assert result.iloc[0]["Статус"] == "OK"
     assert result.iloc[0]["UUID снапшота"] == "snap-a"
+    layers = result.iloc[0]["UUID слоёв"]
+    assert "img-1" in layers
+    assert "img-2" in layers
+
+
+def test_same_image_two_storages_does_not_double_size():
+    df = pd.DataFrame(
+        [
+            _row(image_guid="img-1", size=10 * GIB, storage_name="data01"),
+            _row(image_guid="img-1", size=10 * GIB, storage_name="data02"),
+        ]
+    )
+    result = process_snapshot_dataframe(df)
+    assert len(result) == 1
+    assert result.iloc[0]["Размер"] == 10.0
+    assert result.iloc[0]["Хранилище"] == "data01, data02"
+    assert result.iloc[0]["UUID слоёв"] == "img-1"
 
 
 def test_vm_name_repeated_per_snapshot():
@@ -87,6 +104,7 @@ def test_display_columns_and_types():
     assert list(result.columns) == [
         "Имя ВМ",
         "UUID снапшота",
+        "UUID слоёв",
         "Дата создания",
         "Тип",
         "Статус",
@@ -137,6 +155,30 @@ def test_worst_status_prefers_illegal():
     assert result.iloc[0]["_status_code"] == 3
 
 
+def test_orphan_layer_without_snapshot():
+    df = pd.DataFrame(
+        [_row(snapshot_id=None, snapshot_type=None, image_guid="orphan-1")]
+    )
+    result = process_snapshot_dataframe(df)
+    assert len(result) == 1
+    assert result.iloc[0]["UUID снапшота"] == "—"
+    assert result.iloc[0]["UUID слоёв"] == "orphan-1"
+    assert result.iloc[0]["Тип"] == "—"
+
+
+def test_two_orphan_layers_are_separate_rows():
+    df = pd.DataFrame(
+        [
+            _row(snapshot_id=None, snapshot_type=None, image_guid="orphan-a"),
+            _row(snapshot_id=None, snapshot_type=None, image_guid="orphan-b"),
+        ]
+    )
+    result = process_snapshot_dataframe(df)
+    assert len(result) == 2
+    assert set(result["UUID слоёв"]) == {"orphan-a", "orphan-b"}
+    assert list(result["UUID снапшота"]) == ["—", "—"]
+
+
 @patch("snapshots.snapshots_utils.pd.read_sql")
 @patch("snapshots.snapshots_utils.get_sqlalchemy_engine")
 def test_fetch_sql_no_status_filter(mock_engine, mock_read_sql):
@@ -146,6 +188,9 @@ def test_fetch_sql_no_status_filter(mock_engine, mock_read_sql):
     fetch_snapshots_data("test_db", ("Все ДЦ", "Все кластеры", ""), {}, {})
 
     sql_text = str(mock_read_sql.call_args[0][0])
+    sql_l = sql_text.lower()
+    assert "union" in sql_l
+    assert "vm_device" in sql_l
     assert "vm_snapshot_id" in sql_text
     assert "s.snapshot_id" in sql_text
     assert "imagestatus IN" not in sql_text
@@ -167,6 +212,19 @@ def test_fetch_dc_cluster_search(mock_engine, mock_read_sql):
     params = mock_read_sql.call_args[1]["params"]
     assert "c.storage_pool_id = :dc_id" in sql_text
     assert "v.cluster_id = :cluster_id" in sql_text
+    assert "LOWER(i.image_guid::text) LIKE LOWER(:search)" in sql_text
     assert params["dc_id"] == "dc1"
     assert params["cluster_id"] == "c1"
     assert params["search"] == "%tsk1%"
+
+
+@patch("snapshots.snapshots_utils.fix_uuid_columns")
+@patch("snapshots.snapshots_utils.pd.read_sql")
+@patch("snapshots.snapshots_utils.get_sqlalchemy_engine")
+def test_fetch_applies_fix_uuid(mock_engine, mock_read_sql, mock_fix):
+    mock_engine.return_value = MagicMock()
+    empty = pd.DataFrame()
+    mock_read_sql.return_value = empty
+    mock_fix.return_value = empty
+    fetch_snapshots_data("test_db", ("Все ДЦ", "Все кластеры", ""), {}, {})
+    mock_fix.assert_called_once()

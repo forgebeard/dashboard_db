@@ -272,6 +272,37 @@ IMAGE_LAYER_ISSUE_ORDER: tuple[int, ...] = (
     IMAGE_STATUS_MERGING,
 )
 
+# --- ТИП СОДЕРЖИМОГО ДИСКА (DiskContentType) ---
+# Коды как в Engine PostgreSQL (base_disks.disk_content_type), явные value(), не ordinal().
+# Источник:
+#   oVirt Engine DiskContentType.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/storage/DiskContentType.java
+DISK_CONTENT_TYPE_MAP: Dict[int, str] = {
+    0: "DATA",
+    1: "OVF_STORE",
+    2: "MEMORY_DUMP_VOLUME",
+    3: "MEMORY_METADATA_VOLUME",
+    4: "ISO",
+    5: "HOSTED_ENGINE",
+    6: "HOSTED_ENGINE_SANLOCK",
+    7: "HOSTED_ENGINE_METADATA",
+    8: "HOSTED_ENGINE_CONFIGURATION",
+    9: "BACKUP_SCRATCH",
+}
+
+# --- СТАТУС СЕТИ НА КЛАСТЕРЕ (NetworkStatus) ---
+# Коды как в Engine PostgreSQL (network_cluster.status), явные value().
+# Источник:
+#   oVirt Engine NetworkStatus.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/network/NetworkStatus.java
+# network.type в Engine — Integer без Identifiable enum (Network.java); неизвестное = Code N.
+NETWORK_STATUS_NON_OPERATIONAL = 0
+NETWORK_STATUS_OPERATIONAL = 1
+NETWORK_STATUS_MAP: Dict[int, str] = {
+    NETWORK_STATUS_NON_OPERATIONAL: "NonOperational",
+    NETWORK_STATUS_OPERATIONAL: "Operational",
+}
+
 # --- СТАТУСЫ ОБЩИХ ДОМЕНОВ (StorageDomainSharedStatus) ---
 # Коды как в Engine PostgreSQL (storage_domain_shared_status.status), ordinal enum.
 # Источник:

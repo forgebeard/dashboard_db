@@ -142,6 +142,8 @@ def test_unknown_type_and_cluster_status_codes():
     assert "Code 99" in header
     clusters = text.split("КЛАСТЕРЫ")[1].split("ПРОФИЛИ")[0]
     assert "Code 7" in clusters
+    assert "Operational" in clusters
+    assert "NonOperational" in format_network_report(_payload()).split("КЛАСТЕРЫ")[1].split("ПРОФИЛИ")[0]
 
 
 def test_empty_sections():

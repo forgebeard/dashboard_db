@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from core.constants import mapped_code_label
+from core.constants import NETWORK_STATUS_MAP, mapped_code_label
 from core.inspector_base import InspectorBase
 from vms.vm_inspector_sql import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
@@ -19,9 +19,15 @@ SELECT
 FROM network_attachments na
 JOIN vds_interface vi ON na.nic_id = vi.id
 JOIN vds_static v ON vi.vds_id = v.vds_id
-WHERE na.network_id::text = :network_id
+WHERE LOWER(na.network_id::text) = :network_id
 ORDER BY v.vds_name, vi.name
 """
+
+
+def _network_cluster_status_label(code: Any) -> str:
+    if code in (None, ""):
+        return "—"
+    return mapped_code_label(code, NETWORK_STATUS_MAP)
 
 
 def _raw_code_label(code: Any) -> str:
@@ -78,7 +84,7 @@ def format_network_report(payload: dict[str, Any]) -> str:
         for row in clusters:
             lines.append(_kv_at("    ", "кластер", row.get("cluster_name") or "—"))
             lines.append(_kv_at("    ", "UUID", row.get("cluster_id")))
-            lines.append(_kv_at("    ", "статус", _raw_code_label(row.get("status"))))
+            lines.append(_kv_at("    ", "статус", _network_cluster_status_label(row.get("status"))))
             lines.append(_kv_at("    ", "management", _yes_no(row.get("management"))))
             lines.append(_kv_at("    ", "required", _yes_no(row.get("required"))))
             lines.append(_kv_at("    ", "display", _yes_no(row.get("is_display"))))
@@ -151,7 +157,7 @@ def format_network_report(payload: dict[str, Any]) -> str:
 
 def get_network_inspector_report(db_name: str, network_id: str) -> dict:
     """Отчёт по логической сети."""
-    net_search = str(network_id).strip()
+    net_search = str(network_id).strip().lower()
 
     try:
         with InspectorBase(db_name) as insp:
@@ -175,7 +181,7 @@ def get_network_inspector_report(db_name: str, network_id: str) -> dict:
                     sp.name AS dc_name
                 FROM network n
                 LEFT JOIN storage_pool sp ON n.storage_pool_id = sp.id
-                WHERE n.id::text = :network_id
+                WHERE LOWER(n.id::text) = :network_id
                 LIMIT 1
                 """,
                 {"network_id": net_search},

@@ -12,6 +12,7 @@ import streamlit as st       # Фреймворк UI (используется �
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА (CORE) ---
 from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
+from core.ui_utils import fix_uuid_columns
 
 
 def fetch_gluster_volumes(
@@ -58,7 +59,9 @@ def fetch_gluster_volumes(
         sql_params['cluster'] = cluster_filter
             
     if search_term:
-        conditions.append("(LOWER(v.vol_name) LIKE LOWER(:search) OR v.id::text LIKE LOWER(:search))")
+        conditions.append(
+            "(LOWER(v.vol_name) LIKE LOWER(:search) OR LOWER(v.id::text) LIKE LOWER(:search))"
+        )
         sql_params['search'] = f"%{search_term}%"
         
     if conditions:
@@ -69,7 +72,7 @@ def fetch_gluster_volumes(
     try:
         engine = get_sqlalchemy_engine(active_db)
         df = pd.read_sql(text(base_sql), engine, params=sql_params if sql_params else None)
-        return df
+        return fix_uuid_columns(df)
     except Exception as e:
         st.error(f"Ошибка загрузки томов Gluster: {e}")
         return pd.DataFrame()
@@ -91,8 +94,8 @@ def process_gluster_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     total = pd.to_numeric(df.get("total_space"), errors="coerce")
     used = pd.to_numeric(df.get("used_space"), errors="coerce")
-    usage = (used / total * 100).where(total > 0, 0)
-    df["_usage_pct"] = usage.fillna(0).round(1)
+    usage = (used / total * 100).where((total > 0) & used.notna())
+    df["_usage_pct"] = usage.round(1)
     df["cluster_name"] = df["cluster_name"].fillna("—")
     df["status"] = df["status"].fillna("—")
 

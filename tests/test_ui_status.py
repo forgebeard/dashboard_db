@@ -148,6 +148,17 @@ def test_architecture_and_bios_maps():
     assert BIOS_TYPE_MAP[3] == "Q35 OVMF"
 
 
+def test_disk_content_and_network_status_maps():
+    from core.constants import DISK_CONTENT_TYPE_MAP, NETWORK_STATUS_MAP, mapped_code_label
+
+    assert DISK_CONTENT_TYPE_MAP[0] == "DATA"
+    assert DISK_CONTENT_TYPE_MAP[4] == "ISO"
+    assert mapped_code_label(99, DISK_CONTENT_TYPE_MAP) == "Code 99"
+    assert NETWORK_STATUS_MAP[0] == "NonOperational"
+    assert NETWORK_STATUS_MAP[1] == "Operational"
+    assert mapped_code_label(7, NETWORK_STATUS_MAP) == "Code 7"
+
+
 def test_audit_severity_tones_and_labels():
     from core.constants import (
         AUDIT_SEVERITY_MAP,

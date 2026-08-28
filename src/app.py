@@ -71,7 +71,7 @@ _SHELL_SECTIONS = frozenset({
 SECTIONS: list[tuple[str, str, str]] = [
     ("hosts", "Хосты", ":material/dns:"),
     ("vms", "Виртуальные машины", ":material/computer:"),
-    ("snapshots", "Снапшоты", ":material/photo_camera:"),
+    ("snapshots", "Снапшоты и слои", ":material/photo_camera:"),
     ("clusters", "Кластеры", ":material/hub:"),
     ("networks", "Сети", ":material/lan:"),
     ("storage", "Хранилища", ":material/storage:"),

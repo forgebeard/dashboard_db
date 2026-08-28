@@ -1,4 +1,4 @@
-"""Диагностика раздела «Снапшоты»."""
+"""Диагностика раздела «Снапшоты и слои»."""
 
 from core.table_preview import render_grouped_table_preview
 
@@ -18,6 +18,6 @@ def render_snapshots_diagnostics(active_db: str) -> None:
     render_grouped_table_preview(
         active_db,
         SNAPSHOT_TABLES,
-        title="Таблицы раздела «Снапшоты»",
+        title="Таблицы раздела «Снапшоты и слои»",
         limit_key=f"snap_limit_{active_db}",
     )
