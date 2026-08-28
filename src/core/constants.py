@@ -216,12 +216,20 @@ IMAGE_LAYER_ISSUE_ORDER: tuple[int, ...] = (
     IMAGE_STATUS_MERGING,
 )
 
-# --- СТАТУСЫ ОБЩИХ ДОМЕНОВ (SharedStatus) ---
+# --- СТАТУСЫ ОБЩИХ ДОМЕНОВ (StorageDomainSharedStatus) ---
+# Коды как в Engine PostgreSQL (storage_domain_shared_status.status), ordinal enum.
+# Источник:
+#   oVirt Engine StorageDomainSharedStatus.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/StorageDomainSharedStatus.java
+STORAGE_SHARED_UNATTACHED = 0
+STORAGE_SHARED_ACTIVE = 1
+STORAGE_SHARED_INACTIVE = 2
+STORAGE_SHARED_MIXED = 3
 SHARED_STATUS_MAP: Dict[int, str] = {
-    0: "Unknown",
-    1: "Active",     # Активен и доступен
-    2: "Maintenance",# В обслуживании
-    3: "Problem"     # Проблемы с доступностью
+    STORAGE_SHARED_UNATTACHED: "Unattached",
+    STORAGE_SHARED_ACTIVE: "Active",
+    STORAGE_SHARED_INACTIVE: "Inactive",
+    STORAGE_SHARED_MIXED: "Mixed",
 }
 
 
@@ -288,6 +296,27 @@ def vm_layer_tone(status_code: object) -> StatusTone | None:
     if code in (IMAGE_STATUS_LOCKED, IMAGE_STATUS_MERGING):
         return "warning"
     return None
+
+
+def storage_is_problem(status_code: object) -> bool:
+    """Проблема: Inactive или Mixed (не Active и не Unattached)."""
+    return _as_int_code(status_code) in (
+        STORAGE_SHARED_INACTIVE,
+        STORAGE_SHARED_MIXED,
+    )
+
+
+def storage_status_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == STORAGE_SHARED_ACTIVE:
+        return "success"
+    if code == STORAGE_SHARED_UNATTACHED:
+        return "neutral"
+    if code == STORAGE_SHARED_MIXED:
+        return "warning"
+    if code == STORAGE_SHARED_INACTIVE:
+        return "critical"
+    return "neutral"
 
 
 def _as_count(value: object) -> int:
@@ -375,4 +404,18 @@ def vm_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
         "up": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_UP),
         "down": sum(1 for c in codes if _as_int_code(c) == VM_STATUS_DOWN),
         "problems": sum(1 for c in codes if vm_is_problem(c)),
+    }
+
+
+def storage_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
+    codes = list(status_codes)
+    return {
+        "total": len(codes),
+        "active": sum(
+            1 for c in codes if _as_int_code(c) == STORAGE_SHARED_ACTIVE
+        ),
+        "unattached": sum(
+            1 for c in codes if _as_int_code(c) == STORAGE_SHARED_UNATTACHED
+        ),
+        "problems": sum(1 for c in codes if storage_is_problem(c)),
     }

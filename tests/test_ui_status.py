@@ -12,6 +12,9 @@ from core.constants import (
     host_is_maintenance,
     host_is_problem,
     host_status_tone,
+    storage_health_counts,
+    storage_is_problem,
+    storage_status_tone,
     vm_health_counts,
     vm_is_problem,
     vm_layer_tone,
@@ -100,6 +103,22 @@ def test_cluster_health_counts():
         [CLUSTER_STATUS_OK, CLUSTER_STATUS_OK, CLUSTER_STATUS_PROBLEMS]
     )
     assert counts == {"total": 3, "ok": 2, "problems": 1}
+
+
+def test_storage_shared_status_contract():
+    assert storage_is_problem(1) is False
+    assert storage_is_problem(0) is False
+    assert storage_is_problem(2) is True
+    assert storage_is_problem(3) is True
+    assert storage_status_tone(1) == "success"
+    assert storage_status_tone(0) == "neutral"
+    assert storage_status_tone(3) == "warning"
+    assert storage_status_tone(2) == "critical"
+
+
+def test_storage_health_counts():
+    counts = storage_health_counts([1, 1, 0, 2, 3])
+    assert counts == {"total": 5, "active": 2, "unattached": 1, "problems": 2}
 
 
 def test_architecture_and_bios_maps():
