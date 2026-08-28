@@ -1,39 +1,57 @@
 # src/audit/audit_module.py
-"""
-Модуль отображения журнала событий (Audit Log UI).
-Отвечает за: отрисовку каскадных фильтров, таблицы логов и поиск по ВМ/Хостам.
-"""
+"""Журнал событий: фильтры, pills важности и деталь по клику (без инспектора)."""
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
+import streamlit as st
 
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
 from .audit_utils import (
-    load_audit_infrastructure_maps,  # Загрузка связей ДЦ/Кластеры/Хосты для каскадных фильтров
-    fetch_audit_logs                 # Выполнение параметризованного SQL-запроса к audit_log
+    fetch_audit_logs,
+    format_audit_event_detail,
+    load_audit_infrastructure_maps,
+    process_audit_dataframe,
 )
-from core.constants import (
-    AUDIT_SEVERITY_ALERT,
-    AUDIT_SEVERITY_ERROR,
-    AUDIT_SEVERITY_WARNING,
-    audit_severity_label,
-    audit_severity_tone,
-)
+from core.constants import audit_health_counts, audit_severity_tone
 from core.data_loader import host_ids_for_infra_filters
-from core.ui_utils import dataframe_height, style_status_column
+from core.ui_utils import (
+    dataframe_height,
+    filters_are_active,
+    render_clear_filters_button,
+    render_health_filter,
+    render_page_header,
+    style_status_column,
+)
+
+AUDIT_FILTER_DEFAULTS = {
+    "audit_dc": "Все ДЦ",
+    "audit_cl": "Все кластеры",
+    "audit_host": "Все хосты",
+    "audit_search": "",
+    "audit_start": None,
+    "audit_end": None,
+    "audit_lim": 500,
+    "audit_health_filter": "all",
+}
 
 
 def render_audit_log(active_db, cluster_meta=None):
     maps = load_audit_infrastructure_maps(active_db, cluster_meta)
 
-    # --- СТРОКА 1: ФИЛЬТРЫ ИНФРАСТРУКТУРЫ И ПОИСК ---
-    c1, c2, c3, c4 = st.columns([1, 1, 2, 1])
+    header_box = st.container()
+    show_clear = filters_are_active(AUDIT_FILTER_DEFAULTS)
+    if show_clear:
+        health_col, dc_col, cl_col, host_col, clear_col = st.columns(
+            [1.7, 1, 1, 1, 0.9], vertical_alignment="bottom"
+        )
+    else:
+        health_col, dc_col, cl_col, host_col = st.columns(
+            [1.7, 1, 1, 1.4], vertical_alignment="bottom"
+        )
+        clear_col = None
 
-    with c1:
+    with dc_col:
         dc_opts = ["Все ДЦ"] + sorted(set(maps["dc_id_to_name"].values()))
         sel_dc = st.selectbox("Дата-центр", dc_opts, key="audit_dc")
 
-    with c2:
+    with cl_col:
         cl_opts = ["Все кластеры"]
         if sel_dc != "Все ДЦ":
             dc_id = next((k for k, v in maps["dc_id_to_name"].items() if v == sel_dc), None)
@@ -47,7 +65,7 @@ def render_audit_log(active_db, cluster_meta=None):
             cl_opts += sorted(set(maps["cluster_id_to_name"].values()))
         sel_cl = st.selectbox("Кластер", cl_opts, key="audit_cl")
 
-    with c3:
+    with host_col:
         h_opts = ["Все хосты"]
         if sel_cl != "Все кластеры":
             cl_id = next((k for k, v in maps["cluster_id_to_name"].items() if v == sel_cl), None)
@@ -61,65 +79,80 @@ def render_audit_log(active_db, cluster_meta=None):
             h_opts += sorted(set(maps["host_id_to_name"].values()))
         sel_host = st.selectbox("Хост", h_opts, key="audit_host")
 
-    with c4:
-        search_vm = st.text_input(
-            "Поиск ВМ (имя/UUID)",
-            placeholder="Например: tsk1-zabbix...",
-            key="audit_vm_search",
-        )
+    if clear_col is not None:
+        with clear_col:
+            render_clear_filters_button(
+                AUDIT_FILTER_DEFAULTS, key="audit_clear_filters"
+            )
 
-    t1, t2, t3, t4 = st.columns([2, 2, 1, 1])
-    with t1:
+    search_col, start_col, end_col, limit_col = st.columns(
+        [2.2, 1.4, 1.4, 0.8], vertical_alignment="bottom"
+    )
+    with search_col:
+        search_term = st.text_input(
+            "Поиск (событие / сообщение / ВМ)",
+            placeholder="USER_ADD_VM, текст, имя или UUID...",
+            key="audit_search",
+        )
+    with start_col:
         start_dt = st.datetime_input("С", value=None, key="audit_start")
-    with t2:
+    with end_col:
         end_dt = st.datetime_input("По", value=None, key="audit_end")
-    with t3:
-        sev_map = {
-            "Все": None,
-            "Warning": AUDIT_SEVERITY_WARNING,
-            "Error": AUDIT_SEVERITY_ERROR,
-            "Alert": AUDIT_SEVERITY_ALERT,
-        }
-        sel_sev = st.selectbox("Важность", list(sev_map.keys()), key="audit_sev")
-    with t4:
+    with limit_col:
         limit_val = st.number_input("Лимит", 50, 10000, 500, step=50, key="audit_lim")
 
     host_ids = host_ids_for_infra_filters(maps, sel_dc, sel_cl, sel_host)
     filters = {
         "host_ids": None if host_ids is None else tuple(host_ids),
-        "vm_search": search_vm.strip() if search_vm else None,
-        "severity_code": sev_map[sel_sev],
+        "search": search_term.strip() if search_term else None,
         "start_dt": start_dt,
         "end_dt": end_dt,
     }
 
     df = fetch_audit_logs(active_db, filters, limit_val)
+    counts = audit_health_counts(df["severity"] if not df.empty else [])
+
+    health = "all"
+    if not df.empty:
+        with health_col:
+            health = render_health_filter(
+                (
+                    ("all", f"Все ({counts['total']})"),
+                    ("warning", f"Warning ({counts['warning']})"),
+                    ("errors", f"Error+Alert ({counts['errors']})"),
+                ),
+                key="audit_health_filter",
+            )
+
+    display_df = process_audit_dataframe(df, health_filter=health) if not df.empty else df
+
+    with header_box:
+        render_page_header(
+            "Журнал событий",
+            active_db,
+            details=[f"{counts['total']} записей"],
+        )
 
     if df.empty:
         st.info("Нет записей по заданным критериям.")
         return
+    if display_df.empty:
+        st.info("Нет записей, соответствующих выбранной важности.")
+        return
 
-    show_df = df[
-        ["log_time", "log_type_name", "severity", "message", "vds_name", "vm_name", "user_name"]
-    ].copy()
-    show_df["_status_code"] = show_df["severity"]
-    show_df["severity"] = show_df["_status_code"].map(audit_severity_label)
-    show_df = show_df.rename(
-        columns={
-            "log_time": "Время",
-            "log_type_name": "Событие",
-            "severity": "Ур.",
-            "message": "Сообщение",
-            "vds_name": "Хост",
-            "vm_name": "ВМ",
-            "user_name": "User",
-        }
-    )
-
-    st.dataframe(
-        style_status_column(show_df, audit_severity_tone, status_col="Ур."),
+    event = st.dataframe(
+        style_status_column(display_df, audit_severity_tone, status_col="Ур."),
         width="stretch",
         hide_index=True,
-        height=dataframe_height(len(show_df)),
+        on_select="rerun",
+        selection_mode="single-row",
+        height=dataframe_height(len(display_df)),
         column_config={"_status_code": None},
     )
+
+    if event.selection.rows:
+        idx = event.selection.rows[0]
+        # display_df — срез raw df с тем же порядком строк после фильтра pills
+        selected_raw = df.loc[display_df.index[idx]]
+        st.markdown("#### Событие")
+        st.code(format_audit_event_detail(selected_raw), language="text")

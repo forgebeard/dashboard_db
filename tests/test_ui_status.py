@@ -165,3 +165,41 @@ def test_async_task_status_map():
     assert async_task_result_label(1) == "failure"
     assert ACTION_TYPE_MAP[261] == "ConvertDisk"
     assert action_type_label(261) == "ConvertDisk"
+
+
+def test_vdc_object_type_disk():
+    from core.constants import vdc_object_type_label
+
+    assert vdc_object_type_label(19) == "диск"
+    assert vdc_object_type_label(5) == "ВМ"
+    assert vdc_object_type_label(99) == "тип 99"
+
+
+def test_async_task_buckets_are_exclusive():
+    from core.constants import (
+        async_task_bucket_code,
+        async_task_health_counts,
+        async_task_is_error,
+        async_task_is_finished,
+        async_task_is_running,
+    )
+
+    assert async_task_is_error(3, 1) is True
+    assert async_task_is_finished(3, 1) is False
+    assert async_task_is_running(2, 0) is True
+    assert async_task_is_finished(3, 0) is True
+    assert async_task_is_error(0, 0) is True
+    assert async_task_bucket_code(3, 0) == 0
+    assert async_task_bucket_code(2, 0) == 1
+    assert async_task_bucket_code(3, 1) == 2
+    counts = async_task_health_counts([(2, 0), (3, 0), (3, 1), (0, 0)])
+    assert counts == {"total": 4, "running": 1, "finished": 1, "errors": 2}
+
+
+def test_audit_health_counts_normal_only_in_total():
+    from core.constants import audit_health_counts
+
+    counts = audit_health_counts([0, 0, 1, 2, 3])
+    assert counts["total"] == 5
+    assert counts["warning"] == 1
+    assert counts["errors"] == 2

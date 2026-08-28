@@ -18,13 +18,6 @@ TASK_TABLES = {
         "step_subject_entity": "Связи шагов с сущностями",
         "command_assoc_entities": "Связи команд с сущностями",
     },
-    "Audit & Events": {
-        "audit_log": "Аудит-лог событий",
-        "event_map": "Карта событий",
-        "event_notification_hist": "История уведомлений",
-        "event_subscriber": "Подписчики событий",
-        "dwh_history_timekeeping": "Отслеживание времени для DWH",
-    },
 }
 
 

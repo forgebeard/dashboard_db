@@ -11,6 +11,10 @@ from typing import Optional
 
 from core.constants import (
     action_type_label,
+    async_task_bucket_code,
+    async_task_is_error,
+    async_task_is_finished,
+    async_task_is_running,
     async_task_result_label,
     async_task_status_label,
 )
@@ -113,17 +117,123 @@ def build_tasks_list_sql(
     return text(sql), params
 
 
-def format_tasks_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Колонки списка: Начато, Команда, Статус, Результат."""
+def process_tasks_dataframe(
+    df: pd.DataFrame, health_filter: str = "all"
+) -> pd.DataFrame:
+    """Колонки списка + pills running/finished/ошибки."""
     if df.empty:
         return pd.DataFrame()
 
     result = df.copy()
     command_code = result["command_type"]
     if "action_type" in result.columns:
-        command_code = command_code.where(command_code.notna() & (command_code != 0), result["action_type"])
+        command_code = command_code.where(
+            command_code.notna() & (command_code != 0), result["action_type"]
+        )
     result["Начато"] = pd.to_datetime(result["started_at"]).dt.strftime("%d.%m.%Y %H:%M:%S")
     result["Команда"] = command_code.map(action_type_label)
+    result["UUID"] = result["task_id"].astype(str)
+    result["correlation"] = result["root_command_id"].astype(str)
     result["Статус"] = result["status"].map(async_task_status_label)
     result["Результат"] = result["result"].map(async_task_result_label)
-    return result[["Начато", "Команда", "Статус", "Результат"]]
+    result["_vdsm_task_id"] = (
+        result["vdsm_task_id_txt"].astype(str) if "vdsm_task_id_txt" in result.columns else ""
+    )
+    result["_status_code"] = [
+        async_task_bucket_code(status, res)
+        for status, res in zip(result["status"], result["result"])
+    ]
+    result["_result_code"] = result["result"]
+
+    if health_filter == "running":
+        mask = [
+            async_task_is_running(status, res)
+            for status, res in zip(result["status"], result["result"])
+        ]
+        result = result[mask]
+    elif health_filter == "finished":
+        mask = [
+            async_task_is_finished(status, res)
+            for status, res in zip(result["status"], result["result"])
+        ]
+        result = result[mask]
+    elif health_filter == "errors":
+        mask = [
+            async_task_is_error(status, res)
+            for status, res in zip(result["status"], result["result"])
+        ]
+        result = result[mask]
+
+    if result.empty:
+        return pd.DataFrame()
+
+    return result[
+        [
+            "Начато",
+            "Команда",
+            "UUID",
+            "correlation",
+            "Статус",
+            "Результат",
+            "_status_code",
+            "_result_code",
+            "_vdsm_task_id",
+        ]
+    ]
+
+
+def format_tasks_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Обратная совместимость: полный список без pills."""
+    return process_tasks_dataframe(df, health_filter="all")
+
+
+def build_task_entities_sql(task_id: str) -> tuple[str, dict]:
+    sql = """
+        SELECT
+            e.entity_type,
+            e.entity_id::text AS entity_id,
+            COALESCE(
+                sd.storage_name,
+                vm.vm_name,
+                vds.vds_name,
+                bd.disk_alias
+            ) AS entity_name
+        FROM async_tasks_entities e
+        LEFT JOIN storage_domain_static sd
+            ON e.entity_id = sd.id
+            AND LOWER(e.entity_type) IN ('storage', 'storage_domain')
+        LEFT JOIN vm_static vm
+            ON e.entity_id = vm.vm_guid
+            AND LOWER(e.entity_type) = 'vm'
+        LEFT JOIN vds_static vds
+            ON e.entity_id = vds.vds_id
+            AND LOWER(e.entity_type) IN ('vds', 'host')
+        LEFT JOIN base_disks bd
+            ON e.entity_id = bd.disk_id
+            AND LOWER(e.entity_type) = 'disk'
+        WHERE e.async_task_id::text = :tid
+        ORDER BY e.entity_type, entity_name
+    """
+    return sql, {"tid": task_id}
+
+
+def process_task_entities(entities: pd.DataFrame) -> pd.DataFrame:
+    if entities is None or entities.empty:
+        return pd.DataFrame(columns=["Тип", "Объект"])
+    work = entities.copy()
+    names = work["entity_name"] if "entity_name" in work.columns else None
+
+    def _name(row: pd.Series) -> str:
+        if names is not None:
+            value = row.get("entity_name")
+            if value is not None and not (isinstance(value, float) and pd.isna(value)):
+                text_name = str(value).strip()
+                if text_name and text_name.lower() not in ("none", "nan"):
+                    return text_name
+        oid = row.get("entity_id")
+        text_id = "" if oid is None else str(oid).strip()
+        return text_id[:8] if text_id else "—"
+
+    work["Тип"] = work["entity_type"].fillna("—")
+    work["Объект"] = work.apply(_name, axis=1)
+    return work[["Тип", "Объект"]].reset_index(drop=True)

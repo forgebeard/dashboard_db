@@ -1,37 +1,62 @@
 # src/tasks/tasks_module.py
-"""
-Модуль отображения списка задач VDSM (UI).
-Отвечает за: отрисовку фильтров (по ДЦ/Хосту/ВМ) и таблицы асинхронных задач.
-"""
+"""Список async-задач: фильтры, pills и сущности задачи по клику."""
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
-import pandas as pd         # Работа с табличными данными и подготовка DataFrame для отображения
-
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
+import pandas as pd
+import streamlit as st
 from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
-from core.data_loader import host_ids_for_infra_filters
-from core.ui_utils import dataframe_height
 from audit.audit_utils import load_audit_infrastructure_maps
+from core.constants import async_task_bucket_tone, async_task_health_counts, async_task_result_tone
+from core.data_loader import host_ids_for_infra_filters
+from core.db_utils import get_sqlalchemy_engine
+from core.ui_utils import (
+    dataframe_height,
+    filters_are_active,
+    render_clear_filters_button,
+    render_health_filter,
+    render_page_header,
+    style_status_column,
+)
 from .tasks_utils import (
     build_audit_correlation_sql,
+    build_task_entities_sql,
     build_tasks_list_sql,
-    format_tasks_dataframe,
+    process_task_entities,
+    process_tasks_dataframe,
 )
+
+TASK_FILTER_DEFAULTS = {
+    "task_dc": "Все ДЦ",
+    "task_cl": "Все кластеры",
+    "task_host": "Все хосты",
+    "task_vm_search": "",
+    "task_start": None,
+    "task_end": None,
+    "task_id_search": "",
+    "task_health_filter": "all",
+}
 
 
 def render_tasks_list(active_db, cluster_meta=None):
     maps = load_audit_infrastructure_maps(active_db, cluster_meta)
 
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
+    header_box = st.container()
+    show_clear = filters_are_active(TASK_FILTER_DEFAULTS)
+    if show_clear:
+        health_col, dc_col, cl_col, host_col, clear_col = st.columns(
+            [1.7, 1, 1, 1, 0.9], vertical_alignment="bottom"
+        )
+    else:
+        health_col, dc_col, cl_col, host_col = st.columns(
+            [1.7, 1, 1, 1.4], vertical_alignment="bottom"
+        )
+        clear_col = None
 
-    with c1:
+    with dc_col:
         dc_opts = ["Все ДЦ"] + sorted(set(maps["dc_id_to_name"].values()))
         sel_dc = st.selectbox("Дата-центр", dc_opts, key="task_dc")
 
-    with c2:
+    with cl_col:
         cl_opts = ["Все кластеры"]
         if sel_dc != "Все ДЦ":
             dc_id = next((k for k, v in maps["dc_id_to_name"].items() if v == sel_dc), None)
@@ -45,7 +70,7 @@ def render_tasks_list(active_db, cluster_meta=None):
             cl_opts += sorted(set(maps["cluster_id_to_name"].values()))
         sel_cl = st.selectbox("Кластер", cl_opts, key="task_cl")
 
-    with c3:
+    with host_col:
         h_opts = ["Все хосты"]
         if sel_cl != "Все кластеры":
             cl_id = next((k for k, v in maps["cluster_id_to_name"].items() if v == sel_cl), None)
@@ -59,17 +84,22 @@ def render_tasks_list(active_db, cluster_meta=None):
             h_opts += sorted(set(maps["host_id_to_name"].values()))
         sel_host = st.selectbox("Хост", h_opts, key="task_host")
 
-    with c4:
+    if clear_col is not None:
+        with clear_col:
+            render_clear_filters_button(TASK_FILTER_DEFAULTS, key="task_clear_filters")
+
+    search_col, start_col, end_col, id_col = st.columns(
+        [1.6, 1.2, 1.2, 1.4], vertical_alignment="bottom"
+    )
+    with search_col:
         search_vm = st.text_input(
             "Поиск ВМ (имя)", placeholder="Например: zabbix...", key="task_vm_search"
         )
-
-    t1, t2, t3 = st.columns([2, 2, 2])
-    with t1:
+    with start_col:
         start_dt = st.datetime_input("С даты", value=None, key="task_start")
-    with t2:
+    with end_col:
         end_dt = st.datetime_input("По дату", value=None, key="task_end")
-    with t3:
+    with id_col:
         search_id = st.text_input(
             "Поиск по Task ID", placeholder="UUID задачи...", key="task_id_search"
         )
@@ -108,25 +138,95 @@ def render_tasks_list(active_db, cluster_meta=None):
     try:
         engine = get_sqlalchemy_engine(active_db)
         df = pd.read_sql(sql, engine, params=params)
-
-        if df.empty:
-            st.info("Задач не найдено по заданным критериям.")
-            return
-
-        show_df = format_tasks_dataframe(df)
-        st.dataframe(
-            show_df,
-            width="stretch",
-            hide_index=True,
-            height=dataframe_height(len(show_df)),
-            column_config={
-                "Начато": st.column_config.TextColumn(width=160),
-                "Команда": st.column_config.TextColumn(width="medium"),
-                "Статус": st.column_config.TextColumn(width=110),
-                "Результат": st.column_config.TextColumn(width=120),
-            },
-        )
-
     except Exception as e:
         st.error(f"Ошибка загрузки задач: {e}")
         st.exception(e)
+        return
+
+    pairs = (
+        list(zip(df["status"], df["result"])) if not df.empty else []
+    )
+    counts = async_task_health_counts(pairs)
+
+    health = "all"
+    if not df.empty:
+        with health_col:
+            health = render_health_filter(
+                (
+                    ("all", f"Все ({counts['total']})"),
+                    ("running", f"running ({counts['running']})"),
+                    ("finished", f"finished ({counts['finished']})"),
+                    ("errors", f"ошибки ({counts['errors']})"),
+                ),
+                key="task_health_filter",
+            )
+
+    show_df = process_tasks_dataframe(df, health_filter=health) if not df.empty else df
+
+    with header_box:
+        render_page_header(
+            "Задачи",
+            active_db,
+            details=[f"{counts['total']} задач"],
+        )
+
+    if df.empty:
+        st.info("Задач не найдено по заданным критериям.")
+        return
+    if show_df.empty:
+        st.info("Нет задач, соответствующих выбранному состоянию.")
+        return
+
+    event = st.dataframe(
+        style_status_column(
+            show_df,
+            async_task_bucket_tone,
+            extra=[("Результат", "_result_code", async_task_result_tone)],
+        ),
+        width="stretch",
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        height=dataframe_height(len(show_df)),
+        column_config={
+            "Начато": st.column_config.TextColumn(width=160),
+            "Команда": st.column_config.TextColumn(width="medium"),
+            "UUID": st.column_config.TextColumn(width=220),
+            "correlation": st.column_config.TextColumn(width=220),
+            "Статус": st.column_config.TextColumn(width=110),
+            "Результат": st.column_config.TextColumn(width=120),
+            "_status_code": None,
+            "_result_code": None,
+            "_vdsm_task_id": None,
+        },
+    )
+
+    if not event.selection.rows:
+        return
+
+    idx = event.selection.rows[0]
+    selected = show_df.iloc[idx]
+    task_id = str(selected["UUID"])
+    st.markdown(f"#### {selected['Команда']}")
+    vdsm = selected.get("_vdsm_task_id") or "—"
+    st.caption(
+        f"Начато: {selected['Начато']} · "
+        f"{selected['Статус']} / {selected['Результат']} · "
+        f"UUID: `{task_id}` · command: `{selected['correlation']}` · "
+        f"vdsm: `{vdsm}`"
+    )
+    try:
+        ent_sql, ent_params = build_task_entities_sql(task_id)
+        entities = pd.read_sql(text(ent_sql), engine, params=ent_params)
+        detail = process_task_entities(entities)
+        if detail.empty:
+            st.info("Объекты не привязаны.")
+        else:
+            st.dataframe(
+                detail,
+                width="stretch",
+                hide_index=True,
+                height=dataframe_height(len(detail)),
+            )
+    except Exception as e:
+        st.error(f"Не удалось загрузить объекты задачи: {e}")

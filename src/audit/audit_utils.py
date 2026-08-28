@@ -9,6 +9,12 @@ import streamlit as st
 
 from core.db_utils import get_sqlalchemy_engine
 from core.data_loader import build_infra_filter_maps
+from core.constants import (
+    AUDIT_SEVERITY_ALERT,
+    AUDIT_SEVERITY_ERROR,
+    AUDIT_SEVERITY_WARNING,
+    audit_severity_label,
+)
 
 def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
     """Справочники фильтров: из cluster_meta, без полного скана audit_log."""
@@ -50,9 +56,15 @@ def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
 def build_audit_logs_sql(filters: dict, limit_val: int) -> tuple[str, dict]:
     """Параметризованный SELECT из audit_log. host_ids: None | [] | [id, ...]."""
     sql = """
-        SELECT 
+        SELECT
             audit_log_id, log_time, log_type_name, severity, message,
-            vds_id::text, vds_name, vm_id::text, vm_name, user_name
+            vds_id::text AS vds_id, vds_name,
+            vm_id::text AS vm_id, vm_name,
+            user_id::text AS user_id, user_name,
+            correlation_id::text AS correlation_id,
+            job_id::text AS job_id,
+            cluster_id::text AS cluster_id, cluster_name,
+            storage_domain_id::text AS storage_domain_id, storage_domain_name
         FROM audit_log
         WHERE deleted = false
     """
@@ -66,10 +78,16 @@ def build_audit_logs_sql(filters: dict, limit_val: int) -> tuple[str, dict]:
             sql += " AND vds_id::text IN :host_ids"
             params["host_ids"] = tuple(host_ids)
 
-    if filters.get("vm_search"):
-        term = f"%{filters['vm_search']}%"
-        sql += " AND (LOWER(vm_name) LIKE LOWER(:vm_term) OR vm_id::text LIKE LOWER(:vm_term))"
-        params["vm_term"] = term
+    search = filters.get("search") or filters.get("vm_search")
+    if search:
+        term = f"%{search}%"
+        sql += """ AND (
+            LOWER(COALESCE(log_type_name, '')) LIKE LOWER(:q)
+            OR LOWER(COALESCE(message, '')) LIKE LOWER(:q)
+            OR LOWER(COALESCE(vm_name, '')) LIKE LOWER(:q)
+            OR vm_id::text LIKE LOWER(:q)
+        )"""
+        params["q"] = term
 
     if filters.get("severity_code") is not None:
         sql += " AND severity = :sev_code"
@@ -101,3 +119,69 @@ def fetch_audit_logs(active_db, filters, limit_val):
     except Exception as e:
         st.error(f"Ошибка чтения audit_log: {e}")
         return pd.DataFrame()
+
+
+def process_audit_dataframe(
+    df: pd.DataFrame, health_filter: str = "all"
+) -> pd.DataFrame:
+    """Таблица журнала + фильтр по важности (pills)."""
+    if df.empty:
+        return pd.DataFrame()
+
+    work = df.copy()
+    if health_filter == "warning":
+        work = work[work["severity"] == AUDIT_SEVERITY_WARNING]
+    elif health_filter == "errors":
+        work = work[work["severity"].isin([AUDIT_SEVERITY_ERROR, AUDIT_SEVERITY_ALERT])]
+    if work.empty:
+        return pd.DataFrame()
+
+    show = work[
+        [
+            "log_time",
+            "log_type_name",
+            "severity",
+            "message",
+            "vds_name",
+            "vm_name",
+            "user_name",
+        ]
+    ].copy()
+    show["_status_code"] = show["severity"]
+    show["severity"] = show["_status_code"].map(audit_severity_label)
+    return show.rename(
+        columns={
+            "log_time": "Время",
+            "log_type_name": "Событие",
+            "severity": "Ур.",
+            "message": "Сообщение",
+            "vds_name": "Хост",
+            "vm_name": "ВМ",
+            "user_name": "User",
+        }
+    )
+
+
+def format_audit_event_detail(row: pd.Series) -> str:
+    """Полное сообщение и идентификаторы сущности по выбранной строке."""
+    def _val(key: str) -> str:
+        value = row.get(key)
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return "—"
+        text = str(value).strip()
+        return text if text and text.lower() != "none" else "—"
+
+    lines = [
+        _val("message"),
+        "",
+        f"Событие: {_val('log_type_name')}",
+        f"user_id: {_val('user_id')}  ({_val('user_name')})",
+        f"vm_id: {_val('vm_id')}  ({_val('vm_name')})",
+        f"vds_id: {_val('vds_id')}  ({_val('vds_name')})",
+        f"cluster_id: {_val('cluster_id')}  ({_val('cluster_name')})",
+        f"storage_domain_id: {_val('storage_domain_id')}  ({_val('storage_domain_name')})",
+        f"job_id: {_val('job_id')}",
+        f"correlation_id: {_val('correlation_id')}",
+        f"audit_log_id: {_val('audit_log_id')}",
+    ]
+    return "\n".join(lines)

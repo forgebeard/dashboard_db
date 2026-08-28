@@ -132,32 +132,88 @@ AUDIT_SEVERITY_MAP: Dict[int, str] = {
     AUDIT_SEVERITY_ALERT: "Alert",
 }
 
+# --- ТИП ОБЪЕКТА ПРАВ (VdcObjectType) ---
+# Коды как в Engine (permissions.object_type_id), явные value(), не ordinal().
+# Источник:
+#   oVirt Engine VdcObjectType.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/VdcObjectType.java
+# Дамп: DiskOperator на object_type_id=19 (Disk).
+VDC_OBJECT_TYPE_MAP: Dict[int, str] = {
+    1: "каталог",
+    2: "система",
+    3: "хранилище",
+    4: "дата-центр",
+    5: "ВМ",
+    6: "шаблон",
+    7: "пул ВМ",
+    8: "хост",
+    9: "кластер",
+    10: "закладка",
+    11: "категория",
+    12: "тег",
+    13: "пользователь",
+    14: "право",
+    15: "роль",
+    16: "уведомление",
+    17: "квота",
+    18: "том Gluster",
+    19: "диск",
+    20: "сеть",
+    21: "профиль vNIC",
+    22: "пул MAC",
+}
+
 # --- ASYNC-ЗАДАЧИ (AsyncTaskStatusEnum) ---
 # Коды как в Engine (async_tasks.status), явные значения из Java, не ordinal().
 # Источник:
 #   oVirt Engine AsyncTaskStatusEnum.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/AsyncTaskStatusEnum.java
+ASYNC_TASK_STATUS_UNKNOWN = 0
+ASYNC_TASK_STATUS_INIT = 1
+ASYNC_TASK_STATUS_RUNNING = 2
+ASYNC_TASK_STATUS_FINISHED = 3
+ASYNC_TASK_STATUS_ABORTING = 4
+ASYNC_TASK_STATUS_CLEANING = 5
 ASYNC_TASK_STATUS_MAP: Dict[int, str] = {
-    0: "unknown",
-    1: "init",
-    2: "running",
-    3: "finished",
-    4: "aborting",
-    5: "cleaning",
+    ASYNC_TASK_STATUS_UNKNOWN: "unknown",
+    ASYNC_TASK_STATUS_INIT: "init",
+    ASYNC_TASK_STATUS_RUNNING: "running",
+    ASYNC_TASK_STATUS_FINISHED: "finished",
+    ASYNC_TASK_STATUS_ABORTING: "aborting",
+    ASYNC_TASK_STATUS_CLEANING: "cleaning",
 }
+ASYNC_TASK_RUNNING_CODES = frozenset(
+    {
+        ASYNC_TASK_STATUS_INIT,
+        ASYNC_TASK_STATUS_RUNNING,
+        ASYNC_TASK_STATUS_ABORTING,
+        ASYNC_TASK_STATUS_CLEANING,
+    }
+)
 
 # --- РЕЗУЛЬТАТ ASYNC-ЗАДАЧИ (AsyncTaskResultEnum) ---
 # Коды как в Engine (async_tasks.result), ordinal enum.
 # Источник:
 #   oVirt Engine AsyncTaskResultEnum.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/AsyncTaskResultEnum.java
+ASYNC_TASK_RESULT_SUCCESS = 0
+ASYNC_TASK_RESULT_FAILURE = 1
+ASYNC_TASK_RESULT_CLEAN_SUCCESS = 2
+ASYNC_TASK_RESULT_CLEAN_FAILURE = 3
+ASYNC_TASK_RESULT_UNKNOWN = 4
 ASYNC_TASK_RESULT_MAP: Dict[int, str] = {
-    0: "success",
-    1: "failure",
-    2: "cleanSuccess",
-    3: "cleanFailure",
-    4: "unknown",
+    ASYNC_TASK_RESULT_SUCCESS: "success",
+    ASYNC_TASK_RESULT_FAILURE: "failure",
+    ASYNC_TASK_RESULT_CLEAN_SUCCESS: "cleanSuccess",
+    ASYNC_TASK_RESULT_CLEAN_FAILURE: "cleanFailure",
+    ASYNC_TASK_RESULT_UNKNOWN: "unknown",
 }
+ASYNC_TASK_RESULT_ERROR_CODES = frozenset(
+    {ASYNC_TASK_RESULT_FAILURE, ASYNC_TASK_RESULT_CLEAN_FAILURE}
+)
+ASYNC_TASK_BUCKET_FINISHED = 0
+ASYNC_TASK_BUCKET_RUNNING = 1
+ASYNC_TASK_BUCKET_ERRORS = 2
 
 # --- ТИПЫ ДОМЕНОВ ХРАНЕНИЯ (StorageDomainType) ---
 # Коды как в Engine PostgreSQL (storage_domain_static.storage_domain_type).
@@ -381,6 +437,13 @@ def audit_severity_label(status_code: object) -> str:
     return mapped_code_label(status_code, AUDIT_SEVERITY_MAP)
 
 
+def vdc_object_type_label(status_code: object) -> str:
+    parsed = _as_int_code(status_code)
+    if parsed is None:
+        return "—"
+    return VDC_OBJECT_TYPE_MAP.get(parsed, f"тип {parsed}")
+
+
 def audit_severity_tone(status_code: object) -> StatusTone:
     code = _as_int_code(status_code)
     if code == AUDIT_SEVERITY_NORMAL:
@@ -443,4 +506,79 @@ def storage_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
             1 for c in codes if _as_int_code(c) == STORAGE_SHARED_ACTIVE
         ),
         "problems": sum(1 for c in codes if storage_is_problem(c)),
+    }
+
+
+def audit_is_warning(status_code: object) -> bool:
+    return _as_int_code(status_code) == AUDIT_SEVERITY_WARNING
+
+
+def audit_is_error(status_code: object) -> bool:
+    return _as_int_code(status_code) in (AUDIT_SEVERITY_ERROR, AUDIT_SEVERITY_ALERT)
+
+
+def audit_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
+    codes = list(status_codes)
+    return {
+        "total": len(codes),
+        "warning": sum(1 for c in codes if audit_is_warning(c)),
+        "errors": sum(1 for c in codes if audit_is_error(c)),
+    }
+
+
+def async_task_is_error(status_code: object, result_code: object) -> bool:
+    if _as_int_code(result_code) in ASYNC_TASK_RESULT_ERROR_CODES:
+        return True
+    return _as_int_code(status_code) == ASYNC_TASK_STATUS_UNKNOWN
+
+
+def async_task_is_running(status_code: object, result_code: object) -> bool:
+    if async_task_is_error(status_code, result_code):
+        return False
+    return _as_int_code(status_code) in ASYNC_TASK_RUNNING_CODES
+
+
+def async_task_is_finished(status_code: object, result_code: object) -> bool:
+    if async_task_is_error(status_code, result_code):
+        return False
+    return _as_int_code(status_code) == ASYNC_TASK_STATUS_FINISHED
+
+
+def async_task_bucket_code(status_code: object, result_code: object) -> int:
+    if async_task_is_error(status_code, result_code):
+        return ASYNC_TASK_BUCKET_ERRORS
+    if async_task_is_running(status_code, result_code):
+        return ASYNC_TASK_BUCKET_RUNNING
+    return ASYNC_TASK_BUCKET_FINISHED
+
+
+def async_task_bucket_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == ASYNC_TASK_BUCKET_ERRORS:
+        return "critical"
+    if code == ASYNC_TASK_BUCKET_RUNNING:
+        return "warning"
+    if code == ASYNC_TASK_BUCKET_FINISHED:
+        return "success"
+    return "neutral"
+
+
+def async_task_result_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code in ASYNC_TASK_RESULT_ERROR_CODES:
+        return "critical"
+    if code in (ASYNC_TASK_RESULT_SUCCESS, ASYNC_TASK_RESULT_CLEAN_SUCCESS):
+        return "success"
+    return "warning"
+
+
+def async_task_health_counts(
+    pairs: Iterable[tuple[object, object]],
+) -> dict[str, int]:
+    items = list(pairs)
+    return {
+        "total": len(items),
+        "running": sum(1 for status, result in items if async_task_is_running(status, result)),
+        "finished": sum(1 for status, result in items if async_task_is_finished(status, result)),
+        "errors": sum(1 for status, result in items if async_task_is_error(status, result)),
     }
