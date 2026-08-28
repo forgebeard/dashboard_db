@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import (
+    BIOS_TYPE_MAP,
     IMAGE_STATUS_MAP,
     VM_STATUS_MAP,
     VM_STATUS_UP,
@@ -19,14 +20,6 @@ from core.inspector_base import InspectorBase
 
 BAR_DOUBLE = "═" * 78
 BAR_SINGLE = "─" * 78
-
-BIOS_TYPE_MAP = {
-    0: "Cluster default",
-    1: "i440FX SeaBIOS",
-    2: "Q35 SeaBIOS",
-    3: "Q35 OVMF",
-    4: "Q35 SecureBoot",
-}
 
 VOLUME_TYPE_MAP = {0: "Unassigned", 1: "Preallocated", 2: "Sparse"}
 VOLUME_FORMAT_MAP = {1: "RAW", 4: "COW"}

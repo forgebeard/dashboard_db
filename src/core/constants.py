@@ -17,6 +17,14 @@ HOST_MAINTENANCE_CODES = frozenset({2, 8, 9})  # Maintenance, Reboot, PreparingF
 HOST_CRITICAL_CODES = frozenset({4, 5, 7, 10, 15})  # NonResponsive, Error, InstallFailed, NonOperational, Kdumping
 HOST_NEUTRAL_CODES = frozenset({0, 1})  # Unassigned, Down
 
+# Сводный статус кластера (нет кода Engine): по составу хостов.
+CLUSTER_STATUS_OK = 0
+CLUSTER_STATUS_PROBLEMS = 1
+CLUSTER_STATUS_MAP: Dict[int, str] = {
+    CLUSTER_STATUS_OK: "Ok",
+    CLUSTER_STATUS_PROBLEMS: "Проблемы",
+}
+
 VM_STATUS_UP = 1
 VM_STATUS_DOWN = 0
 VM_STATUS_PAUSED = 4
@@ -68,6 +76,42 @@ HOST_STATUS_MAP: Dict[int, str] = {
 
 # Обратный маппинг: Имя статуса -> Код
 HOST_NAME_TO_STATUS: Dict[str, int] = {v: k for k, v in HOST_STATUS_MAP.items()}
+
+# --- АРХИТЕКТУРА (ArchitectureType) ---
+# Коды как в Engine PostgreSQL (cluster.architecture, vm_static.cpu_architecture).
+# Источник:
+#   oVirt Engine ArchitectureType.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/compat/ArchitectureType.java
+# Дамп 4.6: Cascadelake → architecture=1 (x86_64). Не путать с 0=x86_64 / 1=aarch64.
+ARCHITECTURE_MAP: Dict[int, str] = {
+    0: "undefined",
+    1: "x86_64",
+    2: "ppc64",
+    3: "ppc",
+    4: "s390x",
+    5: "aarch64",
+}
+
+# --- BIOS (BiosType) ---
+# Коды как в Engine (cluster.bios_type, vm_static.bios_type).
+# Источник:
+#   oVirt Engine BiosType.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/BiosType.java
+BIOS_TYPE_MAP: Dict[int, str] = {
+    0: "Cluster default",
+    1: "i440FX SeaBIOS",
+    2: "Q35 SeaBIOS",
+    3: "Q35 OVMF",
+    4: "Q35 SecureBoot",
+}
+
+# --- МИГРАЦИЯ ПРИ ОШИБКЕ ХОСТА (MigrateOnError) ---
+# cluster.migrate_on_error
+MIGRATE_ON_ERROR_MAP: Dict[int, str] = {
+    0: "DoNothing",
+    1: "Migrate",
+    2: "Shutdown",
+}
 
 # --- ТИПЫ ДОМЕНОВ ХРАНЕНИЯ (StorageDomainType) ---
 # Коды как в Engine PostgreSQL (storage_domain_static.storage_domain_type).
@@ -198,6 +242,40 @@ def vm_layer_tone(status_code: object) -> StatusTone | None:
     if code in (IMAGE_STATUS_LOCKED, IMAGE_STATUS_MERGING):
         return "warning"
     return None
+
+
+def _as_count(value: object) -> int:
+    code = _as_int_code(value)
+    return code if code is not None and code > 0 else 0
+
+
+def cluster_status_from_hosts(
+    host_problems: object, host_maintenance: object = None
+) -> int:
+    """Ok, если нет problem-хостов (maintenance хостов не считается проблемой)."""
+    if _as_count(host_problems) > 0:
+        return CLUSTER_STATUS_PROBLEMS
+    return CLUSTER_STATUS_OK
+
+
+def cluster_status_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == CLUSTER_STATUS_OK:
+        return "success"
+    if code == CLUSTER_STATUS_PROBLEMS:
+        return "critical"
+    return "neutral"
+
+
+def cluster_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
+    codes = list(status_codes)
+    return {
+        "total": len(codes),
+        "ok": sum(1 for c in codes if _as_int_code(c) == CLUSTER_STATUS_OK),
+        "problems": sum(
+            1 for c in codes if _as_int_code(c) == CLUSTER_STATUS_PROBLEMS
+        ),
+    }
 
 
 def host_health_counts(status_codes: Iterable[object]) -> dict[str, int]:

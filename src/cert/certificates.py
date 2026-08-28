@@ -4,11 +4,27 @@ import pandas as pd
 
 from core.db_utils import get_sqlalchemy_engine
 
+
+def _highlight_expiry(row):
+    days = row.get("days_left")
+    try:
+        if pd.isna(days):
+            return [""] * len(row)
+        days = int(days)
+    except (TypeError, ValueError):
+        return [""] * len(row)
+    if days < 0:
+        color = "background-color: #ffcccc"
+    elif days <= 30:
+        color = "background-color: #ffffcc"
+    else:
+        color = ""
+    return [color] * len(row)
+
+
 def render_certificates(db_name):
-    st.header("Мониторинг сертификатов")
-    
     query = """
-    SELECT 
+    SELECT
         cd.object_type_id,
         vs.vds_name,
         cd.subject_comname AS cert_name,
@@ -31,66 +47,55 @@ def render_certificates(db_name):
             st.info("Сертификаты не найдены.")
             return
 
-        # Конфигурация колонок
+        st.caption(
+            "Остаток дней считается относительно текущего времени сервера БД, "
+            "не момента снятия дампа. Ориентир — дата окончания."
+        )
+
         column_config = {
             "cert_name": st.column_config.TextColumn("Имя сертификата", width="auto"),
             "file_path": st.column_config.TextColumn("Путь к файлу", width="auto"),
-            "expires_at": st.column_config.DateColumn("Дата окончания", format="DD.MM.YYYY", width="auto"),
-            "days_left": st.column_config.NumberColumn("Осталось дней", format="%d дн.", width="auto"),
+            "expires_at": st.column_config.DateColumn(
+                "Дата окончания", format="DD.MM.YYYY", width="auto"
+            ),
+            "days_left": st.column_config.NumberColumn(
+                "Осталось дней", format="%d дн.", width="auto"
+            ),
         }
 
-        # --- Блок 1: Сертификаты Engine ---
         st.subheader("Engine Certificates")
-        engine_df = df[df['object_type_id'] == 2][['cert_name', 'file_path', 'expires_at', 'days_left']]
-        
-        if not engine_df.empty:
-            def highlight_expiry(s):
-                color = ''
-                if s['days_left'] <= 30:
-                    color = 'background-color: #ffffcc'
-                elif s['days_left'] < 0:
-                    color = 'background-color: #ffcccc'
-                return [color] * len(s)
+        engine_df = df[df["object_type_id"] == 2][
+            ["cert_name", "file_path", "expires_at", "days_left"]
+        ]
 
+        if not engine_df.empty:
             st.dataframe(
-                engine_df.style.apply(highlight_expiry, axis=1),
-                width='stretch',  # Заменяет use_container_width=True
+                engine_df.style.apply(_highlight_expiry, axis=1),
+                width="stretch",
                 hide_index=True,
-                column_config=column_config
+                column_config=column_config,
             )
-            
         else:
             st.warning("Нет данных по сертификатам Engine.")
 
-
-        # --- Блок 2: Сертификаты Хостов ---
         st.subheader("Host Certificates")
-        hosts_df = df[df['object_type_id'] == 3][['vds_name', 'cert_name', 'file_path', 'expires_at', 'days_left']]
+        hosts_df = df[df["object_type_id"] == 3][
+            ["vds_name", "cert_name", "file_path", "expires_at", "days_left"]
+        ]
 
         if not hosts_df.empty:
-            hosts_df = hosts_df.sort_values(by=['vds_name', 'days_left'])
-            unique_hosts = hosts_df['vds_name'].unique()
-            
-            for host in unique_hosts:
-                host_certs = hosts_df[hosts_df['vds_name'] == host].drop(columns=['vds_name'])
-                
-                st.markdown(f"### {host}")
-                
-                def highlight_host_expiry(s):
-                    color = ''
-                    if s['days_left'] <= 30:
-                        color = 'background-color: #ffffcc'
-                    elif s['days_left'] < 0:
-                        color = 'background-color: #ffcccc'
-                    return [color] * len(s)
-
-                st.dataframe(
-                    host_certs.style.apply(highlight_host_expiry, axis=1),
-                    width='stretch',  # Заменяет use_container_width=True
-                    hide_index=True,
-                    column_config=column_config
+            hosts_df = hosts_df.sort_values(by=["vds_name", "days_left"])
+            for host in hosts_df["vds_name"].unique():
+                host_certs = hosts_df[hosts_df["vds_name"] == host].drop(
+                    columns=["vds_name"]
                 )
-
+                st.markdown(f"### {host}")
+                st.dataframe(
+                    host_certs.style.apply(_highlight_expiry, axis=1),
+                    width="stretch",
+                    hide_index=True,
+                    column_config=column_config,
+                )
         else:
             st.warning("Нет данных по сертификатам хостов.")
 

@@ -1,6 +1,13 @@
 """Юнит-тесты тонов статуса и контракта Problem."""
 
 from core.constants import (
+    ARCHITECTURE_MAP,
+    BIOS_TYPE_MAP,
+    CLUSTER_STATUS_OK,
+    CLUSTER_STATUS_PROBLEMS,
+    cluster_health_counts,
+    cluster_status_from_hosts,
+    cluster_status_tone,
     host_health_counts,
     host_is_maintenance,
     host_is_problem,
@@ -74,3 +81,28 @@ def test_dataframe_height_fits_few_rows():
 def test_vm_health_counts():
     counts = vm_health_counts([1, 0, 4, 1])
     assert counts == {"total": 4, "up": 2, "down": 1, "problems": 1}
+
+
+def test_cluster_status_from_hosts():
+    assert cluster_status_from_hosts(0, 0) == CLUSTER_STATUS_OK
+    assert cluster_status_from_hosts(None, None) == CLUSTER_STATUS_OK
+    assert cluster_status_from_hosts(0, 1) == CLUSTER_STATUS_OK
+    assert cluster_status_from_hosts(2, 3) == CLUSTER_STATUS_PROBLEMS
+
+
+def test_cluster_status_tones():
+    assert cluster_status_tone(CLUSTER_STATUS_OK) == "success"
+    assert cluster_status_tone(CLUSTER_STATUS_PROBLEMS) == "critical"
+
+
+def test_cluster_health_counts():
+    counts = cluster_health_counts(
+        [CLUSTER_STATUS_OK, CLUSTER_STATUS_OK, CLUSTER_STATUS_PROBLEMS]
+    )
+    assert counts == {"total": 3, "ok": 2, "problems": 1}
+
+
+def test_architecture_and_bios_maps():
+    assert ARCHITECTURE_MAP[1] == "x86_64"
+    assert ARCHITECTURE_MAP[0] == "undefined"
+    assert BIOS_TYPE_MAP[3] == "Q35 OVMF"

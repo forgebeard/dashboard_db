@@ -61,7 +61,7 @@ from users.users_diagnostics import render_users_diagnostics
 from atlas.atlas_module import render_schema_atlas
 
 # Разделы с собственным page header (фаза A).
-_SHELL_SECTIONS = frozenset({"hosts", "vms"})
+_SHELL_SECTIONS = frozenset({"hosts", "vms", "clusters"})
 
 SECTIONS: list[tuple[str, str, str]] = [
     ("hosts", "Хосты", ":material/dns:"),

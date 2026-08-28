@@ -40,11 +40,11 @@ def render_system_list(active_db: str, cluster_meta: dict) -> None:
     with col_status:
         host_count = len(cluster_meta.get('hosts', {}))
         if host_count > 0 and summary['fence_configured'] == 0:
-            st.warning("⚠️ Хосты есть, но фенсинг не настроен!", icon="️")
+            st.warning("Хосты есть, но фенсинг не настроен!")
         elif summary['fence_configured'] > 0:
-            st.success(f"✅ Фенсинг активен", icon="✅")
+            st.success("Фенсинг активен")
         else:
-            st.info("️ Нет данных о хостах", icon="ℹ️")
+            st.info("Нет данных о хостах")
 
     # --- 2. ФИЛЬТРЫ (как в Хостах/ВМ) ---
     col_type, col_search = st.columns([1, 3])
