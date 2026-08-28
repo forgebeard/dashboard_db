@@ -61,21 +61,22 @@ def render_grouped_table_preview(
     groups: {имя группы: {имя_таблицы: описание}}. Пустое имя группы не печатается.
     limit_key: уникальный key для st.number_input (уже с суффиксом БД).
     """
-    st.subheader(title)
-
     allowed = {table for tables in groups.values() for table in tables}
     for name in allowed:
         assert_safe_ident(name)
 
-    row_limit = st.number_input(
-        "Лимит строк",
-        min_value=10,
-        max_value=MAX_ROW_LIMIT,
-        value=DEFAULT_ROW_LIMIT,
-        step=ROW_STEP,
-        key=limit_key,
-        width=120,
-    )
+    title_col, limit_col = st.columns([4, 1.2], vertical_alignment="bottom")
+    with title_col:
+        st.subheader(title)
+    with limit_col:
+        row_limit = st.number_input(
+            "Лимит строк",
+            min_value=10,
+            max_value=MAX_ROW_LIMIT,
+            value=DEFAULT_ROW_LIMIT,
+            step=ROW_STEP,
+            key=limit_key,
+        )
     row_limit = min(int(row_limit), MAX_ROW_LIMIT)
 
     order_overrides = order_overrides or {}

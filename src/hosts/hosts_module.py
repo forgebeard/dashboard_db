@@ -91,7 +91,7 @@ def render_hosts_list(active_db, cluster_meta):
                     ("all", f"Все ({counts['total']})"),
                     ("up", f"Up ({counts['up']})"),
                     ("maintenance", f"Maintenance ({counts['maintenance']})"),
-                    ("problems", f"Проблемы ({counts['problems']})"),
+                    ("problems", f"Остальное ({counts['problems']})"),
                 ),
                 key="host_health_filter",
             )
@@ -101,25 +101,12 @@ def render_hosts_list(active_db, cluster_meta):
         if not raw_df.empty
         else raw_df
     )
-    csv_download = None
-    if not display_df.empty:
-        csv_df = display_df.drop(columns=["_status_code"], errors="ignore")
-        csv_download = {
-            "label": "Скачать CSV",
-            "data": csv_df.to_csv(index=False).encode("utf-8-sig"),
-            "file_name": "hosts_list.csv",
-            "key": "download-hosts-csv",
-        }
 
     with header_box:
         render_page_header(
             "Хосты",
             active_db,
-            details=[
-                f"{counts['total']} хостов",
-                f"{counts['problems']} проблем",
-            ],
-            download=csv_download,
+            details=[f"{counts['total']} хостов"],
         )
 
     if raw_df.empty:

@@ -65,22 +65,8 @@ def render_clusters_list(active_db: str, cluster_meta: dict) -> None:
         st.info("Нет кластеров, соответствующих критериям.")
         return
 
-    # --- СТРОКА 2: ИТОГИ И ЭКСПОРТ ---
-    col_info, col_spacer, col_btn = st.columns([2, 6, 1])
-    
-    with col_info:
-        st.markdown(f"**Кластеров:** {len(display_df)}")
-        
-    with col_btn:
-        csv = display_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            "📥 Скачать CSV", 
-            csv, 
-            "clusters_list.csv", 
-            "text/csv", 
-            key='download-clusters-csv', 
-            use_container_width=True
-        )
+    # --- СТРОКА 2: ИТОГИ ---
+    st.markdown(f"**Кластеров:** {len(display_df)}")
 
     # --- ТАБЛИЦА КЛАСТЕРОВ С ТОЧЕЧНОЙ ПОДСВЕТКОЙ СТАТУСА ---
     

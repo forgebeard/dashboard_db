@@ -7,7 +7,6 @@
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
 import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
 import pandas as pd         # Работа с табличными данными и подготовка DataFrame для отображения
-from datetime import datetime  # Форматирование имен файлов при экспорте CSV
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
 from .audit_utils import (
@@ -102,7 +101,3 @@ def render_audit_log(active_db, cluster_meta=None):
         hide_index=True, 
         height=600
     )
-    
-    # Экспорт
-    csv = show_df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("Скачать CSV", csv, f"audit_{datetime.now():%Y%m%d}.csv", mime="text/csv")

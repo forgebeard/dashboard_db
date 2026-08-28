@@ -9,7 +9,6 @@
 import streamlit as st      # Фреймворк для построения веб-интерфейса дашборда
 import pandas as pd         # Работа с табличными данными и подготовка DataFrame для отображения
 from sqlalchemy import text # Безопасное формирование параметризованных SQL-запросов
-from datetime import datetime  # Форматирование имен файлов при экспорте CSV
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
 from .task_inspector_sql import get_task_inspector_report  # Генерация текстового отчета по выбранной задаче
@@ -159,10 +158,6 @@ def render_tasks_list(active_db, cluster_meta=None):
             show_df, width='stretch', hide_index=True, height=500,
             on_select="rerun", selection_mode="single-row"
         )
-        
-        # Экспорт
-        csv = show_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("Скачать CSV", csv, f"tasks_{datetime.now():%Y%m%d}.csv", mime="text/csv")
         
         # --- ИНСПЕКТОР ---
         if event.selection.rows:

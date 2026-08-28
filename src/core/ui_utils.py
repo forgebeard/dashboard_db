@@ -63,24 +63,10 @@ def render_page_header(
     title: str,
     db_name: str,
     details: Sequence[str] | None = None,
-    *,
-    download: Mapping[str, Any] | None = None,
 ) -> None:
-    """Заголовок раздела, CSV справа и контекст дампа."""
-    title_col, csv_col = st.columns([5, 1], vertical_alignment="center")
-    with title_col:
-        st.subheader(title)
-    with csv_col:
-        if download:
-            st.download_button(
-                download.get("label", "Скачать CSV"),
-                data=download["data"],
-                file_name=download["file_name"],
-                mime=download.get("mime", "text/csv"),
-                key=download["key"],
-                width="stretch",
-            )
-    parts = [f"`{db_name}`", "READ ONLY"]
+    """Заголовок раздела и контекст дампа."""
+    st.subheader(title)
+    parts = [f"`{db_name}`"]
     if details:
         parts.extend(str(item) for item in details if item)
     st.caption(" · ".join(parts))

@@ -77,18 +77,8 @@ def render_system_list(active_db: str, cluster_meta: dict) -> None:
             )
             raw_df = raw_df[mask]
 
-    # --- 4. СВОДКА И ЭКСПОРТ ---
-    col_info, col_spacer, col_btn = st.columns([2, 6, 1])
-    
-    with col_info:
-        st.markdown(f"**Объектов:** {len(raw_df)}")
-        
-    with col_btn:
-        csv = raw_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            "📥 Скачать CSV", csv, "system_objects.csv", "text/csv", 
-            key='download-system-csv', use_container_width=True
-        )
+    # --- 4. СВОДКА ---
+    st.markdown(f"**Объектов:** {len(raw_df)}")
 
     # --- 5. ЕДИНАЯ ТАБЛИЦА С ЦВЕТОВОЙ ИНДИКАЦИЕЙ ---
     

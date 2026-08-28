@@ -3,7 +3,7 @@
 Модуль глобального SQL-редактора.
 
 Отвечает за выполнение пользовательских ad-hoc запросов к активной БД,
-безопасное отображение результатов, историю запросов и экспорт данных.
+безопасное отображение результатов и историю запросов.
 Предназначен для оффлайн-использования доверенными инженерами L2/L3.
 """
 
@@ -118,23 +118,7 @@ def render_global_sql(active_db: str) -> None:
                         "Рекомендуется добавить LIMIT в запрос."
                     )
 
-                action_col1, action_col2, action_col3 = st.columns([1, 1, 3])
-                csv_text = df_res.to_csv(index=False)
-
-                with action_col1:
-                    st.download_button(
-                        label="Скачать CSV",
-                        data=csv_text.encode("utf-8-sig"),
-                        file_name=f"query_result_{int(time.time())}.csv",
-                        mime="text/csv",
-                        width="stretch",
-                    )
-
-                with action_col2:
-                    st.caption("Используйте Ctrl+C в таблице ниже")
-
-                with action_col3:
-                    st.caption(f"Найдено строк: **{len(df_res)}** | Время: **{elapsed_ms:.0f} мс**")
+                st.caption(f"Найдено строк: **{len(df_res)}** | Время: **{elapsed_ms:.0f} мс**")
 
                 st.dataframe(
                     df_res,

@@ -54,22 +54,8 @@ def render_users_list(active_db: str, cluster_meta: dict) -> None:
         st.info("Нет пользователей, соответствующих критериям.")
         return
 
-    # --- СТРОКА 2: ИТОГИ И ЭКСПОРТ ---
-    col_info, col_spacer, col_btn = st.columns([2, 6, 1])
-    
-    with col_info:
-        st.markdown(f"**Пользователей:** {len(display_df)}")
-        
-    with col_btn:
-        csv = display_df.to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            "📥 Скачать CSV", 
-            csv, 
-            "users_list.csv", 
-            "text/csv", 
-            key='download-users-csv', 
-            use_container_width=True
-        )
+    # --- СТРОКА 2: ИТОГИ ---
+    st.markdown(f"**Пользователей:** {len(display_df)}")
 
     # --- ТАБЛИЦА ПОЛЬЗОВАТЕЛЕЙ С ЦВЕТОВОЙ ИНДИКАЦИЕЙ ДОМЕНА ---
     

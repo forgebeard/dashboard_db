@@ -121,15 +121,6 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
         if not raw_df.empty
         else raw_df
     )
-    csv_download = None
-    if not display_df.empty:
-        csv_df = display_df.drop(columns=["_status_code"], errors="ignore")
-        csv_download = {
-            "label": "Скачать CSV",
-            "data": csv_df.to_csv(index=False).encode("utf-8-sig"),
-            "file_name": "vms_list.csv",
-            "key": "download-csv",
-        }
 
     with header_box:
         render_page_header(
@@ -139,7 +130,6 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
                 f"{counts['total']} ВМ",
                 f"{counts['problems']} проблем",
             ],
-            download=csv_download,
         )
 
     if raw_df.empty:

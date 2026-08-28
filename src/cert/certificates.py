@@ -59,8 +59,6 @@ def render_certificates(db_name):
                 column_config=column_config
             )
             
-            csv_engine = engine_df.to_csv(index=False).encode('utf-8')
-            st.download_button(label="Скачать CSV (Engine)", data=csv_engine, file_name=f"certs_engine_{db_name}.csv", mime="text/csv")
         else:
             st.warning("Нет данных по сертификатам Engine.")
 
@@ -92,9 +90,6 @@ def render_certificates(db_name):
                     hide_index=True,
                     column_config=column_config
                 )
-
-            csv_all_hosts = hosts_df.to_csv(index=False).encode('utf-8')
-            st.download_button(label="Скачать CSV (All Hosts)", data=csv_all_hosts, file_name=f"certs_all_hosts_{db_name}.csv", mime="text/csv")
 
         else:
             st.warning("Нет данных по сертификатам хостов.")
