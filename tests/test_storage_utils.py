@@ -22,8 +22,8 @@ def raw_storage_df():
     return pd.DataFrame({
         'storage_name': ['data_domain_1', 'iso_domain', 'broken_domain'],
         'sd_id': ['uuid-1', 'uuid-2', 'uuid-3'],
-        'storage_domain_type': [0, 1, 99],      # 0=Data, 1=ISO, 99=Unknown
-        'storage_type': [0, 1, 5],             # 0=NFS, 1=iSCSI, 5=Unknown
+        'storage_domain_type': [0, 1, 99],      # фиктивные коды; map патчится в тесте
+        'storage_type': [0, 1, 5],             # фиктивные коды; map патчится в тесте
         'shared_status_code': [0, 3, -1],      # 0=Active, 3=Maintenance, -1=Unknown
         'dc_name': ['DC_PROD', 'DC_ISO', 'DC_BROKEN'],
         'available_disk_size': [1000, 500, 100],
@@ -90,7 +90,7 @@ class TestProcessStorageDataframe:
     @patch('storage.storage_utils.STORAGE_TYPE_MAP', {0: 'NFS', 1: 'iSCSI'})
     @patch('storage.storage_utils.SHARED_STATUS_MAP', {0: 'Active', 3: 'Maintenance'})
     def test_processing_logic(self, raw_storage_df):
-        """Проверка маппинга, расчетов и переименования колонок."""
+        """Проверка расчётов и колонок; map подставляется фиктивный, не Engine."""
         # Act
         result = process_storage_dataframe(raw_storage_df)
         
@@ -154,3 +154,29 @@ class TestProcessStorageDataframe:
             # coerce -> NaN -> fillna(0)
             assert result.iloc[0]['Всего (ГБ)'] == 0.0
             assert result.iloc[0]['Заполнено (%)'] == 0.0
+
+
+def test_engine_storage_type_codes():
+    """Коды БД совпадают с enum oVirt Engine, без патча map."""
+    from core.constants import STORAGE_DOMAIN_TYPE_MAP, STORAGE_TYPE_MAP
+
+    assert STORAGE_TYPE_MAP[2] == "FCP"
+    assert STORAGE_TYPE_MAP[3] == "iSCSI"
+    assert STORAGE_TYPE_MAP[8] == "Glance"
+    assert STORAGE_DOMAIN_TYPE_MAP[0] == "Master"
+    assert STORAGE_DOMAIN_TYPE_MAP[1] == "Data"
+    assert STORAGE_DOMAIN_TYPE_MAP[4] == "Image"
+
+    df = pd.DataFrame({
+        "storage_name": ["hosted_storage", "Dat1", "ovirt-image-repository"],
+        "sd_id": ["u1", "u2", "u3"],
+        "storage_domain_type": [0, 1, 4],
+        "storage_type": [2, 2, 8],
+        "shared_status_code": [1, 1, 1],
+        "dc_name": ["DC", "DC", "DC"],
+        "available_disk_size": [10, 10, 10],
+        "used_disk_size": [1, 1, 1],
+    })
+    result = process_storage_dataframe(df)
+    assert list(result["Тип хранилища"]) == ["FCP", "FCP", "Glance"]
+    assert list(result["Тип домена"]) == ["Master", "Data", "Image"]

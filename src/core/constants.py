@@ -70,23 +70,42 @@ HOST_STATUS_MAP: Dict[int, str] = {
 HOST_NAME_TO_STATUS: Dict[str, int] = {v: k for k, v in HOST_STATUS_MAP.items()}
 
 # --- ТИПЫ ДОМЕНОВ ХРАНЕНИЯ (StorageDomainType) ---
+# Коды как в Engine PostgreSQL (storage_domain_static.storage_domain_type).
+# Источники:
+#   oVirt Engine StorageDomainType.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/StorageDomainType.java
+#   VDSM lib/vdsm/storage/sd.py (классы DATA/ISO/BACKUP — параллельный enum ролей)
 STORAGE_DOMAIN_TYPE_MAP: Dict[int, str] = {
-    0: "Data",      # Домен данных
-    1: "ISO",       # ISO-образы
-    2: "Export",    # Экспорт/Импорт
-    3: "Image"      # Передача образов (Image Transfer)
+    0: "Master",
+    1: "Data",
+    2: "ISO",
+    3: "ImportExport",
+    4: "Image",
+    5: "Volume",
+    6: "Unknown",
+    7: "ManagedBlockStorage",
 }
 
 # --- ФИЗИЧЕСКИЕ ТИПЫ ПОДКЛЮЧЕНИЯ (StorageType) ---
+# Коды как в Engine PostgreSQL (storage_domain_static.storage_type,
+# storage_server_connections.storage_type).
+# Источники:
+#   oVirt Engine StorageType.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/storage/StorageType.java
+#   VDSM lib/vdsm/storage/sd.py (NFS_DOMAIN=1, FCP_DOMAIN=2, ISCSI_DOMAIN=3, ...)
+# Код 5 в актуальном Engine пропущен; в VDSM 5 = CIFS.
 STORAGE_TYPE_MAP: Dict[int, str] = {
+    0: "UNKNOWN",
     1: "NFS",
-    2: "iSCSI",
-    3: "Local",
-    4: "FCP",       # Fibre Channel Protocol
-    5: "NAS",
+    2: "FCP",
+    3: "iSCSI",
+    4: "LocalFS",
+    5: "CIFS",
     6: "POSIXFS",
     7: "GlusterFS",
-    8: "OpenStack Glance"
+    8: "Glance",
+    9: "Cinder",
+    10: "ManagedBlockStorage",
 }
 
 # --- СТАТУСЫ ОБРАЗОВ ДИСКОВ (ImageStatus) ---

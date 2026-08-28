@@ -6,17 +6,33 @@
 
 from __future__ import annotations
 
-import traceback        # Форматирование стека вызовов при ошибках
-from datetime import datetime  # Работа с датой/временем для расчета Uptime и форматирования
+import re
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import text  # Параметризованные запросы с :param синтаксисом
+from core.constants import HOST_STATUS_MAP
+from core.inspector_base import InspectorBase
 
-from core.constants import HOST_STATUS_MAP  # Глобальный справочник статусов хостов (код -> читаемое название)
-from core.inspector_base import InspectorBase  # Единая абстракция подключения к БД
+BAR_DOUBLE = "═" * 78
+BAR_SINGLE = "─" * 78
+
+KDUMP_MAP = {0: "Disabled", 1: "Enabled", 2: "Timeout"}
+
+AUDIT_TYPE_LABELS = {
+    "VM_CONSOLE_DISCONNECTED": "console disconnected",
+    "VM_CONSOLE_CONNECTED": "console connected",
+    "VM_SET_TICKET": "console ticket",
+    "USER_RESET_VM": "VM reset",
+    "USER_ATTACH_DISK_TO_VM": "disk attached",
+}
+
+_ATTACH_DISK_RE = re.compile(
+    r"Disk (\S+) was successfully attached to VM (\S+)", re.IGNORECASE
+)
+_VM_NAME_RE = re.compile(r"\bVM (\S+)")
 
 
-def _fmt_size(mb: Any) -> str:
+def _fmt_size_mb(mb: Any) -> str:
     """Форматирует размер из МБ в ГБ."""
     if mb is None:
         return "—"
@@ -37,7 +53,292 @@ def _fmt_date(dt: Any) -> str:
     """Форматирует дату в читаемый вид."""
     if not dt:
         return "—"
-    return _safe_date(dt).strftime("%d.%m.%Y %H:%M:%S")
+    parsed = _safe_date(dt)
+    if parsed is None:
+        return "—"
+    return parsed.strftime("%d.%m.%Y %H:%M")
+
+
+def _kv(label: str, value: Any, width: int = 16) -> str:
+    text = "—" if value is None or value == "" else str(value)
+    return f"  {(label + ':'):<{width}}{text}"
+
+
+def _fmt_speed(mbps: Any) -> str:
+    if mbps in (None, ""):
+        return ""
+    try:
+        n = int(float(mbps))
+    except (TypeError, ValueError):
+        return str(mbps)
+    if n >= 1000 and n % 1000 == 0:
+        return f"{n // 1000}G"
+    return f"{n} Mbps"
+
+
+def _fmt_mac(mac: Any) -> str:
+    if mac in (None, "", "None"):
+        return ""
+    return str(mac)
+
+
+def _is_bond(iface: dict[str, Any]) -> bool:
+    flag = iface.get("is_bond")
+    return flag in (True, 1, "1", "t", "true", "True")
+
+
+def _vlan_id(iface: dict[str, Any]) -> int | None:
+    vid = iface.get("vlan_id")
+    if vid not in (None, ""):
+        try:
+            return int(vid)
+        except (TypeError, ValueError):
+            pass
+    name = str(iface.get("name") or "")
+    if "." in name:
+        tail = name.rsplit(".", 1)[-1]
+        if tail.isdigit():
+            return int(tail)
+    return None
+
+
+def _vlan_parent(iface: dict[str, Any]) -> str:
+    bond = iface.get("bond_name")
+    if bond:
+        return str(bond)
+    name = str(iface.get("name") or "")
+    if "." in name:
+        return name.rsplit(".", 1)[0]
+    return ""
+
+
+def group_host_interfaces(interfaces: list[dict[str, Any]]) -> dict[str, Any]:
+    """Раскладывает NIC на L3, агрегаты, VLAN и остальные."""
+    ifaces = [row for row in interfaces if (row.get("name") or "") != "lo"]
+    bonds = [row for row in ifaces if _is_bond(row)]
+    with_ip = [row for row in ifaces if row.get("addr")]
+
+    slaves_by_bond: dict[str, list[dict[str, Any]]] = {}
+    for row in ifaces:
+        bond_name = row.get("bond_name")
+        if bond_name and not _is_bond(row) and _vlan_id(row) is None:
+            slaves_by_bond.setdefault(str(bond_name), []).append(row)
+
+    vlans_by_parent: dict[str, list[int]] = {}
+    vlan_names: set[str] = set()
+    for row in ifaces:
+        vid = _vlan_id(row)
+        if vid is None:
+            continue
+        vlan_names.add(str(row.get("name")))
+        parent = _vlan_parent(row)
+        vlans_by_parent.setdefault(parent, []).append(vid)
+    vlans_by_parent = {key: sorted(set(vals)) for key, vals in vlans_by_parent.items()}
+
+    used_names = {str(row.get("name")) for row in with_ip}
+    used_names.update(str(row.get("name")) for row in bonds)
+    for slaves in slaves_by_bond.values():
+        used_names.update(str(row.get("name")) for row in slaves)
+    used_names.update(vlan_names)
+
+    others = [row for row in ifaces if str(row.get("name")) not in used_names]
+    return {
+        "with_ip": with_ip,
+        "bonds": bonds,
+        "slaves_by_bond": slaves_by_bond,
+        "vlans_by_parent": vlans_by_parent,
+        "others": others,
+    }
+
+
+def audit_type_label(log_type_name: str | None) -> str:
+    name = log_type_name or "—"
+    return AUDIT_TYPE_LABELS.get(name, name)
+
+
+def audit_object(log_type_name: str | None, message: str | None) -> str:
+    msg = message or ""
+    if log_type_name == "USER_ATTACH_DISK_TO_VM":
+        match = _ATTACH_DISK_RE.search(msg)
+        if match:
+            return f"{match.group(1)} -> {match.group(2)}"
+    match = _VM_NAME_RE.search(msg)
+    if match:
+        return match.group(1).rstrip(".,")
+    return ""
+
+
+def compact_audit_line(event: dict[str, Any]) -> str:
+    when = _fmt_date(event.get("log_time"))
+    label = audit_type_label(event.get("log_type_name"))
+    obj = audit_object(event.get("log_type_name"), event.get("message"))
+    user = event.get("user_name") or "—"
+    parts = [f"  {when:<18}{label:<24}"]
+    if obj:
+        parts.append(f"{obj:<28}")
+    parts.append(str(user))
+    return "".join(parts).rstrip()
+
+
+def _cpu_label(sockets: Any, cores: Any, threads: Any) -> str:
+    sock = sockets if sockets is not None else "—"
+    core = cores if cores is not None else "—"
+    line = f"{sock} сокета × {core} ядер"
+    if threads not in (None, "", 0, "0"):
+        line += f"    потоки: {threads}"
+    return line
+
+
+def _ram_label(phys_mb: Any, committed_mb: Any) -> str:
+    phys = _fmt_size_mb(phys_mb)
+    committed = _fmt_size_mb(committed_mb)
+    line = f"{phys} физ.  /  {committed} под ВМ"
+    try:
+        p = float(phys_mb)
+        c = float(committed_mb)
+        if p > 0:
+            line += f"  ({round(c / p * 100)}%)"
+    except (TypeError, ValueError):
+        pass
+    return line
+
+
+def format_host_report(payload: dict[str, Any]) -> str:
+    """Собирает текстовый отчёт по согласованному макету."""
+    header = payload.get("header") or {}
+    metrics = payload.get("metrics") or {}
+    versions = payload.get("versions") or {}
+    grouped = group_host_interfaces(payload.get("networks") or [])
+    events = payload.get("events") or []
+    section_errors = payload.get("section_errors") or {}
+    generated_at = payload.get("generated_at") or "—"
+
+    lines = [
+        BAR_DOUBLE,
+        f"  Host-Inspector                                     {generated_at}",
+        BAR_DOUBLE,
+        "",
+        "СВЕДЕНИЯ О ХОСТЕ",
+        BAR_SINGLE,
+        _kv("Имя хоста", header.get("name")),
+        _kv("ID", header.get("id")),
+        _kv("FQDN", header.get("fqdn")),
+        _kv("Кластер", header.get("cluster")),
+        _kv("Дата-центр", header.get("dc")),
+        _kv("Создан", header.get("created")),
+        _kv("Обновлён", header.get("updated")),
+        "",
+        "РЕСУРСЫ",
+        BAR_SINGLE,
+        _kv("Статус", metrics.get("status")),
+        _kv("Kdump", metrics.get("kdump")),
+        _kv("SPM", metrics.get("spm")),
+        _kv("CPU", metrics.get("cpu")),
+        _kv("Модель CPU", metrics.get("cpu_model")),
+        _kv("RAM", metrics.get("ram")),
+        _kv("ВМ на хосте", metrics.get("vm_active")),
+        "",
+        "ВЕРСИИ",
+        BAR_SINGLE,
+        _kv("ОС", versions.get("os")),
+        _kv("Ядро", versions.get("kernel")),
+        _kv("VDSM", versions.get("vdsm")),
+        _kv("Libvirt", versions.get("libvirt")),
+        _kv("KVM", versions.get("kvm")),
+        "",
+        "СЕТЕВЫЕ ИНТЕРФЕЙСЫ",
+        BAR_SINGLE,
+    ]
+
+    if section_errors.get("networks"):
+        lines.append(f"  ошибка чтения ({section_errors['networks']})")
+    else:
+        nets = payload.get("networks") or []
+        if not nets:
+            lines.append("  нет интерфейсов")
+        else:
+            if grouped["with_ip"]:
+                lines.append("  С адресом:")
+                for iface in grouped["with_ip"]:
+                    extra = []
+                    speed = _fmt_speed(iface.get("speed"))
+                    if speed:
+                        extra.append(speed)
+                    if iface.get("mtu") not in (None, ""):
+                        extra.append(f"MTU {iface['mtu']}")
+                    mac = _fmt_mac(iface.get("mac_addr"))
+                    if mac:
+                        extra.append(f"MAC {mac}")
+                    tail = ("    " + "    ".join(extra)) if extra else ""
+                    lines.append(
+                        f"    {str(iface.get('name') or '—'):<14}{iface.get('addr') or '—'}{tail}"
+                    )
+                lines.append("")
+            for bond in grouped["bonds"]:
+                speed = _fmt_speed(bond.get("speed"))
+                mac = _fmt_mac(bond.get("mac_addr"))
+                ip_bit = bond.get("addr") or "IPv4 нет"
+                bits = [f"  Агрегат {bond.get('name') or '—'}"]
+                if speed:
+                    bits.append(speed)
+                if bond.get("mtu") not in (None, ""):
+                    bits.append(f"MTU {bond['mtu']}")
+                if mac:
+                    bits.append(f"MAC {mac}")
+                bits.append(ip_bit if bond.get("addr") else "IPv4 нет")
+                lines.append("    ".join(bits))
+                ports = grouped["slaves_by_bond"].get(str(bond.get("name")), [])
+                if ports:
+                    port_bits = []
+                    for port in ports:
+                        label = str(port.get("name") or "—")
+                        ps = _fmt_speed(port.get("speed"))
+                        port_bits.append(f"{label} ({ps})" if ps else label)
+                    lines.append(f"    порты:        {', '.join(port_bits)}")
+                vids = grouped["vlans_by_parent"].get(str(bond.get("name")), [])
+                if vids:
+                    lines.append(f"    VLAN:         {' '.join(str(v) for v in vids)}")
+                lines.append("")
+            leftover_vlans = {
+                parent: vids
+                for parent, vids in grouped["vlans_by_parent"].items()
+                if parent not in {str(b.get("name")) for b in grouped["bonds"]}
+            }
+            for parent, vids in leftover_vlans.items():
+                if not vids:
+                    continue
+                lines.append(f"  VLAN {parent or '—'}: {' '.join(str(v) for v in vids)}")
+            if grouped["others"]:
+                lines.append("  Остальные:")
+                for iface in grouped["others"]:
+                    speed = _fmt_speed(iface.get("speed"))
+                    mac = _fmt_mac(iface.get("mac_addr"))
+                    extra = []
+                    if speed:
+                        extra.append(speed)
+                    if mac:
+                        extra.append(f"MAC {mac}")
+                    tail = ("    " + "    ".join(extra)) if extra else ""
+                    lines.append(f"    {str(iface.get('name') or '—'):<14}{tail}".rstrip())
+
+    lines += ["", "ЖУРНАЛ СОБЫТИЙ (последние 5)", BAR_SINGLE]
+    if section_errors.get("events"):
+        lines.append(f"  ошибка чтения ({section_errors['events']})")
+    elif not events:
+        lines.append("  нет событий")
+    else:
+        for event in events:
+            lines.append(compact_audit_line(event))
+
+    lines += ["", BAR_DOUBLE, ""]
+    return "\n".join(lines)
+
+
+def _libvirt_label(raw: Any) -> str:
+    text = str(raw or "—")
+    if text.lower().startswith("libvirt-"):
+        return text[8:]
+    return text
 
 
 def get_host_inspector_report(db_name: str, host_id: str) -> dict:
@@ -46,17 +347,18 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
         with InspectorBase(db_name) as insp:
             now_naive = datetime.now().replace(tzinfo=None)
 
-            # 1. Основная информация
             host = insp.fetch_one(
                 """
                 SELECT
                     s.vds_id, s.vds_name, s.host_name, s.cluster_id,
-                    d.status, d.cpu_sockets, d.cpu_cores, d.cpu_threads,
+                    s._create_date, s._update_date,
+                    d.status, d.cpu_sockets, d.cpu_cores, d.cpu_threads, d.cpu_model,
                     d.physical_mem_mb, d.mem_commited, d.vm_active,
                     d.software_version, d.host_os, d.kvm_version,
                     d.kernel_version, d.libvirt_version, d.pretty_name,
                     d.kdump_status as kdump_code,
-                    c.name as cluster_name, sp.name as dc_name, sp.id as storage_pool_id
+                    c.name as cluster_name, sp.name as dc_name, sp.id as storage_pool_id,
+                    (s.vds_id = sp.spm_vds_id) AS is_spm
                 FROM vds_static s
                 JOIN vds_dynamic d ON s.vds_id = d.vds_id
                 LEFT JOIN cluster c ON s.cluster_id = c.cluster_id
@@ -69,125 +371,38 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
             if not host:
                 return {"error": "Хост не найден.", "report_text": "", "nav_data": {}}
 
-            kdump_map = {0: "Disabled", 1: "Enabled", 2: "Timeout"}
-            total_threads = (host["cpu_sockets"] or 0) * (host["cpu_cores"] or 0) * (host["cpu_threads"] or 1)
+            section_errors: dict[str, str] = {}
+            networks: list[dict[str, Any]] = []
+            events: list[dict[str, Any]] = []
 
-            # Используем глобальную константу
-            current_status = HOST_STATUS_MAP.get(host["status"], f"Code {host['status']}")
-
-            report = f"""══════════════════════════════════════════════════════════════════════════════
-  Host-Inspector v2.0 — Диагностический отчёт хоста
-  Время: {now_naive.strftime('%d.%m.%Y %H:%M:%S')}
-══════════════════════════════════════════════════════════════════════════════
-
-📋 ОСНОВНАЯ ИНФОРМАЦИЯ
-──────────────────────────────────────────────────────────────────────────────
-  Имя хоста:     {host['vds_name']}
-  ID:             {host['vds_id']}
-  FQDN:           {host['host_name']}
-  Кластер:        {host['cluster_name'] or '—'}
-  Дата-центр:     {host['dc_name'] or '—'}
-
-  🖥 Аппаратная часть:
-    CPU:    {host['cpu_sockets']} сок. × {host['cpu_cores']} ядер × {host['cpu_threads'] or 1} пот. = {total_threads} потоков
-    RAM:    {_fmt_size(host['physical_mem_mb'])} (физ.) / {_fmt_size(host['mem_commited'])} (занято ВМ)
-
-  ⚙ ПО и статус:
-    Статус:       {current_status}
-    Kdump:        {kdump_map.get(host['kdump_code'], f"Code {host['kdump_code']}")}
-    ОС:           {host['pretty_name'] or host['host_os'] or '—'}
-    Ядро:         {host['kernel_version'] or '—'}
-    VDSM:         {host['software_version'] or '—'}
-    Libvirt:      {host['libvirt_version'] or '—'}
-    KVM:          {host['kvm_version'] or '—'}
-"""
-
-            # 2. Сеть
             try:
-                interfaces = insp.fetch_all(
+                networks = insp.fetch_all(
                     """
-                    SELECT name, mac_addr, addr, subnet, gateway, mtu, speed, is_bond, bond_name
+                    SELECT name, mac_addr, addr, subnet, gateway, mtu, speed,
+                           is_bond, bond_name, vlan_id, network_name
                     FROM vds_interface
                     WHERE vds_id = CAST(:host_id AS uuid) AND name != 'lo'
                     ORDER BY name
                     """,
                     {"host_id": host["vds_id"]},
                 )
-
-                if interfaces:
-                    report += "\n🌐 СЕТЕВЫЕ ИНТЕРФЕЙСЫ\n──────────────────────────────────────────────────────────────────────────────\n"
-                    for iface in interfaces:
-                        bond_tag = " [BOND]" if iface["is_bond"] else ""
-                        ip_info = f"IP: {iface['addr'] or '—'}" if iface["addr"] else "IP: DHCP/None"
-                        report += f"  • {iface['name']}{bond_tag}\n"
-                        report += f"    MAC: {iface['mac_addr']} | {ip_info} | MTU: {iface['mtu'] or '—'}\n"
-                        if iface["speed"]:
-                            report += f"    Speed: {iface['speed']} Mbps\n"
-            except Exception as e:
-                report += f"\n🌐 СЕТЬ: Ошибка чтения ({e})\n"
-
-            # 3. Хранилища
-            try:
-                if host["storage_pool_id"]:
-                    storages = insp.fetch_all(
+            except Exception:
+                try:
+                    networks = insp.fetch_all(
                         """
-                        SELECT
-                            sds.storage_name,
-                            sdd.available_disk_size,
-                            sdd.used_disk_size,
-                            sds.storage_type,
-                            sds.storage_domain_type
-                        FROM storage_domain_static sds
-                        JOIN storage_domain_dynamic sdd ON sds.id = sdd.id
-                        JOIN storage_pool_with_storage_domain spwsd ON sds.id = spwsd.storage_id
-                        WHERE spwsd.storage_pool_id = CAST(:storage_pool_id AS uuid)
-                        ORDER BY sds.storage_name
+                        SELECT name, mac_addr, addr, subnet, gateway, mtu, speed,
+                               is_bond, bond_name, vlan_id
+                        FROM vds_interface
+                        WHERE vds_id = CAST(:host_id AS uuid) AND name != 'lo'
+                        ORDER BY name
                         """,
-                        {"storage_pool_id": host["storage_pool_id"]},
+                        {"host_id": host["vds_id"]},
                     )
+                except Exception as exc:
+                    section_errors["networks"] = str(exc)
 
-                    if storages:
-                        report += "\n💾 ХРАНИЛИЩА ДАТА-ЦЕНТРА\n──────────────────────────────────────────────────────────────────────────────\n"
-                        for stg in storages:
-                            avail = round(stg["available_disk_size"] / 1024**3, 2) if stg["available_disk_size"] else 0
-                            used = round(stg["used_disk_size"] / 1024**3, 2) if stg["used_disk_size"] else 0
-                            total = avail + used
-                            usage_pct = round((used / total * 100), 1) if total > 0 else 0
-
-                            type_label = f"{stg['storage_type']} ({stg['storage_domain_type']})"
-                            report += f"  • {stg['storage_name']} [{type_label}]\n"
-                            report += f"    Всего: {round(total, 2)} ГБ | Занято: {used} ГБ ({usage_pct}%)\n"
-            except Exception as e:
-                report += f"\n💾 ХРАНИЛИЩА: Ошибка чтения ({e})\n"
-
-            # 4. ВМ на хосте
             try:
-                vms = insp.fetch_all(
-                    """
-                    SELECT vs.vm_name, vd.status, vd.client_ip
-                    FROM vm_static vs
-                    JOIN vm_dynamic vd ON vs.vm_guid = vd.vm_guid
-                    WHERE vd.run_on_vds = CAST(:host_id AS uuid)
-                    ORDER BY vs.vm_name
-                    """,
-                    {"host_id": host["vds_id"]},
-                )
-
-                report += f"\n🖥 ВИРТУАЛЬНЫЕ МАШИНЫ ({len(vms)})\n──────────────────────────────────────────────────────────────────────────────\n"
-                if vms:
-                    for vm in vms:
-                        status_icon = "▶️" if vm["status"] == 1 else "⏹️"
-                        report += f"  {status_icon} {vm['vm_name']} (статус: {vm['status']})\n"
-                        if vm["client_ip"]:
-                            report += f"      IP: {vm['client_ip']}\n"
-                else:
-                    report += "  ✅ Нет запущенных ВМ\n"
-            except Exception as e:
-                report += f"\n🖥 ВМ: Ошибка чтения ({e})\n"
-
-            # 5. Аудит
-            try:
-                logs = insp.fetch_all(
+                events = insp.fetch_all(
                     """
                     SELECT log_time, log_type_name, user_name, message
                     FROM audit_log
@@ -196,45 +411,50 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
                     """,
                     {"host_id": host["vds_id"], "host_name": host["vds_name"]},
                 )
+            except Exception as exc:
+                section_errors["events"] = str(exc)
 
-                if logs:
-                    report += "\n📜 АУДИТ (последние 5 событий)\n──────────────────────────────────────────────────────────────────────────────\n"
-                    for l in logs:
-                        msg = l["message"][:150] + "..." if len(l["message"]) > 150 else l["message"]
-                        report += f"  ℹ️ [{_fmt_date(l['log_time'])}] {l['log_type_name']} (user: {l['user_name'] or '—'})\n    {msg}\n"
-            except Exception as e:
-                report += f"\n📜 АУДИТ: Ошибка чтения ({e})\n"
-
-            # 6. Диагностика
-            issues = []
-            if host["status"] == 4:
-                issues.append("🔴 Статус NonResponsive — хост не отвечает!")
-            if host["status"] == 5:
-                issues.append("🔴 Статус Error")
-            if host["status"] == 10:
-                issues.append("⚠️ Статус NonOperational")
-            if host["kdump_code"] != 1:
-                issues.append("⚠️ Kdump отключен или в ошибке")
-
-            report += f"\n🔍 ДИАГНОСТИКА ({len(issues)} проблем)\n──────────────────────────────────────────────────────────────────────────────\n"
-            if issues:
-                for issue in issues:
-                    report += f"  {issue}\n"
-            else:
-                report += "  ✅ Критичных проблем не обнаружено\n"
-
-            report += "\n══════════════════════════════════════════════════════════════════════════════\n"
-
-            nav_data = {
-                "cluster_id": host["cluster_id"],
-                "cluster_name": host["cluster_name"],
-                "dc_name": host["dc_name"],
+            kdump_label = KDUMP_MAP.get(host["kdump_code"], f"Code {host['kdump_code']}")
+            payload = {
+                "generated_at": now_naive.strftime("%d.%m.%Y %H:%M:%S"),
+                "header": {
+                    "name": host["vds_name"],
+                    "id": host["vds_id"],
+                    "fqdn": host["host_name"],
+                    "cluster": host["cluster_name"] or "—",
+                    "dc": host["dc_name"] or "—",
+                    "created": _fmt_date(host["_create_date"]),
+                    "updated": _fmt_date(host["_update_date"]),
+                },
+                "metrics": {
+                    "status": HOST_STATUS_MAP.get(host["status"], f"Code {host['status']}"),
+                    "kdump": kdump_label,
+                    "spm": "да" if host["is_spm"] else "нет",
+                    "cpu": _cpu_label(
+                        host["cpu_sockets"], host["cpu_cores"], host["cpu_threads"]
+                    ),
+                    "cpu_model": host["cpu_model"] or "—",
+                    "ram": _ram_label(host["physical_mem_mb"], host["mem_commited"]),
+                    "vm_active": host["vm_active"] if host["vm_active"] is not None else 0,
+                },
+                "versions": {
+                    "os": host["pretty_name"] or host["host_os"] or "—",
+                    "kernel": host["kernel_version"] or "—",
+                    "vdsm": host["software_version"] or "—",
+                    "libvirt": _libvirt_label(host["libvirt_version"]),
+                    "kvm": host["kvm_version"] or "—",
+                },
+                "networks": networks,
+                "events": events,
+                "section_errors": section_errors,
+                "nav_data": {
+                    "cluster_id": host["cluster_id"],
+                    "cluster_name": host["cluster_name"],
+                    "dc_name": host["dc_name"],
+                },
             }
+            payload["report_text"] = format_host_report(payload)
+            return payload
 
-            return {
-                "report_text": report,
-                "nav_data": nav_data,
-            }
-
-    except Exception as e:
-        return {"error": f"❌ Ошибка инспектора: {e}", "report_text": "", "nav_data": {}}
+    except Exception as exc:
+        return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}
