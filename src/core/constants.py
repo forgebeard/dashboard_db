@@ -382,6 +382,37 @@ def vm_layer_tone(status_code: object) -> StatusTone | None:
     return None
 
 
+def image_is_ok(status_code: object) -> bool:
+    return _as_int_code(status_code) == IMAGE_STATUS_OK
+
+
+def image_is_problem(status_code: object) -> bool:
+    """Остальное: известный imagestatus, но не OK."""
+    if image_is_ok(status_code):
+        return False
+    return _as_int_code(status_code) is not None
+
+
+def image_status_tone(status_code: object) -> StatusTone:
+    code = _as_int_code(status_code)
+    if code == IMAGE_STATUS_OK:
+        return "success"
+    if code == IMAGE_STATUS_ILLEGAL:
+        return "critical"
+    if code in (IMAGE_STATUS_LOCKED, IMAGE_STATUS_MERGING):
+        return "warning"
+    return "warning"
+
+
+def image_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
+    codes = list(status_codes)
+    return {
+        "total": len(codes),
+        "ok": sum(1 for c in codes if image_is_ok(c)),
+        "problems": sum(1 for c in codes if image_is_problem(c)),
+    }
+
+
 def storage_is_problem(status_code: object) -> bool:
     """Остальное: не Active (включая Unattached, Inactive, Mixed)."""
     code = _as_int_code(status_code)

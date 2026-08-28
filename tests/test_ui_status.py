@@ -15,6 +15,9 @@ from core.constants import (
     storage_health_counts,
     storage_is_problem,
     storage_status_tone,
+    image_health_counts,
+    image_is_problem,
+    image_status_tone,
     vm_health_counts,
     vm_is_problem,
     vm_layer_tone,
@@ -70,6 +73,23 @@ def test_vm_layer_tones():
     assert vm_layer_tone(2) == "warning"
     assert vm_layer_tone(4) == "warning"
     assert vm_layer_tone(3) == "critical"
+
+
+def test_image_status_contract():
+    assert image_is_problem(1) is False
+    assert image_is_problem(2) is True
+    assert image_is_problem(3) is True
+    assert image_is_problem(4) is True
+    assert image_is_problem(None) is False
+    assert image_status_tone(1) == "success"
+    assert image_status_tone(2) == "warning"
+    assert image_status_tone(4) == "warning"
+    assert image_status_tone(3) == "critical"
+
+
+def test_image_health_counts():
+    counts = image_health_counts([1, 1, 2, 3, None])
+    assert counts == {"total": 5, "ok": 2, "problems": 2}
 
 
 def test_dataframe_height_fits_few_rows():

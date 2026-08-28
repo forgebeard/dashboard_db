@@ -88,30 +88,30 @@ def process_gluster_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
 
-    # Расчет процента использования пространства (с защитой от деления на ноль)
-    def calc_usage(row):
-        total = row.get('total_space')
-        used = row.get('used_space')
-        if total and total > 0 and used is not None:
-            return round((used / total) * 100, 1)
-        return 0.0
+    df = df.copy()
+    total = pd.to_numeric(df.get("total_space"), errors="coerce")
+    used = pd.to_numeric(df.get("used_space"), errors="coerce")
+    usage = (used / total * 100).where(total > 0, 0)
+    df["_usage_pct"] = usage.fillna(0).round(1)
+    df["cluster_name"] = df["cluster_name"].fillna("—")
+    df["status"] = df["status"].fillna("—")
 
-    df['_usage_pct'] = df.apply(calc_usage, axis=1)
-    
-    # Добавляем служебный столбец для цветовой индикации статуса
-    df['_status_type'] = df['status'].apply(
-        lambda x: 'up' if x and 'up' in str(x).lower() else 'other'
-    )
-
-    # Формируем итоговый набор колонок для UI
-    display_df = df[[
-        'vol_name', '_volume_id', 'cluster_name', 'vol_type', 
-        'status', '_usage_pct', '_status_type'
-    ]].copy()
-    
+    display_df = df[
+        [
+            "vol_name",
+            "_volume_id",
+            "cluster_name",
+            "vol_type",
+            "status",
+            "_usage_pct",
+        ]
+    ].copy()
     display_df.columns = [
-        'Имя тома', 'UUID', 'Кластер', 'Тип', 
-        'Статус', 'Заполнен (%)', '_status_type'
+        "Имя тома",
+        "UUID",
+        "Кластер",
+        "Тип",
+        "Статус",
+        "Заполнен (%)",
     ]
-    
-    return display_df
+    return display_df.reset_index(drop=True)

@@ -55,13 +55,18 @@ from audit.audit_module import render_audit_log
 from audit.audit_diagnostics import render_audit_diagnostics
 from cert.certificates import render_certificates
 from networks.network_module import render_networks_list
+from networks.network_diagnostics import render_networks_diagnostics
 from system.system_module import render_system_list
 from users.users_module import render_users_list
 from users.users_diagnostics import render_users_diagnostics
 from atlas.atlas_module import render_schema_atlas
 
 # Разделы с собственным page header (фаза A).
-_SHELL_SECTIONS = frozenset({"hosts", "vms", "clusters", "storage", "audit", "tasks", "users", "system"})
+_SHELL_SECTIONS = frozenset({
+    "hosts", "vms", "snapshots", "clusters", "storage",
+    "networks", "disks", "gluster",
+    "audit", "tasks", "users", "system",
+})
 
 SECTIONS: list[tuple[str, str, str]] = [
     ("hosts", "Хосты", ":material/dns:"),
@@ -113,6 +118,8 @@ def _render_section(section_id: str, db_name: str, cluster_meta: dict) -> None:
         render_clusters_diagnostics(db_name)
     elif section_id == "networks":
         render_networks_list(db_name, cluster_meta)
+        st.divider()
+        render_networks_diagnostics(db_name)
     elif section_id == "storage":
         render_storage_list(db_name, cluster_meta)
         st.divider()

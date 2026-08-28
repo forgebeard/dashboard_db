@@ -1,148 +1,164 @@
-# src/snapshots/snapshots_module.py
-"""
-Модуль отображения списка снапшотов (UI).
-Отвечает за: отрисовку фильтров, таблицы и взаимодействие с инспектором.
-"""
+"""Список снапшотов: фильтры, сводка, таблица и текстовый инспектор."""
 
-# --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import streamlit as st  # Фреймворк для построения веб-интерфейса дашборда
-import pandas as pd     # Работа с табличными данными и подготовка DataFrame для отображения
+import streamlit as st
 
-# --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА ---
-from snapshots.snapshots_utils import (
-    fetch_snapshots_data,            # Выполнение SQL-запроса к снапшотам с учетом фильтров
-    process_snapshot_dataframe       # Обработка сырого DataFrame: статусы, имена, фильтрация
+from core.constants import image_health_counts, image_status_tone
+from core.ui_utils import (
+    dataframe_height,
+    filters_are_active,
+    render_clear_filters_button,
+    render_health_filter,
+    render_page_header,
+    style_status_column,
 )
+from snapshots.snapshots_utils import (
+    fetch_snapshots_data,
+    prepare_snapshot_rows,
+    process_snapshot_dataframe,
+)
+
+SNAP_FILTER_DEFAULTS = {
+    "snap_dc_filter": "Все ДЦ",
+    "snap_cluster_filter": "Все кластеры",
+    "snap_search": "",
+    "snap_health_filter": "all",
+}
 
 
 def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
-    """
-    Отрисовывает интерфейс списка снапшотов с фильтрами и инспектором.
-    
-    Args:
-        active_db: Имя активной базы данных
-        cluster_meta: Закешированные метаданные инфраструктуры из session_state
-    """
-    # Извлекаем справочники из централизованного кэша
-    clusters = {str(k): v for k, v in cluster_meta.get('clusters', {}).items()}
-    dc_id_to_name = cluster_meta.get('datacenters', {})
+    clusters_raw = cluster_meta.get("clusters", {})
+    clusters = {str(k): v for k, v in clusters_raw.items()}
+    dc_id_to_name = {str(k): v for k, v in cluster_meta.get("datacenters", {}).items()}
+    dc_to_clusters = {
+        str(k): [str(x) for x in v]
+        for k, v in cluster_meta.get("dc_to_clusters", {}).items()
+    }
     dc_names_set = set(dc_id_to_name.values())
 
-    # --- СТРОКА 1: ФИЛЬТРЫ ---
-    col_dc, col_cl, col_search, col_status = st.columns([1, 1, 3, 1])
-    
-    with col_dc:
-        selected_dc_name = st.selectbox(
-            "Дата-центр:", 
-            ['Все ДЦ'] + sorted(list(dc_names_set)), 
-            key="snap_dc_filter"
+    header_box = st.container()
+    show_clear = filters_are_active(SNAP_FILTER_DEFAULTS)
+    if show_clear:
+        health_col, dc_col, cl_col, search_col, clear_col = st.columns(
+            [1.7, 1, 1, 1.6, 0.9], vertical_alignment="bottom"
         )
-        
-    with col_cl:
-        cl_options = ['Все кластеры']
-        target_dc_id = None
-        
-        if selected_dc_name != 'Все ДЦ':
-            target_dc_id = next((k for k, v in dc_id_to_name.items() if v == selected_dc_name), None)
-            if target_dc_id and target_dc_id in cluster_meta.get('dc_to_clusters', {}):
-                valid_cids = cluster_meta['dc_to_clusters'][target_dc_id]
-                valid_names = [clusters.get(cid, f"Cluster-{cid[:8]}") for cid in valid_cids]
+    else:
+        health_col, dc_col, cl_col, search_col = st.columns(
+            [1.7, 1, 1, 2.0], vertical_alignment="bottom"
+        )
+        clear_col = None
+
+    with dc_col:
+        selected_dc_name = st.selectbox(
+            "Дата-центр:",
+            ["Все ДЦ"] + sorted(list(dc_names_set)),
+            key="snap_dc_filter",
+        )
+    with cl_col:
+        cl_options = ["Все кластеры"]
+        if selected_dc_name != "Все ДЦ":
+            target_dc_id = next(
+                (k for k, v in dc_id_to_name.items() if v == selected_dc_name), None
+            )
+            if target_dc_id and target_dc_id in dc_to_clusters:
+                valid_cids = dc_to_clusters[target_dc_id]
+                valid_names = [
+                    clusters.get(cid, f"Cluster-{cid[:8]}") for cid in valid_cids
+                ]
                 cl_options += sorted(valid_names)
             else:
                 cl_options += sorted(set(clusters.values()))
         else:
             cl_options += sorted(set(clusters.values()))
-            
-        selected_cluster_name = st.selectbox("Кластер:", cl_options, key="snap_cluster_filter")
-
-    with col_search:
+        selected_cluster_name = st.selectbox(
+            "Кластер:", cl_options, key="snap_cluster_filter"
+        )
+    with search_col:
         search_term = st.text_input(
-            "Поиск (Имя ВМ / UUID снапшота):", 
-            placeholder="Введите имя или UUID...", 
-            key="snap_search"
+            "Поиск (Имя ВМ / UUID):",
+            placeholder="Введите имя или UUID...",
+            key="snap_search",
+        )
+    if clear_col is not None:
+        with clear_col:
+            render_clear_filters_button(SNAP_FILTER_DEFAULTS, key="snap_clear_filters")
+
+    filters = (selected_dc_name, selected_cluster_name, search_term)
+    raw_df = fetch_snapshots_data(active_db, filters, dc_id_to_name, clusters)
+    if raw_df.empty:
+        counts = image_health_counts([])
+    else:
+        counts = image_health_counts(prepare_snapshot_rows(raw_df)["_status_code"])
+
+    health = "all"
+    if not raw_df.empty:
+        with health_col:
+            health = render_health_filter(
+                (
+                    ("all", f"Все ({counts['total']})"),
+                    ("ok", f"OK ({counts['ok']})"),
+                    ("problems", f"Остальное ({counts['problems']})"),
+                ),
+                key="snap_health_filter",
+            )
+
+    display_df = (
+        process_snapshot_dataframe(raw_df, health_filter=health)
+        if not raw_df.empty
+        else raw_df
+    )
+
+    with header_box:
+        render_page_header(
+            "Снапшоты",
+            active_db,
+            details=[f"{counts['total']} снапшотов"],
         )
 
-    with col_status:
-        status_options = ['Все статусы', 'OK', 'LOCKED', 'ILLEGAL', 'MERGING', 'UNASSIGNED', 'UPLOADING']
-        selected_status = st.selectbox("Статус образа:", status_options, key="snap_status_filter")
-
-    # --- ПОЛУЧЕНИЕ И ОБРАБОТКА ДАННЫХ ---
-    filters = (selected_dc_name, selected_cluster_name, search_term, selected_status)
-    raw_df = fetch_snapshots_data(active_db, filters, dc_id_to_name, clusters)
-    
     if raw_df.empty:
         st.info("Снапшоты не найдены.")
         return
-
-    display_df = process_snapshot_dataframe(raw_df, dc_id_to_name, clusters)
-    
     if display_df.empty:
-        st.info("Нет снапшотов, соответствующих критериям.")
+        st.info("Нет снапшотов, соответствующих выбранному состоянию.")
         return
 
-    # --- СТРОКА 2: ИТОГИ ---
-    st.markdown(f"**Снапшотов:** {len(display_df)}")
-
-    # --- ТАБЛИЦА СНАПШОТОВ С ТОЧЕЧНОЙ ПОДСВЕТКОЙ СТАТУСА ---
-    
-    def highlight_image_status(val):
-        """Возвращает CSS-стиль для ячейки статуса образа."""
-        if not isinstance(val, str):
-            return ''
-            
-        if val == 'OK': 
-            return 'color: #2ecc71; font-weight: bold;'
-        if val == 'LOCKED': 
-            return 'color: #e74c3c; font-weight: bold;'
-        if val == 'ILLEGAL': 
-            return 'color: #f39c12; font-weight: bold;'
-        return ''
-
-    column_config = {
-        "Имя ВМ": st.column_config.TextColumn(width="medium"),
-        "UUID снапшота": st.column_config.TextColumn(width="small"),
-        "Дата создания": st.column_config.DatetimeColumn(format="DD.MM.YYYY HH:mm", width="medium"),
-        "Тип": st.column_config.TextColumn(width="small"),
-        "Размер": st.column_config.NumberColumn(format="%.2f ГБ", width="small"),
-        "Статус образа": st.column_config.TextColumn(width="small"),
-        "Хранилище": st.column_config.TextColumn(width="small"),
-        "_image_status_code": None  # Скрываем служебный столбец
-    }
-
-    # Применяем стиль ТОЛЬКО к колонке 'Статус образа'
-    styled_df = display_df.style.map(
-        highlight_image_status, 
-        subset=['Статус образа']
-    )
-
-    #  ДИНАМИЧЕСКАЯ ВЫСОТА: минимум 200px, максимум 500px, +40px на строку
-    table_height = min(max(len(display_df) * 40 + 60, 200), 500)
-
     event = st.dataframe(
-        styled_df,
-        width='stretch', 
-        hide_index=True, 
+        style_status_column(display_df, image_status_tone),
+        width="stretch",
+        hide_index=True,
         on_select="rerun",
-        selection_mode="single-row", 
-        column_config=column_config, 
-        height=table_height
+        selection_mode="single-row",
+        column_config={
+            "Имя ВМ": st.column_config.TextColumn(),
+            "UUID снапшота": st.column_config.TextColumn(width=220),
+            "Дата создания": st.column_config.DatetimeColumn(
+                format="DD.MM.YYYY HH:mm", width=140
+            ),
+            "Тип": st.column_config.TextColumn(width=90),
+            "Статус": st.column_config.TextColumn(width=90),
+            "Размер": st.column_config.NumberColumn(format="%.2f ГБ", width=90),
+            "Хранилище": st.column_config.TextColumn(width=120),
+            "_status_code": None,
+            "_vm_id": None,
+        },
+        height=dataframe_height(len(display_df)),
     )
 
-    # --- ИНСПЕКТОР ---
-    
     if event.selection.rows:
         idx = event.selection.rows[0]
-        selected_vm_id = display_df.iloc[idx]['_vm_id']
-        row = raw_df[raw_df['_vm_id'] == selected_vm_id].iloc[0]
-        
-        # Используем оригинальные имена столбцов из raw_df, а не переименованные из display_df
-        st.markdown(f"#### 🔍 Инспектор: {row['vm_name']}")
-        st.caption(f"ВМ UUID: `{row['_vm_id']}` | Снапшот: {row['snapshot_id']}")
-        
+        selected = display_df.iloc[idx]
+        vm_name = selected["Имя ВМ"]
+        snap_id = selected["UUID снапшота"]
+        snap_type = selected["Тип"]
+        st.markdown(f"#### 🔍 Инспектор: {vm_name}")
+        st.caption(
+            f"ВМ UUID: `{selected['_vm_id']}` | снапшот: `{snap_id}` ({snap_type})"
+        )
         with st.spinner("Генерация полного отчета Snapshot-Inspector..."):
             from snapshots.snapshot_inspector_sql import get_snapshot_inspector_report
-            result = get_snapshot_inspector_report(active_db, str(row['_vm_id']))
-            
+
+            result = get_snapshot_inspector_report(
+                active_db, str(selected["_vm_id"]), str(snap_id)
+            )
         if "error" in result:
             st.error(result["error"])
         else:
