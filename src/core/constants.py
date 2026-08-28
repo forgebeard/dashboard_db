@@ -232,6 +232,34 @@ SHARED_STATUS_MAP: Dict[int, str] = {
     STORAGE_SHARED_MIXED: "Mixed",
 }
 
+# --- СТАТУС ПРИВЯЗКИ ДОМЕНА К ДЦ (StorageDomainStatus) ---
+# Коды как в Engine (storage_pool_iso_map.status).
+# Источник:
+#   oVirt Engine StorageDomainStatus.java
+#     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/StorageDomainStatus.java
+STORAGE_DOMAIN_STATUS_ACTIVE = 3
+STORAGE_DOMAIN_STATUS_MAP: Dict[int, str] = {
+    0: "Unknown",
+    1: "Uninitialized",
+    2: "Unattached",
+    3: "Active",
+    4: "Inactive",
+    5: "Locked",
+    6: "Maintenance",
+    7: "PreparingForMaintenance",
+    8: "Detaching",
+    9: "Activating",
+}
+
+# storage_pool.status
+STORAGE_POOL_STATUS_MAP: Dict[int, str] = {
+    0: "Uninitialized",
+    1: "Up",
+    2: "Maintenance",
+    3: "NotOperational",
+    4: "Problematic",
+}
+
 
 def _as_int_code(code: object) -> int | None:
     if code is None:
@@ -299,11 +327,11 @@ def vm_layer_tone(status_code: object) -> StatusTone | None:
 
 
 def storage_is_problem(status_code: object) -> bool:
-    """Проблема: Inactive или Mixed (не Active и не Unattached)."""
-    return _as_int_code(status_code) in (
-        STORAGE_SHARED_INACTIVE,
-        STORAGE_SHARED_MIXED,
-    )
+    """Остальное: не Active (включая Unattached, Inactive, Mixed)."""
+    code = _as_int_code(status_code)
+    if code is None:
+        return False
+    return code != STORAGE_SHARED_ACTIVE
 
 
 def storage_status_tone(status_code: object) -> StatusTone:
@@ -413,9 +441,6 @@ def storage_health_counts(status_codes: Iterable[object]) -> dict[str, int]:
         "total": len(codes),
         "active": sum(
             1 for c in codes if _as_int_code(c) == STORAGE_SHARED_ACTIVE
-        ),
-        "unattached": sum(
-            1 for c in codes if _as_int_code(c) == STORAGE_SHARED_UNATTACHED
         ),
         "problems": sum(1 for c in codes if storage_is_problem(c)),
     }

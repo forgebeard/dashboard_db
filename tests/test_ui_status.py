@@ -107,9 +107,10 @@ def test_cluster_health_counts():
 
 def test_storage_shared_status_contract():
     assert storage_is_problem(1) is False
-    assert storage_is_problem(0) is False
+    assert storage_is_problem(0) is True
     assert storage_is_problem(2) is True
     assert storage_is_problem(3) is True
+    assert storage_is_problem(None) is False
     assert storage_status_tone(1) == "success"
     assert storage_status_tone(0) == "neutral"
     assert storage_status_tone(3) == "warning"
@@ -118,7 +119,7 @@ def test_storage_shared_status_contract():
 
 def test_storage_health_counts():
     counts = storage_health_counts([1, 1, 0, 2, 3])
-    assert counts == {"total": 5, "active": 2, "unattached": 1, "problems": 2}
+    assert counts == {"total": 5, "active": 2, "problems": 3}
 
 
 def test_architecture_and_bios_maps():

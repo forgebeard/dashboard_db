@@ -11,7 +11,6 @@ from core.constants import (
     SHARED_STATUS_MAP,
     STORAGE_DOMAIN_TYPE_MAP,
     STORAGE_SHARED_ACTIVE,
-    STORAGE_SHARED_UNATTACHED,
     STORAGE_TYPE_MAP,
     storage_is_problem,
 )
@@ -125,8 +124,6 @@ def process_storage_dataframe(
     kind = _resolve_health_filter(show_problems, health_filter)
     if kind == "active":
         df = df[df["shared_status_code"] == STORAGE_SHARED_ACTIVE].copy()
-    elif kind == "unattached":
-        df = df[df["shared_status_code"] == STORAGE_SHARED_UNATTACHED].copy()
     elif kind == "problems":
         df = df[df["is_problematic"]].copy()
 

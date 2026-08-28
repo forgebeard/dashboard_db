@@ -69,7 +69,6 @@ def render_storage_list(active_db, cluster_meta):
                 (
                     ("all", f"Все ({counts['total']})"),
                     ("active", f"Active ({counts['active']})"),
-                    ("unattached", f"Unattached ({counts['unattached']})"),
                     ("problems", f"Остальное ({counts['problems']})"),
                 ),
                 key="storage_health_filter",

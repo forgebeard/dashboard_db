@@ -93,16 +93,17 @@ def test_non_numeric_size_coercion():
     assert result.iloc[0]["Заполнено (%)"] == 0.0
 
 
-def test_health_filter_active_unattached_problems():
+def test_health_filter_active_and_problems():
     df = _raw_storage_df()
     active = process_storage_dataframe(df, health_filter="active")
     assert list(active["Имя домена"]) == ["data_domain_1"]
 
-    unattached = process_storage_dataframe(df, health_filter="unattached")
-    assert list(unattached["Имя домена"]) == ["iso_domain"]
-
     problems = process_storage_dataframe(df, health_filter="problems")
-    assert list(problems["Имя домена"]) == ["broken_domain", "mixed_domain"]
+    assert list(problems["Имя домена"]) == [
+        "iso_domain",
+        "broken_domain",
+        "mixed_domain",
+    ]
 
 
 def test_engine_storage_type_and_shared_status_codes():
