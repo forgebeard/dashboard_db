@@ -6,6 +6,7 @@
 import logging
 
 import pandas as pd
+import streamlit as st
 from sqlalchemy import text
 
 from core.constants import (
@@ -14,7 +15,8 @@ from core.constants import (
     HOST_STATUS_UP,
     host_is_problem,
 )
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import get_sqlalchemy_engine, load_sql_df, read_sql_df
+from core.exceptions import DataLoadError
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +46,9 @@ def load_host_infrastructure_maps(active_db):
         for _, row in df_dcs.iterrows():
             dc_id_to_name[row['dc_id']] = row['dc_name']
             dc_names_set.add(row['dc_name'])
-    except Exception as e:
+    except DataLoadError as e:
         logger.warning("Не удалось загрузить связи инфраструктуры хостов: %s", e)
+        st.warning(f"Не удалось загрузить связи инфраструктуры хостов: {e}")
         
     return dc_to_clusters, dc_id_to_name, dc_names_set
 
@@ -96,8 +99,7 @@ def fetch_hosts_data(active_db, filters, clusters, dc_id_to_name):
         base_sql += " WHERE " + " AND ".join(conditions)
     base_sql += " ORDER BY s.vds_name"
 
-    engine = get_sqlalchemy_engine(active_db)
-    return read_sql_df(engine, text(base_sql), params=sql_params if sql_params else None)
+    return load_sql_df(active_db, text(base_sql), params=sql_params if sql_params else None)
 
 def _resolve_health_filter(show_problems: bool, health_filter: str | None) -> str:
     if health_filter:

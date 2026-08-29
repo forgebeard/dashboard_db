@@ -3,15 +3,14 @@
 import streamlit as st
 
 from core.constants import image_health_counts, image_status_tone
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
-    render_load_error,
     render_page_header,
     style_status_column,
+    try_load,
 )
 from snapshots.snapshots_utils import (
     fetch_snapshots_data,
@@ -85,10 +84,10 @@ def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
             render_clear_filters_button(SNAP_FILTER_DEFAULTS, key="snap_clear_filters")
 
     filters = (selected_dc_name, selected_cluster_name, search_term)
-    try:
-        raw_df = fetch_snapshots_data(active_db, filters, dc_id_to_name, clusters)
-    except DataLoadError as exc:
-        render_load_error(exc, "снапшотов")
+    raw_df = try_load(
+        "снапшотов", fetch_snapshots_data, active_db, filters, dc_id_to_name, clusters
+    )
+    if raw_df is None:
         return
     if raw_df.empty:
         counts = image_health_counts([])

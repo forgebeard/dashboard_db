@@ -1,6 +1,6 @@
 """Unit-тесты для src/networks/network_utils.py."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -36,14 +36,12 @@ def test_process_columns_and_vlan():
     assert result.iloc[0]["UUID"] == "n1"
 
 
-@patch("networks.network_utils.read_sql_df")
-@patch("networks.network_utils.get_sqlalchemy_engine")
-def test_fetch_dc_and_search(mock_engine, mock_read_sql):
-    mock_engine.return_value = MagicMock()
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("networks.network_utils.load_sql_df")
+def test_fetch_dc_and_search(mock_load):
+    mock_load.return_value = pd.DataFrame()
     fetch_networks_data("db", ("MyDC", "mgmt"), {"dc-uuid": "MyDC"})
-    sql_text = str(mock_read_sql.call_args[0][1])
-    params = mock_read_sql.call_args[1]["params"]
+    sql_text = str(mock_load.call_args[0][1])
+    params = mock_load.call_args[1]["params"]
     assert "n.storage_pool_id = :dc_id" in sql_text
     assert params["dc_id"] == "dc-uuid"
     assert params["search"] == "%mgmt%"

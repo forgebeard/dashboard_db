@@ -18,7 +18,7 @@ from core.constants import (
     HOST_STATUS_UP,
     cluster_status_from_hosts,
 )
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import load_sql_df
 
 _MAINT_SQL = ", ".join(str(code) for code in sorted(HOST_MAINTENANCE_CODES))
 
@@ -87,9 +87,8 @@ def fetch_clusters_data(
         ORDER BY c.name
     """
 
-    engine = get_sqlalchemy_engine(active_db)
-    return read_sql_df(
-        engine, text(base_sql), params=sql_params if sql_params else None
+    return load_sql_df(
+        active_db, text(base_sql), params=sql_params if sql_params else None
     )
 
 

@@ -16,6 +16,7 @@ from core.constants import (
     VM_STATUS_MAP,
     VM_STATUS_UP,
 )
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
@@ -544,7 +545,7 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["disks"] = str(exc)
 
             try:
@@ -576,7 +577,7 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["layers"] = str(exc)
 
             try:
@@ -601,7 +602,7 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["snapshots"] = str(exc)
 
             try:
@@ -625,7 +626,7 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                     params,
                 )
                 nics = merge_guest_ips(nics, guest_ifaces)
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["networks"] = str(exc)
                 nics = []
 
@@ -640,7 +641,7 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                     """,
                     {"vm_guid": vm["vm_guid"], "vm_name": vm["vm_name"]},
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["events"] = str(exc)
 
             bios_code = vm["bios_type"]
@@ -701,5 +702,5 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
             payload["report_text"] = format_vm_report(payload)
             return payload
 
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

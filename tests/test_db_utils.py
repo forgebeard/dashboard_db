@@ -5,12 +5,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.config import STATEMENT_TIMEOUT_MS
+from core.config import STATEMENT_TIMEOUT_MS, statement_timeout_ms
 from core.db_utils import (
     PG_READ_ONLY_OPTIONS,
     get_available_databases,
     get_db_params,
     get_psycopg2_connect_kwargs,
+    get_sqlalchemy_engine,
     get_table_list,
     load_sql_df,
     read_sql_df,
@@ -160,10 +161,40 @@ def test_is_statement_timeout_by_message():
     assert not is_statement_timeout(Exception("syntax error"))
 
 
+class QueryCanceled(Exception):
+    """Имя как у psycopg2.errors.QueryCanceled."""
+
+
+def test_is_statement_timeout_by_class_and_cause():
+    assert is_statement_timeout(QueryCanceled("canceled"))
+    wrapped = RuntimeError("driver")
+    wrapped.__cause__ = QueryCanceled("canceled")
+    assert is_statement_timeout(wrapped)
+
+
 def test_format_load_error_timeout():
     msg = format_load_error(Exception("statement timeout"))
     assert "таймауту" in msg
     assert str(STATEMENT_TIMEOUT_MS // 1000) in msg
+
+
+def test_format_load_error_read_only():
+    msg = format_load_error(Exception("cannot execute INSERT in a read-only transaction"))
+    assert "только чтение" in msg
+
+
+def test_statement_timeout_ms_from_env(monkeypatch):
+    monkeypatch.setenv("STATEMENT_TIMEOUT_MS", "15000")
+    assert statement_timeout_ms() == 15000
+    monkeypatch.delenv("STATEMENT_TIMEOUT_MS")
+    assert statement_timeout_ms() == 30000
+
+
+@patch("core.db_utils.create_engine", side_effect=RuntimeError("pool down"))
+def test_get_sqlalchemy_engine_wraps_errors(mock_create, monkeypatch):
+    monkeypatch.setenv("DB_PASSWORD", "secret")
+    with pytest.raises(DataLoadError, match="pool down"):
+        get_sqlalchemy_engine("wrap_engine_errors")
 
 
 @patch("core.db_utils.pd.read_sql")

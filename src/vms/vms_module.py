@@ -4,15 +4,14 @@
 import streamlit as st
 
 from core.constants import vm_health_counts, vm_layer_tone, vm_status_tone
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
-    render_load_error,
     render_page_header,
     style_status_column,
+    try_load,
 )
 from vms.vms_utils import fetch_vms_data, process_vm_dataframe
 
@@ -96,10 +95,10 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
             render_clear_filters_button(VM_FILTER_DEFAULTS, key="vm_clear_filters")
 
     filters = (selected_dc_name, selected_cluster_name, selected_host_name, search_term)
-    try:
-        raw_df = fetch_vms_data(active_db, filters, clusters, hosts, dc_id_to_name)
-    except DataLoadError as exc:
-        render_load_error(exc, "ВМ")
+    raw_df = try_load(
+        "ВМ", fetch_vms_data, active_db, filters, clusters, hosts, dc_id_to_name
+    )
+    if raw_df is None:
         return
     counts = vm_health_counts(
         raw_df["vm_status_code"] if not raw_df.empty else []

@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import NETWORK_STATUS_MAP, mapped_code_label
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
@@ -231,7 +232,7 @@ def get_network_inspector_report(db_name: str, network_id: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["clusters"] = str(exc)
 
             profiles: list[dict[str, Any]] = []
@@ -254,7 +255,7 @@ def get_network_inspector_report(db_name: str, network_id: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["profiles"] = str(exc)
 
             dns: list[dict[str, Any]] = []
@@ -270,19 +271,19 @@ def get_network_inspector_report(db_name: str, network_id: str) -> dict:
                         """,
                         {"dns_config_id": dns_id},
                     )
-                except Exception as exc:
+                except DataLoadError as exc:
                     section_errors["dns"] = str(exc)
 
             hosts: list[dict[str, Any]] = []
             try:
                 hosts = insp.fetch_all(HOST_ATTACHMENTS_SQL, params)
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["hosts"] = str(exc)
 
             vms: list[dict[str, Any]] = []
             try:
                 vms = insp.fetch_all(NETWORK_VMS_SQL, params)
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["vms"] = str(exc)
 
             payload = {
@@ -302,5 +303,5 @@ def get_network_inspector_report(db_name: str, network_id: str) -> dict:
             payload["report_text"] = format_network_report(payload)
             return payload
 
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

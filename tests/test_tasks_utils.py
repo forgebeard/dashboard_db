@@ -52,7 +52,9 @@ class TestTasksDiagnostics:
     @patch("core.table_preview.st")
     @patch("core.table_preview.get_sqlalchemy_engine")
     def test_render_connection_error(self, mock_get_engine, mock_st, mock_active_db):
-        mock_get_engine.side_effect = Exception("DB Down")
+        from core.exceptions import DataLoadError
+
+        mock_get_engine.side_effect = DataLoadError("DB Down")
         mock_st.number_input.return_value = 100
         mock_st.columns.return_value = [MagicMock(), MagicMock()]
 
@@ -184,15 +186,13 @@ class TestTasksModuleSQL:
 
     @patch("core.ui_utils.st")
     @patch("tasks.tasks_module.st")
-    @patch("tasks.tasks_module.get_sqlalchemy_engine")
     @patch("tasks.tasks_module.load_audit_infrastructure_maps")
-    @patch("tasks.tasks_module.read_sql_df")
+    @patch("tasks.tasks_module.load_sql_df")
     def test_sql_generation_with_host_filter(
-        self, mock_read_sql, mock_load_maps, mock_get_engine, mock_st, mock_ui_st,
+        self, mock_load, mock_load_maps, mock_st, mock_ui_st,
         mock_active_db, mock_infra_maps
     ):
         mock_load_maps.return_value = mock_infra_maps
-        mock_get_engine.return_value = MagicMock()
         self._setup_st_mocks(mock_st, ["Все ДЦ", "Все кластеры", "Host_A"], mock_ui_st)
 
         df_corr = pd.DataFrame({"correlation_id": ["corr-uuid-1", "corr-uuid-2"]})
@@ -201,15 +201,15 @@ class TestTasksModuleSQL:
             "started_at": [datetime.now()], "vdsm_task_id_txt": ["v1"],
             "root_command_id": ["r1"], "command_type": ["CreateVM"]
         })
-        mock_read_sql.side_effect = [df_corr, df_tasks]
+        mock_load.side_effect = [df_corr, df_tasks]
 
         render_tasks_list(mock_active_db)
 
-        corr_sql = str(mock_read_sql.call_args_list[0][0][1])
+        corr_sql = str(mock_load.call_args_list[0][0][1])
         assert "IN :h_ids" in corr_sql
-        assert mock_read_sql.call_args_list[0][1]["params"]["h_ids"] == ("h-1",)
+        assert mock_load.call_args_list[0][1]["params"]["h_ids"] == ("h-1",)
 
-        main_call = mock_read_sql.call_args_list[1]
+        main_call = mock_load.call_args_list[1]
         sql_text = str(main_call[0][1])
         assert "IN :corr_ids" in sql_text or "IN (" in sql_text
         params = main_call[1]["params"]
@@ -222,17 +222,15 @@ class TestTasksModuleSQL:
 
     @patch("core.ui_utils.st")
     @patch("tasks.tasks_module.st")
-    @patch("tasks.tasks_module.get_sqlalchemy_engine")
     @patch("tasks.tasks_module.load_audit_infrastructure_maps")
-    @patch("tasks.tasks_module.read_sql_df")
+    @patch("tasks.tasks_module.load_sql_df")
     def test_dc_filter_uses_all_cluster_hosts(
-        self, mock_read_sql, mock_load_maps, mock_get_engine, mock_st, mock_ui_st,
+        self, mock_load, mock_load_maps, mock_st, mock_ui_st,
         mock_active_db, mock_infra_maps
     ):
         mock_load_maps.return_value = mock_infra_maps
-        mock_get_engine.return_value = MagicMock()
         self._setup_st_mocks(mock_st, ["DC_PROD", "Все кластеры", "Все хосты"], mock_ui_st)
-        mock_read_sql.side_effect = [
+        mock_load.side_effect = [
             pd.DataFrame({"correlation_id": ["c1"]}),
             pd.DataFrame({
                 "task_id": ["t1"], "action_type": [1], "status": [1], "result": [0],
@@ -243,28 +241,54 @@ class TestTasksModuleSQL:
 
         render_tasks_list(mock_active_db)
 
-        corr_params = mock_read_sql.call_args_list[0][1]["params"]
+        corr_params = mock_load.call_args_list[0][1]["params"]
         assert corr_params["h_ids"] == ("h-1", "h-2")
 
     @patch("core.ui_utils.st")
     @patch("tasks.tasks_module.st")
-    @patch("tasks.tasks_module.get_sqlalchemy_engine")
     @patch("tasks.tasks_module.load_audit_infrastructure_maps")
-    @patch("tasks.tasks_module.read_sql_df")
+    @patch("tasks.tasks_module.load_sql_df")
     def test_empty_correlation_ids_returns_nothing(
-        self, mock_read_sql, mock_load_maps, mock_get_engine, mock_st, mock_ui_st,
+        self, mock_load, mock_load_maps, mock_st, mock_ui_st,
         mock_active_db, mock_infra_maps
     ):
         mock_load_maps.return_value = mock_infra_maps
-        mock_get_engine.return_value = MagicMock()
         self._setup_st_mocks(mock_st, ["Все ДЦ", "Все кластеры", "Host_A"], mock_ui_st)
-        mock_read_sql.side_effect = [pd.DataFrame(), pd.DataFrame()]
+        mock_load.side_effect = [pd.DataFrame(), pd.DataFrame()]
 
         render_tasks_list(mock_active_db)
 
-        main_call = mock_read_sql.call_args_list[1]
+        main_call = mock_load.call_args_list[1]
         sql_text = str(main_call[0][1])
         assert "AND 1=0" in sql_text
+
+    @patch("core.ui_utils.st")
+    @patch("tasks.tasks_module.st")
+    @patch("tasks.tasks_module.load_audit_infrastructure_maps")
+    @patch("tasks.tasks_module.load_sql_df")
+    def test_correlation_load_error_fail_closed(
+        self, mock_load, mock_load_maps, mock_st, mock_ui_st,
+        mock_active_db, mock_infra_maps
+    ):
+        from core.exceptions import DataLoadError
+
+        mock_load_maps.return_value = mock_infra_maps
+        self._setup_st_mocks(mock_st, ["Все ДЦ", "Все кластеры", "Host_A"], mock_ui_st)
+        mock_load.side_effect = [
+            DataLoadError("timeout"),
+            pd.DataFrame({
+                "task_id": ["t1"], "action_type": [1], "status": [1], "result": [0],
+                "started_at": [datetime.now()], "vdsm_task_id_txt": ["v1"],
+                "root_command_id": ["r1"], "command_type": ["CreateVM"]
+            }),
+        ]
+
+        render_tasks_list(mock_active_db)
+
+        main_call = mock_load.call_args_list[1]
+        sql_text = str(main_call[0][1])
+        assert "AND 1=0" in sql_text
+        mock_ui_st.error.assert_called()
 
 
 def test_task_inspector_not_imported():

@@ -21,7 +21,7 @@ from core.constants import (
     VM_STATUS_UP,
     vm_is_problem,
 )
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import load_sql_df
 
 
 def _layer_issue_codes(raw: object) -> list[int]:
@@ -154,8 +154,7 @@ def fetch_vms_data(
         base_sql += " AND " + " AND ".join(conditions)
     base_sql += " ORDER BY vs.vm_name"
 
-    engine = get_sqlalchemy_engine(active_db)
-    return read_sql_df(engine, text(base_sql), params=sql_params if sql_params else None)
+    return load_sql_df(active_db, text(base_sql), params=sql_params if sql_params else None)
 
 
 def _resolve_health_filter(show_problems: bool, health_filter: str | None) -> str:

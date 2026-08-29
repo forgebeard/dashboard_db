@@ -13,7 +13,7 @@ from core.constants import (
     image_is_problem,
     mapped_code_label,
 )
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import load_sql_df
 from core.ui_utils import fix_uuid_columns
 
 
@@ -91,8 +91,7 @@ def fetch_disks_data(
         ORDER BY bd.disk_alias
     """
 
-    engine = get_sqlalchemy_engine(active_db)
-    df = read_sql_df(engine, text(base_sql), params=params if params else None)
+    df = load_sql_df(active_db, text(base_sql), params=params if params else None)
     return fix_uuid_columns(df)
 
 

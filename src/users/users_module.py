@@ -3,13 +3,12 @@
 
 import streamlit as st
 
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
-    render_load_error,
     render_page_header,
+    try_load,
 )
 from users.users_utils import (
     fetch_user_domains,
@@ -28,10 +27,8 @@ USER_FILTER_DEFAULTS = {
 
 def render_users_list(active_db: str, cluster_meta: dict) -> None:
     header_box = st.container()
-    try:
-        domains = fetch_user_domains(active_db)
-    except DataLoadError as exc:
-        render_load_error(exc, "доменов")
+    domains = try_load("доменов", fetch_user_domains, active_db)
+    if domains is None:
         return
     domain_options = ["Все домены"] + domains
 
@@ -63,10 +60,10 @@ def render_users_list(active_db: str, cluster_meta: dict) -> None:
         with clear_col:
             render_clear_filters_button(USER_FILTER_DEFAULTS, key="user_clear_filters")
 
-    try:
-        raw_df = fetch_users_data(active_db, (selected_domain, search_term))
-    except DataLoadError as exc:
-        render_load_error(exc, "пользователей")
+    raw_df = try_load(
+        "пользователей", fetch_users_data, active_db, (selected_domain, search_term)
+    )
+    if raw_df is None:
         return
 
     with header_box:
@@ -108,10 +105,8 @@ def render_users_list(active_db: str, cluster_meta: dict) -> None:
     selected = display_df.iloc[idx]
     st.markdown(f"#### {selected['Имя']}")
     st.caption(f"UUID: `{selected['UUID']}` | Домен: {selected['Домен']}")
-    try:
-        perms = fetch_user_permissions(active_db, str(selected["UUID"]))
-    except DataLoadError as exc:
-        render_load_error(exc, "прав")
+    perms = try_load("прав", fetch_user_permissions, active_db, str(selected["UUID"]))
+    if perms is None:
         return
     summary = format_user_role_summary(perms)
     if perms.empty:

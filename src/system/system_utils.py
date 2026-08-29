@@ -6,7 +6,7 @@ import logging
 import pandas as pd
 from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import get_sqlalchemy_engine, load_sql_df, read_sql_df
 from core.exceptions import DataLoadError
 from core.ui_utils import fix_uuid_columns
 
@@ -85,8 +85,7 @@ def fence_agents_caption(fence_configured: int) -> str:
 
 def fetch_system_tab(active_db: str, tab_id: str) -> pd.DataFrame:
     sql = SYSTEM_TAB_SQL[tab_id]
-    engine = get_sqlalchemy_engine(active_db)
-    df = read_sql_df(engine, text(sql))
+    df = load_sql_df(active_db, text(sql))
     return fix_uuid_columns(df)
 
 
@@ -129,6 +128,6 @@ def get_system_summary(active_db: str) -> dict:
             summary["active_transfers"] = int(row["trans"])
             summary["custom_options"] = int(row["opts"])
             summary["quota_count"] = int(row["quota"])
-    except (DataLoadError, Exception) as e:
+    except DataLoadError as e:
         logger.warning("Не удалось загрузить сводку: %s", e)
     return summary

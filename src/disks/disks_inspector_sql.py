@@ -13,6 +13,7 @@ from core.constants import (
     async_task_status_label,
     mapped_code_label,
 )
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 from vms.vm_inspector_sql import (
@@ -215,7 +216,7 @@ def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
                 selected["storage_name"] = _storage_line(
                     [row.get("storage_name") for row in storage_rows]
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["storage"] = str(exc)
                 selected["storage_name"] = "—"
 
@@ -241,7 +242,7 @@ def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
                     """,
                     {"disk_id": disk_id},
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["attachments"] = str(exc)
 
             layers: list[dict[str, Any]] = []
@@ -280,7 +281,7 @@ def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
                     """,
                     {"disk_id": disk_id},
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["layers"] = str(exc)
 
             tasks: list[dict[str, Any]] = []
@@ -300,7 +301,7 @@ def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
                     """,
                     {"image_guid": image_id, "disk_id": disk_id},
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["tasks"] = str(exc)
 
             first = attachments[0] if attachments else {}
@@ -321,5 +322,5 @@ def get_disk_inspector_report(db_name: str, image_guid: str) -> dict:
             payload["report_text"] = format_disk_report(payload)
             return payload
 
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

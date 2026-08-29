@@ -1,7 +1,7 @@
 """
 Unit-тесты для src/vms/vms_utils.py.
 """
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -115,12 +115,9 @@ def test_process_vm_dataframe_empty():
     assert result.empty
 
 
-@patch("vms.vms_utils.read_sql_df")
-@patch("vms.vms_utils.get_sqlalchemy_engine")
-def test_fetch_vms_data_no_filters(mock_get_engine, mock_read_sql):
-    mock_engine = MagicMock()
-    mock_get_engine.return_value = mock_engine
-    mock_read_sql.return_value = pd.DataFrame({"vm_guid": ["v1"]})
+@patch("vms.vms_utils.load_sql_df")
+def test_fetch_vms_data_no_filters(mock_load):
+    mock_load.return_value = pd.DataFrame({"vm_guid": ["v1"]})
 
     filters = ("Все ДЦ", "Все кластеры", "Все хосты", "")
     clusters, hosts, dc_map = {}, {}, {}
@@ -128,18 +125,15 @@ def test_fetch_vms_data_no_filters(mock_get_engine, mock_read_sql):
     df = fetch_vms_data("test_db", filters, clusters, hosts, dc_map)
 
     assert not df.empty
-    sql_text = str(mock_read_sql.call_args[0][1])
+    sql_text = str(mock_load.call_args[0][1])
     assert "layer_issue_codes" in sql_text
     assert "has_bad_images" not in sql_text
     assert "AND" not in sql_text.split("entity_type = 'VM'")[1].split("ORDER BY")[0]
 
 
-@patch("vms.vms_utils.read_sql_df")
-@patch("vms.vms_utils.get_sqlalchemy_engine")
-def test_fetch_vms_data_with_host_filter(mock_get_engine, mock_read_sql):
-    mock_engine = MagicMock()
-    mock_get_engine.return_value = mock_engine
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("vms.vms_utils.load_sql_df")
+def test_fetch_vms_data_with_host_filter(mock_load):
+    mock_load.return_value = pd.DataFrame()
 
     filters = ("Все ДЦ", "Все кластеры", "MyHost", "")
     clusters, dc_map = {}, {}
@@ -147,27 +141,24 @@ def test_fetch_vms_data_with_host_filter(mock_get_engine, mock_read_sql):
 
     fetch_vms_data("test_db", filters, clusters, hosts, dc_map)
 
-    sql_text = str(mock_read_sql.call_args[0][1])
-    params = mock_read_sql.call_args[1]["params"]
+    sql_text = str(mock_load.call_args[0][1])
+    params = mock_load.call_args[1]["params"]
 
     assert "vd.run_on_vds = :host_id" in sql_text
     assert params["host_id"] == "h_uuid_1"
 
 
-@patch("vms.vms_utils.read_sql_df")
-@patch("vms.vms_utils.get_sqlalchemy_engine")
-def test_fetch_vms_data_with_search(mock_get_engine, mock_read_sql):
-    mock_engine = MagicMock()
-    mock_get_engine.return_value = mock_engine
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("vms.vms_utils.load_sql_df")
+def test_fetch_vms_data_with_search(mock_load):
+    mock_load.return_value = pd.DataFrame()
 
     filters = ("Все ДЦ", "Все кластеры", "Все хосты", "search_term")
     clusters, hosts, dc_map = {}, {}, {}
 
     fetch_vms_data("test_db", filters, clusters, hosts, dc_map)
 
-    sql_text = str(mock_read_sql.call_args[0][1])
-    params = mock_read_sql.call_args[1]["params"]
+    sql_text = str(mock_load.call_args[0][1])
+    params = mock_load.call_args[1]["params"]
 
     assert "LOWER(vs.vm_name) LIKE LOWER(:search)" in sql_text
     assert params["search"] == "%search_term%"

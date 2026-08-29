@@ -11,7 +11,7 @@ from core.constants import (
     async_task_result_tone,
 )
 from core.data_loader import host_ids_for_infra_filters
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import load_sql_df
 from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
@@ -21,6 +21,7 @@ from core.ui_utils import (
     render_load_error,
     render_page_header,
     style_status_column,
+    try_load,
 )
 
 from .tasks_utils import (
@@ -125,13 +126,13 @@ def render_tasks_list(active_db, cluster_meta=None):
                 end_dt=end_dt,
             )
             try:
-                engine_temp = get_sqlalchemy_engine(active_db)
-                df_corr = read_sql_df(engine_temp, text(audit_sql), params=audit_params)
+                df_corr = load_sql_df(active_db, text(audit_sql), params=audit_params)
                 allowed_correlation_ids = (
                     df_corr["correlation_id"].tolist() if not df_corr.empty else []
                 )
-            except DataLoadError:
-                allowed_correlation_ids = None
+            except DataLoadError as exc:
+                render_load_error(exc, "фильтра по хостам/ВМ")
+                allowed_correlation_ids = []
 
     sql, params = build_tasks_list_sql(
         allowed_correlation_ids=allowed_correlation_ids,
@@ -141,11 +142,8 @@ def render_tasks_list(active_db, cluster_meta=None):
         limit=500,
     )
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = read_sql_df(engine, sql, params=params)
-    except DataLoadError as e:
-        render_load_error(e, "задач")
+    df = try_load("задач", load_sql_df, active_db, sql, params=params)
+    if df is None:
         return
 
     pairs = (
@@ -220,18 +218,19 @@ def render_tasks_list(active_db, cluster_meta=None):
         f"UUID: `{task_id}` · command: `{selected['correlation']}` · "
         f"vdsm: `{vdsm}`"
     )
-    try:
-        ent_sql, ent_params = build_task_entities_sql(task_id)
-        entities = read_sql_df(engine, text(ent_sql), params=ent_params)
-        detail = process_task_entities(entities)
-        if detail.empty:
-            st.info("Объекты не привязаны.")
-        else:
-            st.dataframe(
-                detail,
-                width="stretch",
-                hide_index=True,
-                height=dataframe_height(len(detail)),
-            )
-    except DataLoadError as e:
-        render_load_error(e, "объектов задачи")
+    ent_sql, ent_params = build_task_entities_sql(task_id)
+    entities = try_load(
+        "объектов задачи", load_sql_df, active_db, text(ent_sql), params=ent_params
+    )
+    if entities is None:
+        return
+    detail = process_task_entities(entities)
+    if detail.empty:
+        st.info("Объекты не привязаны.")
+        return
+    st.dataframe(
+        detail,
+        width="stretch",
+        hide_index=True,
+        height=dataframe_height(len(detail)),
+    )

@@ -103,13 +103,10 @@ def test_process_host_dataframe_empty():
 
 # --- Тесты для fetch_hosts_data (SQL логика с моками) ---
 
-@patch("hosts.hosts_utils.read_sql_df")
-@patch("hosts.hosts_utils.get_sqlalchemy_engine")
-def test_fetch_hosts_data_no_filters(mock_get_engine, mock_read_sql):
+@patch("hosts.hosts_utils.load_sql_df")
+def test_fetch_hosts_data_no_filters(mock_load):
     """Тест запроса без фильтров."""
-    mock_engine = MagicMock()
-    mock_get_engine.return_value = mock_engine
-    mock_read_sql.return_value = pd.DataFrame({'vds_id': ['h1']})
+    mock_load.return_value = pd.DataFrame({'vds_id': ['h1']})
     
     filters = ('Все ДЦ', 'Все кластеры', '')
     clusters = {}
@@ -118,27 +115,20 @@ def test_fetch_hosts_data_no_filters(mock_get_engine, mock_read_sql):
     df = fetch_hosts_data("test_db", filters, clusters, dc_map)
     
     assert not df.empty
-    mock_get_engine.assert_called_once_with("test_db")
-    mock_read_sql.assert_called_once()
+    mock_load.assert_called_once()
     
-    # Проверяем, что в SQL нет WHERE
-    call_args = mock_read_sql.call_args
-    sql_text = str(call_args[0][1]) # Первый аргумент - text object
-    assert "WHERE" not in sql_text.upper() or "WHERE" in sql_text.upper() and "AND" not in sql_text.upper() 
-    # Точнее: если условий нет, WHERE не добавляется вообще в коде: if conditions: base_sql += " WHERE ..."
-    # Значит WHERE не должно быть
+    call_args = mock_load.call_args
+    sql_text = str(call_args[0][1])
     assert "WHERE" not in sql_text
     assert "is_spm" in sql_text
     assert "spm_vds_id" in sql_text
     assert "storage_pool" in sql_text
 
-@patch("hosts.hosts_utils.read_sql_df")
-@patch("hosts.hosts_utils.get_sqlalchemy_engine")
-def test_fetch_hosts_data_with_search(mock_get_engine, mock_read_sql):
+
+@patch("hosts.hosts_utils.load_sql_df")
+def test_fetch_hosts_data_with_search(mock_load):
     """Тест запроса с поиском по имени."""
-    mock_engine = MagicMock()
-    mock_get_engine.return_value = mock_engine
-    mock_read_sql.return_value = pd.DataFrame()
+    mock_load.return_value = pd.DataFrame()
     
     filters = ('Все ДЦ', 'Все кластеры', 'myhost')
     clusters = {}
@@ -146,28 +136,26 @@ def test_fetch_hosts_data_with_search(mock_get_engine, mock_read_sql):
     
     fetch_hosts_data("test_db", filters, clusters, dc_map)
     
-    call_args = mock_read_sql.call_args
+    call_args = mock_load.call_args
     sql_text = str(call_args[0][1])
     params = call_args[1]['params']
     
     assert "LIKE" in sql_text.upper()
     assert params['search'] == "%myhost%"
 
-@patch("hosts.hosts_utils.read_sql_df")
-@patch("hosts.hosts_utils.get_sqlalchemy_engine")
-def test_fetch_hosts_data_with_dc_filter(mock_get_engine, mock_read_sql):
+
+@patch("hosts.hosts_utils.load_sql_df")
+def test_fetch_hosts_data_with_dc_filter(mock_load):
     """Тест фильтрации по Дата-центру."""
-    mock_engine = MagicMock()
-    mock_get_engine.return_value = mock_engine
-    mock_read_sql.return_value = pd.DataFrame()
+    mock_load.return_value = pd.DataFrame()
     
     filters = ('MyDC', 'Все кластеры', '')
     clusters = {}
-    dc_map = {'dc_uuid_1': 'MyDC'} # Обратный маппинг для поиска ID по имени
+    dc_map = {'dc_uuid_1': 'MyDC'}
     
     fetch_hosts_data("test_db", filters, clusters, dc_map)
     
-    call_args = mock_read_sql.call_args
+    call_args = mock_load.call_args
     sql_text = str(call_args[0][1])
     params = call_args[1]['params']
     
@@ -197,10 +185,8 @@ def test_load_host_infrastructure_maps(mock_get_engine, mock_read_sql):
     mock_engine.dispose.assert_not_called()
 
 
-@patch("hosts.hosts_utils.read_sql_df")
-@patch("hosts.hosts_utils.get_sqlalchemy_engine")
-def test_fetch_hosts_data_raises_dataloaderror(mock_get_engine, mock_read_sql):
-    mock_get_engine.return_value = MagicMock()
-    mock_read_sql.side_effect = DataLoadError("boom")
+@patch("hosts.hosts_utils.load_sql_df")
+def test_fetch_hosts_data_raises_dataloaderror(mock_load):
+    mock_load.side_effect = DataLoadError("boom")
     with pytest.raises(DataLoadError, match="boom"):
         fetch_hosts_data("test_db", ("Все ДЦ", "Все кластеры", ""), {}, {})

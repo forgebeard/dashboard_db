@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, TypeVar
 
 import pandas as pd
 import streamlit as st
@@ -18,6 +18,9 @@ from core.config import (
     STATUS_TONE_CSS,
 )
 from core.constants import StatusTone
+from core.exceptions import DataLoadError
+
+T = TypeVar("T")
 
 
 def fix_uuid_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -89,6 +92,15 @@ def style_status_column(
 def render_load_error(exc: BaseException, what: str) -> None:
     """Сообщение об ошибке загрузки данных (не путать с пустым результатом)."""
     st.error(f"Ошибка загрузки {what}: {exc}")
+
+
+def try_load(what: str, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:
+    """Вызывает fn; при DataLoadError показывает ошибку и возвращает None."""
+    try:
+        return fn(*args, **kwargs)
+    except DataLoadError as exc:
+        render_load_error(exc, what)
+        return None
 
 
 def render_page_header(

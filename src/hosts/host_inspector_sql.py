@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import HOST_STATUS_MAP
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv
 
@@ -379,7 +380,7 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
                     """,
                     {"host_id": host["vds_id"]},
                 )
-            except Exception:
+            except DataLoadError:
                 try:
                     networks = insp.fetch_all(
                         """
@@ -391,7 +392,7 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
                         """,
                         {"host_id": host["vds_id"]},
                     )
-                except Exception as exc:
+                except DataLoadError as exc:
                     section_errors["networks"] = str(exc)
 
             try:
@@ -404,7 +405,7 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
                     """,
                     {"host_id": host["vds_id"], "host_name": host["vds_name"]},
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["events"] = str(exc)
 
             kdump_label = KDUMP_MAP.get(host["kdump_code"], f"Code {host['kdump_code']}")
@@ -449,5 +450,5 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
             payload["report_text"] = format_host_report(payload)
             return payload
 
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

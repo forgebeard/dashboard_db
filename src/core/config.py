@@ -7,6 +7,8 @@
 что упрощает поддержку и масштабирование дашборда.
 """
 
+import os
+
 # --- КОНФИГУРАЦИЯ ПРИЛОЖЕНИЯ ---
 APP_TITLE = "RED Virt Analytics"  # Заголовок вкладки браузера и сайдбара
 APP_LAYOUT = "wide"               # Режим разметки: 'centered' (узкий) или 'wide' (на всю ширину)
@@ -15,7 +17,14 @@ APP_LAYOUT = "wide"               # Режим разметки: 'centered' (у�
 DEFAULT_ROW_LIMIT = 50      # Стандартный лимит строк для превью таблиц
 MAX_ROW_LIMIT = 2000        # Жесткий потолок защиты от переполнения памяти Streamlit
 ROW_STEP = 10               # Шаг изменения лимита в виджете number_input
-STATEMENT_TIMEOUT_MS = 30000  # PostgreSQL statement_timeout (мс); LIMIT не ограничивает время JOIN/ORDER BY
+
+
+def statement_timeout_ms() -> int:
+    """Потолок времени SQL (мс). Переопределяется STATEMENT_TIMEOUT_MS в .env."""
+    return int(os.getenv("STATEMENT_TIMEOUT_MS", "30000"))
+
+
+STATEMENT_TIMEOUT_MS = statement_timeout_ms()
 
 # --- НАСТРОЙКИ ОТОБРАЖЕНИЯ (UI) ---
 DATAFRAME_HEIGHT = 500      # Потолок высоты st.dataframe (px)

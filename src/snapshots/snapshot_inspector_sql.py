@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import IMAGE_STATUS_MAP, mapped_code_label
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 from vms.vm_inspector_sql import (
@@ -254,7 +255,7 @@ def _fetch_snapshots(insp: InspectorBase, vm_guid: Any) -> list[dict[str, Any]]:
     extra_sql = ",\n            " + ",\n            ".join(_SNAPSHOT_EXTRA_COLS)
     try:
         return insp.fetch_all(base_select.format(extra=extra_sql), params)
-    except Exception:
+    except DataLoadError:
         return insp.fetch_all(base_select.format(extra=""), params)
 
 
@@ -292,7 +293,7 @@ def get_snapshot_inspector_report(
 
             try:
                 snapshots = _fetch_snapshots(insp, vm["vm_guid"])
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["snapshots"] = str(exc)
 
             selected = next(
@@ -348,7 +349,7 @@ def get_snapshot_inspector_report(
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["layers"] = str(exc)
 
             try:
@@ -366,7 +367,7 @@ def get_snapshot_inspector_report(
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["checkpoints"] = str(exc)
 
             payload = {
@@ -391,5 +392,5 @@ def get_snapshot_inspector_report(
             payload["report_text"] = format_snapshot_report(payload)
             return payload
 
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

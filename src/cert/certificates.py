@@ -4,9 +4,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
-from core.exceptions import DataLoadError
-from core.ui_utils import dataframe_height, render_load_error
+from core.db_utils import load_sql_df
+from core.ui_utils import dataframe_height, try_load
 
 COLUMN_CONFIG = {
     "Файл": st.column_config.TextColumn(width=220),
@@ -95,36 +94,33 @@ def render_certificates(db_name):
     ORDER BY vs.vds_name, cd.file_path
     """
 
-    try:
-        engine = get_sqlalchemy_engine(db_name)
-        df = read_sql_df(engine, query)
+    df = try_load("сертификатов", load_sql_df, db_name, query)
+    if df is None:
+        return
 
-        if df.empty:
-            st.info("Сертификаты не найдены.")
-            return
+    if df.empty:
+        st.info("Сертификаты не найдены.")
+        return
 
-        st.subheader("Engine")
-        engine_src = df[df["object_type_id"] == 2]
-        engine_df = _display_certs(engine_src)
-        if not engine_df.empty:
-            _show_table(engine_df)
+    st.subheader("Engine")
+    engine_src = df[df["object_type_id"] == 2]
+    engine_df = _display_certs(engine_src)
+    if not engine_df.empty:
+        _show_table(engine_df)
+    else:
+        st.warning("Нет данных по сертификатам Engine.")
+
+    hosts_src = df[df["object_type_id"] == 3].copy()
+    if hosts_src.empty:
+        st.warning("Нет данных по сертификатам хостов.")
+        return
+
+    st.subheader("Хосты")
+    hosts_src["vds_name"] = hosts_src["vds_name"].fillna("—")
+    for host in sorted(hosts_src["vds_name"].unique(), key=str):
+        host_df = _display_certs(hosts_src[hosts_src["vds_name"] == host])
+        st.markdown(f"### {host}")
+        if host_df.empty:
+            st.info("Нет сертификатов.")
         else:
-            st.warning("Нет данных по сертификатам Engine.")
-
-        hosts_src = df[df["object_type_id"] == 3].copy()
-        if hosts_src.empty:
-            st.warning("Нет данных по сертификатам хостов.")
-            return
-
-        st.subheader("Хосты")
-        hosts_src["vds_name"] = hosts_src["vds_name"].fillna("—")
-        for host in sorted(hosts_src["vds_name"].unique(), key=str):
-            host_df = _display_certs(hosts_src[hosts_src["vds_name"] == host])
-            st.markdown(f"### {host}")
-            if host_df.empty:
-                st.info("Нет сертификатов.")
-            else:
-                _show_table(host_df)
-
-    except DataLoadError as e:
-        render_load_error(e, "сертификатов")
+            _show_table(host_df)

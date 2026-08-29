@@ -95,33 +95,38 @@ def get_sqlalchemy_engine(db_name: str):
     Returns:
         Объект sqlalchemy.engine.Engine
     """
-    # Нормализация имени БД для корректного кэширования
-    normalized_name = db_name.lower().strip()
-    
-    params = get_db_params(normalized_name)
-    
-    # Безопасное формирование URL с автоматическим экранированием спецсимволов в пароле
-    db_url = URL.create(
-        drivername="postgresql+psycopg2",
-        username=params["user"],
-        password=params["password"],
-        host=params["host"],
-        port=params["port"],
-        database=params["dbname"]
-    )
-    
-    logger.info(f"Создание/получение движка для БД: {params['dbname']}")
-    
-    return create_engine(
-        db_url,
-        pool_pre_ping=True,
-        connect_args={
-            "connect_timeout": CONNECT_TIMEOUT,
-            "options": PG_READ_ONLY_OPTIONS,
-        },
-        pool_size=5,
-        max_overflow=10,
-    )
+    try:
+        # Нормализация имени БД для корректного кэширования
+        normalized_name = db_name.lower().strip()
+
+        params = get_db_params(normalized_name)
+
+        # Безопасное формирование URL с автоматическим экранированием спецсимволов в пароле
+        db_url = URL.create(
+            drivername="postgresql+psycopg2",
+            username=params["user"],
+            password=params["password"],
+            host=params["host"],
+            port=params["port"],
+            database=params["dbname"]
+        )
+
+        logger.info(f"Создание/получение движка для БД: {params['dbname']}")
+
+        return create_engine(
+            db_url,
+            pool_pre_ping=True,
+            connect_args={
+                "connect_timeout": CONNECT_TIMEOUT,
+                "options": PG_READ_ONLY_OPTIONS,
+            },
+            pool_size=5,
+            max_overflow=10,
+        )
+    except DataLoadError:
+        raise
+    except Exception as exc:
+        raise DataLoadError(format_load_error(exc)) from exc
 
 
 def read_sql_df(

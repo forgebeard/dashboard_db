@@ -3,13 +3,12 @@
 
 import streamlit as st
 
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
-    render_load_error,
     render_page_header,
+    try_load,
 )
 from system.system_diagnostics import render_system_diagnostics
 from system.system_utils import (
@@ -71,10 +70,10 @@ def render_system_list(active_db: str, cluster_meta: dict) -> None:
 
 
 def _render_system_tab(active_db: str, tab_id: str, search_term: str) -> None:
-    try:
-        raw_df = fetch_system_tab(active_db, tab_id)
-    except DataLoadError as exc:
-        render_load_error(exc, f"«{SYSTEM_TAB_LABELS.get(tab_id, tab_id)}»")
+    raw_df = try_load(
+        f"«{SYSTEM_TAB_LABELS.get(tab_id, tab_id)}»", fetch_system_tab, active_db, tab_id
+    )
+    if raw_df is None:
         return
     shown = filter_system_rows(raw_df, search_term.strip() if search_term else "")
     st.markdown(f"**Записей:** {len(shown)}")

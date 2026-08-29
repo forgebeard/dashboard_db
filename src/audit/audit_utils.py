@@ -16,7 +16,8 @@ from core.constants import (
     audit_severity_label,
 )
 from core.data_loader import build_infra_filter_maps
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import get_sqlalchemy_engine, load_sql_df, read_sql_df
+from core.exceptions import DataLoadError
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,9 @@ def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
             maps["host_id_to_name"][r["h_id"]] = host_name
             if r["h_id"]:
                 maps["cluster_to_hosts"].setdefault(r["cl_id"], []).append(r["h_id"])
-    except Exception as e:
+    except DataLoadError as e:
         logger.warning("Не удалось загрузить связи для журнала: %s", e)
+        st.warning(f"Не удалось загрузить связи для журнала: {e}")
     return maps
 
 
@@ -114,8 +116,7 @@ def build_audit_logs_sql(filters: dict, limit_val: int) -> tuple[str, dict]:
 def fetch_audit_logs(active_db, filters, limit_val):
     """Выполняет параметризованный запрос к audit_log."""
     sql, params = build_audit_logs_sql(filters, limit_val)
-    engine = get_sqlalchemy_engine(active_db)
-    df = read_sql_df(engine, text(sql), params=params)
+    df = load_sql_df(active_db, text(sql), params=params)
 
     if not df.empty:
         df["log_time"] = pd.to_datetime(df["log_time"]).dt.strftime("%d.%m.%Y %H:%M:%S")

@@ -1,9 +1,11 @@
 """Unit-тесты для src/disks/disks_utils.py."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
+from core.exceptions import DataLoadError
 from disks.disks_utils import fetch_disks_data, process_disks_dataframe
 
 GIB = 1024**3
@@ -79,40 +81,41 @@ def test_two_layers_one_disk_worst_status():
     assert list(problems["UUID диска"]) == ["disk-1"]
 
 
-@patch("disks.disks_utils.read_sql_df")
-@patch("disks.disks_utils.get_sqlalchemy_engine")
-def test_fetch_no_status_in_sql(mock_engine, mock_read_sql):
-    mock_engine.return_value = MagicMock()
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("disks.disks_utils.load_sql_df")
+def test_fetch_no_status_in_sql(mock_load):
+    mock_load.return_value = pd.DataFrame()
     fetch_disks_data("db", ("", "", ""))
-    sql_text = str(mock_read_sql.call_args[0][1])
+    sql_text = str(mock_load.call_args[0][1])
     sql_l = sql_text.lower()
     assert "imagestatus IN" not in sql_text
     assert "limit 500" not in sql_l
     assert "newest.image_group_id" not in sql_l
 
 
-@patch("disks.disks_utils.read_sql_df")
-@patch("disks.disks_utils.get_sqlalchemy_engine")
-def test_fetch_search_no_limit(mock_engine, mock_read_sql):
-    mock_engine.return_value = MagicMock()
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("disks.disks_utils.load_sql_df")
+def test_fetch_search_no_limit(mock_load):
+    mock_load.return_value = pd.DataFrame()
     fetch_disks_data("db", ("os", "", ""))
-    sql_text = str(mock_read_sql.call_args[0][1])
-    params = mock_read_sql.call_args[1]["params"]
+    sql_text = str(mock_load.call_args[0][1])
+    params = mock_load.call_args[1]["params"]
     assert "LIMIT 500" not in sql_text
     assert params["search_disk"] == "%os%"
 
 
-@patch("disks.disks_utils.read_sql_df")
-@patch("disks.disks_utils.get_sqlalchemy_engine")
-def test_fetch_one_row_per_image(mock_engine, mock_read_sql):
-    mock_engine.return_value = MagicMock()
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("disks.disks_utils.load_sql_df")
+def test_fetch_one_row_per_image(mock_load):
+    mock_load.return_value = pd.DataFrame()
     fetch_disks_data("db", ("", "", ""))
-    sql = " ".join(str(mock_read_sql.call_args[0][1]).lower().split())
+    sql = " ".join(str(mock_load.call_args[0][1]).lower().split())
     assert "string_agg(distinct vm.vm_name" in sql
     assert "string_agg(distinct sd.storage_name" in sql
     assert "group by" in sql
     assert "vd.type = 'disk'" in sql
     assert "disk_id" in sql
+
+
+@patch("disks.disks_utils.load_sql_df")
+def test_fetch_raises_dataloaderror(mock_load):
+    mock_load.side_effect = DataLoadError("boom")
+    with pytest.raises(DataLoadError, match="boom"):
+        fetch_disks_data("db", ("", "", ""))

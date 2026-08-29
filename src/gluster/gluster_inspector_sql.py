@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 from vms.vm_inspector_sql import _fmt_size_bytes, _fmt_ts
@@ -189,7 +190,7 @@ def get_gluster_volume_report(db_name: str, volume_id: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["bricks"] = str(exc)
 
             options: list[dict[str, Any]] = []
@@ -203,7 +204,7 @@ def get_gluster_volume_report(db_name: str, volume_id: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["options"] = str(exc)
 
             georep: list[dict[str, Any]] = []
@@ -226,7 +227,7 @@ def get_gluster_volume_report(db_name: str, volume_id: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["georep"] = str(exc)
 
             snapshots: list[dict[str, Any]] = []
@@ -240,7 +241,7 @@ def get_gluster_volume_report(db_name: str, volume_id: str) -> dict:
                     """,
                     params,
                 )
-            except Exception as exc:
+            except DataLoadError as exc:
                 section_errors["snapshots"] = str(exc)
 
             payload = {
@@ -260,5 +261,5 @@ def get_gluster_volume_report(db_name: str, volume_id: str) -> dict:
             payload["report_text"] = format_gluster_report(payload)
             return payload
 
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

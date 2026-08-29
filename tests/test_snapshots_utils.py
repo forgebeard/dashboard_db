@@ -1,7 +1,7 @@
 """Unit-тесты для src/snapshots/snapshots_utils.py."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -186,15 +186,13 @@ def test_two_orphan_layers_are_separate_rows():
     assert list(result["UUID снапшота"]) == ["—", "—"]
 
 
-@patch("snapshots.snapshots_utils.read_sql_df")
-@patch("snapshots.snapshots_utils.get_sqlalchemy_engine")
-def test_fetch_sql_no_status_filter(mock_engine, mock_read_sql):
-    mock_engine.return_value = MagicMock()
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("snapshots.snapshots_utils.load_sql_df")
+def test_fetch_sql_no_status_filter(mock_load):
+    mock_load.return_value = pd.DataFrame()
 
     fetch_snapshots_data("test_db", ("Все ДЦ", "Все кластеры", ""), {}, {})
 
-    sql_text = str(mock_read_sql.call_args[0][1])
+    sql_text = str(mock_load.call_args[0][1])
     sql_l = sql_text.lower()
     assert "union" in sql_l
     assert "vm_device" in sql_l
@@ -205,11 +203,9 @@ def test_fetch_sql_no_status_filter(mock_engine, mock_read_sql):
     assert sql_l.count("disk_image_dynamic") == 2
 
 
-@patch("snapshots.snapshots_utils.read_sql_df")
-@patch("snapshots.snapshots_utils.get_sqlalchemy_engine")
-def test_fetch_dc_cluster_search(mock_engine, mock_read_sql):
-    mock_engine.return_value = MagicMock()
-    mock_read_sql.return_value = pd.DataFrame()
+@patch("snapshots.snapshots_utils.load_sql_df")
+def test_fetch_dc_cluster_search(mock_load):
+    mock_load.return_value = pd.DataFrame()
 
     fetch_snapshots_data(
         "test_db",
@@ -217,8 +213,8 @@ def test_fetch_dc_cluster_search(mock_engine, mock_read_sql):
         {"dc1": "MyDC"},
         {"c1": "Cluster-One"},
     )
-    sql_text = str(mock_read_sql.call_args[0][1])
-    params = mock_read_sql.call_args[1]["params"]
+    sql_text = str(mock_load.call_args[0][1])
+    params = mock_load.call_args[1]["params"]
     assert "c.storage_pool_id = :dc_id" in sql_text
     assert "v.cluster_id = :cluster_id" in sql_text
     assert "LOWER(i.image_guid::text) LIKE LOWER(:search)" in sql_text
@@ -228,12 +224,10 @@ def test_fetch_dc_cluster_search(mock_engine, mock_read_sql):
 
 
 @patch("snapshots.snapshots_utils.fix_uuid_columns")
-@patch("snapshots.snapshots_utils.read_sql_df")
-@patch("snapshots.snapshots_utils.get_sqlalchemy_engine")
-def test_fetch_applies_fix_uuid(mock_engine, mock_read_sql, mock_fix):
-    mock_engine.return_value = MagicMock()
+@patch("snapshots.snapshots_utils.load_sql_df")
+def test_fetch_applies_fix_uuid(mock_load, mock_fix):
     empty = pd.DataFrame()
-    mock_read_sql.return_value = empty
+    mock_load.return_value = empty
     mock_fix.return_value = empty
     fetch_snapshots_data("test_db", ("Все ДЦ", "Все кластеры", ""), {}, {})
     mock_fix.assert_called_once()

@@ -9,15 +9,14 @@ from core.constants import (
     cluster_status_from_hosts,
     cluster_status_tone,
 )
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
-    render_load_error,
     render_page_header,
     style_status_column,
+    try_load,
 )
 
 CLUSTER_FILTER_DEFAULTS = {
@@ -64,10 +63,8 @@ def render_clusters_list(active_db: str, cluster_meta: dict) -> None:
             )
 
     filters = (selected_dc_name, search_term)
-    try:
-        raw_df = fetch_clusters_data(active_db, filters, dc_id_to_name)
-    except DataLoadError as exc:
-        render_load_error(exc, "кластеров")
+    raw_df = try_load("кластеров", fetch_clusters_data, active_db, filters, dc_id_to_name)
+    if raw_df is None:
         return
     if raw_df.empty:
         codes: list[int] = []

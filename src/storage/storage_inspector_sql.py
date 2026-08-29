@@ -22,6 +22,7 @@ from core.constants import (
     STORAGE_TYPE_MAP,
     VM_STATUS_MAP,
 )
+from core.exceptions import DataLoadError
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE
 from core.report_text import _kv as _kv_core
@@ -539,5 +540,5 @@ def get_storage_inspector_report(db_name: str, sd_id: str) -> dict:
             }
             payload["report_text"] = format_storage_report(payload)
             return payload
-    except Exception as exc:
+    except DataLoadError as exc:
         return {"error": f"Ошибка инспектора: {exc}", "report_text": "", "nav_data": {}}

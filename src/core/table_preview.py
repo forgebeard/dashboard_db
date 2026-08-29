@@ -120,5 +120,5 @@ def render_grouped_table_preview(
                             st.caption(f"Показано {len(df_table)} записей из `{table_name}`")
                     except DataLoadError as e:
                         st.error(f"Не удалось загрузить `{table_name}`: {e}")
-    except Exception as e:
+    except DataLoadError as e:
         st.error(f"Не удалось подключиться для просмотра таблиц: {e}")

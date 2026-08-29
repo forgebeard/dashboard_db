@@ -22,6 +22,7 @@ from sqlalchemy.sql.expression import (
 from core.db_utils import (
     get_sqlalchemy_engine,  # Единая точка получения кэшированного движка
 )
+from core.exceptions import DataLoadError, format_load_error
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +105,13 @@ class InspectorBase:
         if self._conn is None:
             raise RuntimeError("InspectorBase должен использоваться внутри контекстного менеджера (with)")
 
-        # Если передан готовый TextClause (например, с bindparam expanding=True),
-        # не оборачиваем повторно в text() — это вызывает ошибку
-        # "expected string or bytes-like object, got 'TextClause'"
         stmt = sql if isinstance(sql, TextClause) else text(sql)
-        result = self._conn.execute(stmt, params or {})
+        try:
+            result = self._conn.execute(stmt, params or {})
+        except DataLoadError:
+            raise
+        except Exception as exc:
+            raise DataLoadError(format_load_error(exc)) from exc
         # .mappings() гарантирует возврат строк как словарей (аналог RealDictCursor)
         row = result.mappings().fetchone()
         return dict(row) if row else None
@@ -132,9 +135,13 @@ class InspectorBase:
         if self._conn is None:
             raise RuntimeError("InspectorBase должен использоваться внутри контекстного менеджера (with)")
 
-        # Аналогично fetch_one: проверяем тип, чтобы поддержать expanding IN
         stmt = sql if isinstance(sql, TextClause) else text(sql)
-        result = self._conn.execute(stmt, params or {})
+        try:
+            result = self._conn.execute(stmt, params or {})
+        except DataLoadError:
+            raise
+        except Exception as exc:
+            raise DataLoadError(format_load_error(exc)) from exc
         return [dict(row) for row in result.mappings().fetchall()]
 
     # ─── Общие хелперы форматирования ────────────────────────────────

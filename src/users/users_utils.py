@@ -5,7 +5,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from core.constants import vdc_object_type_label
-from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.db_utils import load_sql_df
 
 
 def build_users_list_sql(selected_domain: str, search_term: str) -> tuple[str, dict]:
@@ -74,22 +74,19 @@ def build_user_permissions_sql() -> str:
 
 
 def fetch_user_domains(active_db: str) -> list[str]:
-    engine = get_sqlalchemy_engine(active_db)
-    df = read_sql_df(engine, text(build_user_domains_sql()))
+    df = load_sql_df(active_db, text(build_user_domains_sql()))
     return [str(v) for v in df["domain"].tolist() if v]
 
 
 def fetch_users_data(active_db: str, filters: tuple[str, str]) -> pd.DataFrame:
     selected_domain, search_term = filters
     sql, sql_params = build_users_list_sql(selected_domain, search_term.strip() if search_term else "")
-    engine = get_sqlalchemy_engine(active_db)
-    return read_sql_df(engine, text(sql), params=sql_params if sql_params else None)
+    return load_sql_df(active_db, text(sql), params=sql_params if sql_params else None)
 
 
 def fetch_user_permissions(active_db: str, user_id: str) -> pd.DataFrame:
-    engine = get_sqlalchemy_engine(active_db)
-    return read_sql_df(
-        engine,
+    return load_sql_df(
+        active_db,
         text(build_user_permissions_sql()),
         params={"uid": str(user_id)},
     )

@@ -9,13 +9,12 @@
 
 import time
 
-import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
 from core.config import MAX_ROW_LIMIT, STATEMENT_TIMEOUT_MS
-from core.db_utils import get_sqlalchemy_engine
-from core.exceptions import format_load_error
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.exceptions import DataLoadError, format_load_error
 from core.sql_guard import apply_max_row_limit, validate_adhoc_sql
 from core.ui_utils import fix_uuid_columns
 
@@ -90,8 +89,7 @@ def render_global_sql(active_db: str) -> None:
             engine = get_sqlalchemy_engine(active_db)
 
             start_time = time.perf_counter()
-            with engine.connect() as conn:
-                df_res = pd.read_sql_query(text(limited_sql), conn)
+            df_res = read_sql_df(engine, text(limited_sql))
             elapsed_ms = (time.perf_counter() - start_time) * 1000
 
             _add_to_history(global_query.strip())
@@ -122,5 +120,5 @@ def render_global_sql(active_db: str) -> None:
 
         except ValueError as e:
             st.error(str(e))
-        except Exception as e:
+        except DataLoadError as e:
             st.error(_format_sql_error(e))

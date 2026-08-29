@@ -98,7 +98,7 @@ sudo systemctl reload postgresql-15
 
 ## CI
 
-При push и pull request GitHub Actions запускает `ruff check`, unit-тесты pytest с отчётом покрытия (без интеграционных, им нужна живая БД; fail-under только на sql_guard/константы статусов/инспекторы) и сборку Docker-образа. Чтобы красный CI блокировал merge, включите required checks в настройках ветки на GitHub.
+При push и pull request GitHub Actions запускает `ruff check`, сверку `uv export` с `requirements*.txt`, unit-тесты pytest с покрытием `src` (без интеграционных) и сборку Docker-образа. Чтобы красный CI блокировал merge, включите required checks в настройках ветки на GitHub.
 
 ## Структура проекта
 
@@ -219,7 +219,9 @@ sudo systemctl reload postgresql-15
 1.  **Конфиденциальность:** Дампы БД содержат чувствительные данные. Храните их в защищенном месте.
 2.  **Память:** При работе с `audit_log` или `event_history` используйте фильтр по дате. Выборка автоматически ограничена, но требует внимания при ручных запросах.
 3.  **Локальный контур:** `docker-compose` публикует порт только на `127.0.0.1:8502`. С LAN и других интерфейсов хоста UI недоступен. Внутри контейнера Streamlit слушает `0.0.0.0:8501` — это нужно для проброса порта, не для внешнего доступа.
-4.  **Режим чтения:** Каждое подключение к PostgreSQL открывается с `default_transaction_read_only=on` и `statement_timeout` (см. `STATEMENT_TIMEOUT_MS`). SQL-редактор принимает только SELECT/WITH (и EXPLAIN к ним), несколько стейтментов запрещены, выборка ограничена `MAX_ROW_LIMIT`. DML отклоняется и фильтром редактора, и самой БД.
+4.  **Режим чтения:** Каждое подключение к PostgreSQL открывается с `default_transaction_read_only=on` и `statement_timeout` (`STATEMENT_TIMEOUT_MS` в `.env`, по умолчанию 30000 мс). SQL-редактор принимает только SELECT/WITH (и EXPLAIN к ним), несколько стейтментов запрещены, выборка ограничена `MAX_ROW_LIMIT`. DML отклоняется и фильтром редактора, и самой БД.
+
+Runtime проверен на pandas 3.x (пин в `pyproject.toml`).
 
 Обновление зависимостей: правите прямые пакеты в `pyproject.toml`, затем `uv lock` и `uv export --frozen --no-dev --no-hashes -o requirements.txt` / `uv export --frozen --no-hashes -o requirements-dev.txt`. Docker по-прежнему ставит `requirements.txt`.
 

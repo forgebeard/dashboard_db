@@ -3,15 +3,14 @@
 import streamlit as st
 
 from core.constants import image_health_counts, image_status_tone
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
-    render_load_error,
     render_page_header,
     style_status_column,
+    try_load,
 )
 from disks.disks_utils import (
     fetch_disks_data,
@@ -63,10 +62,10 @@ def render_disks_list(active_db, cluster_meta):
         with clear_col:
             render_clear_filters_button(DISK_FILTER_DEFAULTS, key="disk_clear_filters")
 
-    try:
-        raw_df = fetch_disks_data(active_db, (search_disk, search_vm, search_sd))
-    except DataLoadError as exc:
-        render_load_error(exc, "дисков")
+    raw_df = try_load(
+        "дисков", fetch_disks_data, active_db, (search_disk, search_vm, search_sd)
+    )
+    if raw_df is None:
         return
     if raw_df.empty:
         counts = image_health_counts([])
