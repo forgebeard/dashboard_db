@@ -152,3 +152,34 @@ def test_audit_one_line_no_user_repeat():
     )
     assert "ЖУРНАЛ СОБЫТИЙ" in text
     assert "User admin@internal-authz got disconnected" not in text
+
+
+def test_fetch_host_networks_retries_on_missing_column():
+    from unittest.mock import MagicMock
+
+    from core.exceptions import DataLoadError
+    from hosts.host_inspector_sql import _fetch_host_networks
+
+    insp = MagicMock()
+    insp.fetch_all.side_effect = [
+        DataLoadError('column "network_name" does not exist'),
+        [{"name": "eth0"}],
+    ]
+    rows = _fetch_host_networks(insp, "guid")
+    assert rows == [{"name": "eth0"}]
+    assert insp.fetch_all.call_count == 2
+
+
+def test_fetch_host_networks_does_not_retry_timeout():
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from core.exceptions import DataLoadError
+    from hosts.host_inspector_sql import _fetch_host_networks
+
+    insp = MagicMock()
+    insp.fetch_all.side_effect = DataLoadError("statement timeout")
+    with pytest.raises(DataLoadError, match="statement timeout"):
+        _fetch_host_networks(insp, "guid")
+    assert insp.fetch_all.call_count == 1

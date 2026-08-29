@@ -150,3 +150,34 @@ def test_checkpoint_full_uuid():
     assert "нет чекпоинтов" not in text
     assert "Done" in text
     assert "parent_id:" in text
+
+
+def test_fetch_snapshots_retries_on_missing_column():
+    from unittest.mock import MagicMock
+
+    from core.exceptions import DataLoadError
+    from snapshots.snapshot_inspector_sql import _fetch_snapshots
+
+    insp = MagicMock()
+    insp.fetch_all.side_effect = [
+        DataLoadError('column "vm_configuration_broken" does not exist'),
+        [{"snapshot_id": "1"}],
+    ]
+    rows = _fetch_snapshots(insp, "guid")
+    assert rows == [{"snapshot_id": "1"}]
+    assert insp.fetch_all.call_count == 2
+
+
+def test_fetch_snapshots_does_not_retry_timeout():
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from core.exceptions import DataLoadError
+    from snapshots.snapshot_inspector_sql import _fetch_snapshots
+
+    insp = MagicMock()
+    insp.fetch_all.side_effect = DataLoadError("statement timeout")
+    with pytest.raises(DataLoadError, match="statement timeout"):
+        _fetch_snapshots(insp, "guid")
+    assert insp.fetch_all.call_count == 1

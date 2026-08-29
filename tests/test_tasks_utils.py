@@ -274,21 +274,13 @@ class TestTasksModuleSQL:
 
         mock_load_maps.return_value = mock_infra_maps
         self._setup_st_mocks(mock_st, ["Все ДЦ", "Все кластеры", "Host_A"], mock_ui_st)
-        mock_load.side_effect = [
-            DataLoadError("timeout"),
-            pd.DataFrame({
-                "task_id": ["t1"], "action_type": [1], "status": [1], "result": [0],
-                "started_at": [datetime.now()], "vdsm_task_id_txt": ["v1"],
-                "root_command_id": ["r1"], "command_type": ["CreateVM"]
-            }),
-        ]
+        mock_load.side_effect = DataLoadError("timeout")
 
         render_tasks_list(mock_active_db)
 
-        main_call = mock_load.call_args_list[1]
-        sql_text = str(main_call[0][1])
-        assert "AND 1=0" in sql_text
+        assert mock_load.call_count == 1
         mock_ui_st.error.assert_called()
+        mock_st.dataframe.assert_not_called()
 
 
 def test_task_inspector_not_imported():

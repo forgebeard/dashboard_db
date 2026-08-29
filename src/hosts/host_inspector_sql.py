@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import HOST_STATUS_MAP
-from core.exceptions import DataLoadError
+from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv
 
@@ -335,6 +335,34 @@ def _libvirt_label(raw: Any) -> str:
     return text
 
 
+def _fetch_host_networks(insp: InspectorBase, host_id: Any) -> list[dict[str, Any]]:
+    params = {"host_id": host_id}
+    try:
+        return insp.fetch_all(
+            """
+            SELECT name, mac_addr, addr, subnet, gateway, mtu, speed,
+                   is_bond, bond_name, vlan_id, network_name
+            FROM vds_interface
+            WHERE vds_id = CAST(:host_id AS uuid) AND name != 'lo'
+            ORDER BY name
+            """,
+            params,
+        )
+    except DataLoadError as exc:
+        if not should_retry_narrow_sql(exc):
+            raise
+        return insp.fetch_all(
+            """
+            SELECT name, mac_addr, addr, subnet, gateway, mtu, speed,
+                   is_bond, bond_name, vlan_id
+            FROM vds_interface
+            WHERE vds_id = CAST(:host_id AS uuid) AND name != 'lo'
+            ORDER BY name
+            """,
+            params,
+        )
+
+
 def get_host_inspector_report(db_name: str, host_id: str) -> dict:
     """Возвращает словарь с отчетом и навигационными данными."""
     try:
@@ -370,30 +398,9 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
             events: list[dict[str, Any]] = []
 
             try:
-                networks = insp.fetch_all(
-                    """
-                    SELECT name, mac_addr, addr, subnet, gateway, mtu, speed,
-                           is_bond, bond_name, vlan_id, network_name
-                    FROM vds_interface
-                    WHERE vds_id = CAST(:host_id AS uuid) AND name != 'lo'
-                    ORDER BY name
-                    """,
-                    {"host_id": host["vds_id"]},
-                )
-            except DataLoadError:
-                try:
-                    networks = insp.fetch_all(
-                        """
-                        SELECT name, mac_addr, addr, subnet, gateway, mtu, speed,
-                               is_bond, bond_name, vlan_id
-                        FROM vds_interface
-                        WHERE vds_id = CAST(:host_id AS uuid) AND name != 'lo'
-                        ORDER BY name
-                        """,
-                        {"host_id": host["vds_id"]},
-                    )
-                except DataLoadError as exc:
-                    section_errors["networks"] = str(exc)
+                networks = _fetch_host_networks(insp, host["vds_id"])
+            except DataLoadError as exc:
+                section_errors["networks"] = str(exc)
 
             try:
                 events = insp.fetch_all(

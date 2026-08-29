@@ -39,7 +39,9 @@ from clusters.clusters_module import render_clusters_list
 from core.config import APP_LAYOUT, APP_TITLE, FONT_SIZE_CSS
 from core.data_loader import load_cluster_metadata
 from core.db_utils import get_available_databases
+from core.exceptions import DataLoadError
 from core.sql_editor import render_global_sql
+from core.ui_utils import render_load_error, run_section
 from disks.disks_diagnostics import render_disks_diagnostics
 from disks.disks_module import render_disks_list
 from gluster.gluster_diagnostics import render_gluster_diagnostics
@@ -158,15 +160,14 @@ def _make_section_page(section_id: str, icon: str):
         if not db_name:
             st.error("База данных не выбрана.")
             return
-        try:
-            _render_section(
+        run_section(
+            SECTION_LABELS[section_id],
+            lambda: _render_section(
                 section_id,
                 db_name,
                 st.session_state.get("cluster_meta", {}),
-            )
-        except Exception as exc:
-            st.error(f"Ошибка при отрисовке раздела «{SECTION_LABELS[section_id]}»: {exc}")
-            st.exception(exc)
+            ),
+        )
 
     _page.__name__ = f"page_{section_id}"
     _page.__qualname__ = f"page_{section_id}"
@@ -193,9 +194,13 @@ st.markdown(
 
 st.sidebar.header(":material/settings: Подключение")
 
-available_dbs = get_available_databases()
+try:
+    available_dbs = get_available_databases()
+except DataLoadError as exc:
+    render_load_error(exc, "списка баз")
+    st.stop()
 if not available_dbs:
-    st.error("Не удалось получить список баз. Проверьте DB_* в .env и доступность PostgreSQL.")
+    st.error("В PostgreSQL нет доступных баз для анализа.")
     st.stop()
 
 selected_db = st.sidebar.radio(

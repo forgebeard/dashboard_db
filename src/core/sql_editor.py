@@ -12,7 +12,7 @@ import time
 import streamlit as st
 from sqlalchemy import text
 
-from core.config import MAX_ROW_LIMIT, STATEMENT_TIMEOUT_MS
+from core.config import MAX_ROW_LIMIT, statement_timeout_ms
 from core.db_utils import get_sqlalchemy_engine, read_sql_df
 from core.exceptions import DataLoadError, format_load_error
 from core.sql_guard import apply_max_row_limit, validate_adhoc_sql
@@ -46,7 +46,7 @@ def render_global_sql(active_db: str) -> None:
     """
     st.caption(
         f"Только SELECT/WITH. Результат ограничен {MAX_ROW_LIMIT} строками. "
-        f"Сессия PostgreSQL — read-only, statement_timeout {STATEMENT_TIMEOUT_MS // 1000} с."
+        f"Сессия PostgreSQL — read-only, statement_timeout {statement_timeout_ms() // 1000} с."
     )
     _ensure_history()
 

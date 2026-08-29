@@ -27,8 +27,8 @@ from sqlalchemy import (  # Создание DB-движка, безопасны
 from sqlalchemy.engine import Engine
 from sqlalchemy.sql.expression import TextClause
 
-from core.config import STATEMENT_TIMEOUT_MS
-from core.exceptions import DataLoadError, format_load_error
+from core.config import statement_timeout_ms
+from core.exceptions import DataLoadError, wrap_load_error
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -37,11 +37,14 @@ logger = logging.getLogger(__name__)
 DB_SCHEMA = "public"              # Схема по умолчанию для oVirt Engine
 CONNECT_TIMEOUT = 10              # Таймаут соединения в секундах
 ENGINE_CACHE_MAXSIZE = 8          # Максимум кэшированных движков (для локальных дампов достаточно)
-# Сессия PostgreSQL: только чтение + потолок времени запроса.
-PG_READ_ONLY_OPTIONS = (
-    "-c default_transaction_read_only=on "
-    f"-c statement_timeout={STATEMENT_TIMEOUT_MS}ms"
-)
+
+
+def pg_read_only_options() -> str:
+    """options libpq: read-only + statement_timeout из env на момент вызова."""
+    return (
+        "-c default_transaction_read_only=on "
+        f"-c statement_timeout={statement_timeout_ms()}ms"
+    )
 
 
 def get_db_params(db_name: str | None = None) -> dict[str, str | int]:
@@ -69,7 +72,7 @@ def get_db_params(db_name: str | None = None) -> dict[str, str | int]:
         "dbname": db_name or os.getenv("DB_NAME", "postgres"),
         "user": os.getenv("DB_USER", "postgres"),
         "password": password,
-        "options": PG_READ_ONLY_OPTIONS,
+        "options": pg_read_only_options(),
     }
 
 
@@ -88,6 +91,8 @@ def get_sqlalchemy_engine(db_name: str):
     с жизненным циклом Streamlit (очистка при рестарте сервера).
     Имя БД нормализуется к нижнему регистру для предотвращения дублирования кэша.
     Возвращённый Engine нельзя dispose(): это уничтожит общий пул для всего приложения.
+    Смена STATEMENT_TIMEOUT_MS в env применяется к новым движкам; уже закэшированный
+    engine сохраняет options до рестарта приложения.
     
     Args:
         db_name: Имя базы данных (дампа)
@@ -118,7 +123,7 @@ def get_sqlalchemy_engine(db_name: str):
             pool_pre_ping=True,
             connect_args={
                 "connect_timeout": CONNECT_TIMEOUT,
-                "options": PG_READ_ONLY_OPTIONS,
+                "options": pg_read_only_options(),
             },
             pool_size=5,
             max_overflow=10,
@@ -126,7 +131,7 @@ def get_sqlalchemy_engine(db_name: str):
     except DataLoadError:
         raise
     except Exception as exc:
-        raise DataLoadError(format_load_error(exc)) from exc
+        raise wrap_load_error(exc) from exc
 
 
 def read_sql_df(
@@ -141,7 +146,7 @@ def read_sql_df(
     except DataLoadError:
         raise
     except Exception as exc:
-        raise DataLoadError(format_load_error(exc)) from exc
+        raise wrap_load_error(exc) from exc
 
 
 def load_sql_df(
@@ -149,26 +154,24 @@ def load_sql_df(
     sql: str | TextClause,
     params: dict | None = None,
 ) -> pd.DataFrame:
-    """Движок по имени БД + read_sql_df. Ошибки подключения тоже DataLoadError."""
-    try:
-        engine = get_sqlalchemy_engine(db_name)
-    except DataLoadError:
-        raise
-    except Exception as exc:
-        raise DataLoadError(format_load_error(exc)) from exc
-    return read_sql_df(engine, sql, params)
+    """Движок по имени БД + read_sql_df."""
+    return read_sql_df(get_sqlalchemy_engine(db_name), sql, params)
 
 
 def get_available_databases() -> list[str]:
     """
     Получает список доступных БД через psycopg2 (быстрее для системных запросов).
     Использует контекстный менеджер для гарантированного закрытия соединения.
-    
+
     Returns:
-        Список имен баз данных. Пустой список при ошибке подключения.
+        Список имен баз данных. Пустой список, если каталог успешно прочитан и пуст.
+
+    Raises:
+        DataLoadError: Если не удалось подключиться ни к postgres, ни к template1.
     """
     system_dbs = ["postgres", "template1"]
-    
+    last_exc: Exception | None = None
+
     for sys_db in system_dbs:
         try:
             params = get_psycopg2_connect_kwargs(sys_db)
@@ -178,27 +181,33 @@ def get_available_databases() -> list[str]:
                         WHERE datistemplate = false AND datallowconn = true 
                         ORDER BY datname;
                     """)
-                dbs = [row[0] for row in cur.fetchall()]
-                return dbs
+                return [row[0] for row in cur.fetchall()]
+        except ValueError:
+            raise
         except Exception as e:
+            last_exc = e
             logger.debug(f"Не удалось подключиться к '{sys_db}': {e}")
             continue
-            
+
     logger.warning("Не удалось получить список БД ни через postgres, ни через template1")
-    return []
+    if last_exc is None:
+        raise DataLoadError("Не удалось получить список баз данных")
+    raise wrap_load_error(last_exc) from last_exc
 
 
 def get_table_list(db_name: str, schema: str = DB_SCHEMA) -> list[str]:
     """
     Возвращает список пользовательских таблиц в указанной схеме БД.
-    Используется для автодополнения в SQL-редакторе.
-    
+
     Args:
         db_name: Имя базы данных
         schema: Имя схемы (по умолчанию 'public')
-        
+
     Returns:
-        Отсортированный список имен таблиц. Пустой список при ошибке.
+        Отсортированный список имен таблиц.
+
+    Raises:
+        DataLoadError: Если движок или запрос к information_schema не удались.
     """
     try:
         engine = get_sqlalchemy_engine(db_name)
@@ -209,6 +218,8 @@ def get_table_list(db_name: str, schema: str = DB_SCHEMA) -> list[str]:
                 ORDER BY table_name;
             """), {"schema": schema})
             return [row[0] for row in result.fetchall()]
+    except DataLoadError:
+        raise
     except Exception as e:
         logger.error(f"Ошибка получения списка таблиц для {db_name}: {e}")
-        return []
+        raise wrap_load_error(e) from e

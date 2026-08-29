@@ -10,8 +10,9 @@
 from __future__ import annotations
 
 import logging  # Логирование жизненного цикла соединений
+from collections.abc import Callable
 from datetime import datetime  # Работа с датой/временем для хелперов форматирования
-from typing import Any  # Type hints для универсальных параметров
+from typing import Any, TypeVar  # Type hints для универсальных параметров
 
 from sqlalchemy import text  # Параметризованные запросы с :param синтаксисом
 from sqlalchemy.engine import Engine  # Тип движка SQLAlchemy для type hints
@@ -22,9 +23,10 @@ from sqlalchemy.sql.expression import (
 from core.db_utils import (
     get_sqlalchemy_engine,  # Единая точка получения кэшированного движка
 )
-from core.exceptions import DataLoadError, format_load_error
+from core.exceptions import DataLoadError, wrap_load_error
 
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 
 class InspectorBase:
@@ -61,6 +63,15 @@ class InspectorBase:
         self._engine: Engine | None = None  # Ссылка на кэшированный движок
         self._conn = None                   # Активное соединение (открывается в __enter__)
 
+    @staticmethod
+    def _wrap_driver(fn: Callable[[], T]) -> T:
+        try:
+            return fn()
+        except DataLoadError:
+            raise
+        except Exception as exc:
+            raise wrap_load_error(exc) from exc
+
     def __enter__(self) -> InspectorBase:
         """
         Открывает соединение при входе в контекст.
@@ -68,8 +79,11 @@ class InspectorBase:
         Движок получается из кэша st.cache_resource — повторные вызовы
         для той же БД не создают новых пулов соединений.
         """
-        self._engine = get_sqlalchemy_engine(self._db_name)
-        self._conn = self._engine.connect()
+        def _open() -> None:
+            self._engine = get_sqlalchemy_engine(self._db_name)
+            self._conn = self._engine.connect()
+
+        self._wrap_driver(_open)
         logger.debug("Соединение инспектора для '%s' открыто", self._db_name)
         return self
 
@@ -80,10 +94,19 @@ class InspectorBase:
         Engine НЕ диспозится — он кэшируется через st.cache_resource в db_utils.
         Диспоз кэшированного движка сломал бы все остальные компоненты приложения.
         Закрывается только соединение (connection), которое возвращает слот в пул.
+        Сбой close логируется и не подменяет исключение тела with.
         """
         if self._conn is not None:
-            self._conn.close()
-            self._conn = None
+            try:
+                self._conn.close()
+            except Exception:
+                logger.warning(
+                    "Не удалось закрыть соединение инспектора для '%s'",
+                    self._db_name,
+                    exc_info=True,
+                )
+            finally:
+                self._conn = None
         logger.debug("Соединение инспектора для '%s' закрыто", self._db_name)
 
     def fetch_one(self, sql: str | TextClause, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
@@ -106,12 +129,7 @@ class InspectorBase:
             raise RuntimeError("InspectorBase должен использоваться внутри контекстного менеджера (with)")
 
         stmt = sql if isinstance(sql, TextClause) else text(sql)
-        try:
-            result = self._conn.execute(stmt, params or {})
-        except DataLoadError:
-            raise
-        except Exception as exc:
-            raise DataLoadError(format_load_error(exc)) from exc
+        result = self._wrap_driver(lambda: self._conn.execute(stmt, params or {}))
         # .mappings() гарантирует возврат строк как словарей (аналог RealDictCursor)
         row = result.mappings().fetchone()
         return dict(row) if row else None
@@ -136,12 +154,7 @@ class InspectorBase:
             raise RuntimeError("InspectorBase должен использоваться внутри контекстного менеджера (with)")
 
         stmt = sql if isinstance(sql, TextClause) else text(sql)
-        try:
-            result = self._conn.execute(stmt, params or {})
-        except DataLoadError:
-            raise
-        except Exception as exc:
-            raise DataLoadError(format_load_error(exc)) from exc
+        result = self._wrap_driver(lambda: self._conn.execute(stmt, params or {}))
         return [dict(row) for row in result.mappings().fetchall()]
 
     # ─── Общие хелперы форматирования ────────────────────────────────

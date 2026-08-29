@@ -12,13 +12,11 @@ from core.constants import (
 )
 from core.data_loader import host_ids_for_infra_filters
 from core.db_utils import load_sql_df
-from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
-    render_load_error,
     render_page_header,
     style_status_column,
     try_load,
@@ -125,14 +123,18 @@ def render_tasks_list(active_db, cluster_meta=None):
                 start_dt=start_dt,
                 end_dt=end_dt,
             )
-            try:
-                df_corr = load_sql_df(active_db, text(audit_sql), params=audit_params)
-                allowed_correlation_ids = (
-                    df_corr["correlation_id"].tolist() if not df_corr.empty else []
-                )
-            except DataLoadError as exc:
-                render_load_error(exc, "фильтра по хостам/ВМ")
-                allowed_correlation_ids = []
+            df_corr = try_load(
+                "фильтра по хостам/ВМ",
+                load_sql_df,
+                active_db,
+                text(audit_sql),
+                params=audit_params,
+            )
+            if df_corr is None:
+                return
+            allowed_correlation_ids = (
+                df_corr["correlation_id"].tolist() if not df_corr.empty else []
+            )
 
     sql, params = build_tasks_list_sql(
         allowed_correlation_ids=allowed_correlation_ids,

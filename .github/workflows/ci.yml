@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
 
 jobs:
@@ -22,11 +22,11 @@ jobs:
           diff -u -I '^#' requirements.txt /tmp/requirements.txt
           diff -u -I '^#' requirements-dev.txt /tmp/requirements-dev.txt
       - name: Install dev dependencies
-        run: pip install -r requirements-dev.txt
+        run: uv sync --frozen --group dev
       - name: Ruff
-        run: ruff check
+        run: uv run ruff check
       - name: Pytest (unit)
-        run: pytest -m "not integration" --cov=src --cov-report=term-missing --cov-fail-under=55
+        run: uv run pytest -m "not integration" --cov=src --cov-report=term-missing --cov-fail-under=59
 
   image:
     runs-on: ubuntu-latest

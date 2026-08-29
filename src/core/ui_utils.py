@@ -103,6 +103,17 @@ def try_load(what: str, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T | 
         return None
 
 
+def run_section(label: str, fn: Callable[[], None]) -> None:
+    """Отрисовывает раздел: DataLoadError без traceback, прочий Exception — с ним."""
+    try:
+        fn()
+    except DataLoadError as exc:
+        render_load_error(exc, f"раздела «{label}»")
+    except Exception as exc:
+        st.error(f"Ошибка при отрисовке раздела «{label}»: {exc}")
+        st.exception(exc)
+
+
 def render_page_header(
     title: str,
     db_name: str,

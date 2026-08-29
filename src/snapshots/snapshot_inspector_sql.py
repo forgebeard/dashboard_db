@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from core.constants import IMAGE_STATUS_MAP, mapped_code_label
-from core.exceptions import DataLoadError
+from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 from vms.vm_inspector_sql import (
@@ -255,7 +255,9 @@ def _fetch_snapshots(insp: InspectorBase, vm_guid: Any) -> list[dict[str, Any]]:
     extra_sql = ",\n            " + ",\n            ".join(_SNAPSHOT_EXTRA_COLS)
     try:
         return insp.fetch_all(base_select.format(extra=extra_sql), params)
-    except DataLoadError:
+    except DataLoadError as exc:
+        if not should_retry_narrow_sql(exc):
+            raise
         return insp.fetch_all(base_select.format(extra=""), params)
 
 
