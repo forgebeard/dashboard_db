@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime
 from typing import Any
@@ -13,7 +14,7 @@ from typing import Any
 from core.constants import HOST_STATUS_MAP
 from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
-from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _yes_no
 
 KDUMP_MAP = {0: "Disabled", 1: "Enabled", 2: "Timeout"}
 
@@ -240,6 +241,23 @@ def format_host_report(payload: dict[str, Any]) -> str:
         _kv("Libvirt", versions.get("libvirt")),
         _kv("KVM", versions.get("kvm")),
         "",
+    ]
+
+    engine8 = payload.get("engine8") or {}
+    if engine8:
+        lines += [
+            "РЕД ВИРТ 8",
+            BAR_SINGLE,
+        ]
+        if "cpu_topology" in engine8:
+            lines.append(_kv("CPU topology", engine8["cpu_topology"]))
+        if "ovn_configured" in engine8:
+            lines.append(_kv("OVN", engine8["ovn_configured"]))
+        if "vdsm_cpus_affinity" in engine8:
+            lines.append(_kv("VDSM affinity", engine8["vdsm_cpus_affinity"]))
+        lines.append("")
+
+    lines += [
         "СЕТЕВЫЕ ИНТЕРФЕЙСЫ",
         BAR_SINGLE,
     ]
@@ -363,6 +381,42 @@ def _fetch_host_networks(insp: InspectorBase, host_id: Any) -> list[dict[str, An
         )
 
 
+def _json_cell(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, default=str)
+    return str(value)
+
+
+def _fetch_host_engine8(insp: InspectorBase, host_id: Any) -> dict[str, str]:
+    try:
+        row = insp.fetch_one(
+            """
+            SELECT cpu_topology, ovn_configured, vdsm_cpus_affinity
+            FROM vds_dynamic
+            WHERE vds_id = CAST(:host_id AS uuid)
+            """,
+            {"host_id": host_id},
+        )
+    except DataLoadError as exc:
+        if not should_retry_narrow_sql(exc):
+            raise
+        return {}
+    if not row:
+        return {}
+    extra: dict[str, str] = {}
+    topology = _json_cell(row.get("cpu_topology"))
+    if topology is not None:
+        extra["cpu_topology"] = topology
+    if row.get("ovn_configured") is not None:
+        extra["ovn_configured"] = _yes_no(row.get("ovn_configured"))
+    affinity = row.get("vdsm_cpus_affinity")
+    if affinity not in (None, ""):
+        extra["vdsm_cpus_affinity"] = str(affinity)
+    return extra
+
+
 def get_host_inspector_report(db_name: str, host_id: str) -> dict:
     """Возвращает словарь с отчетом и навигационными данными."""
     try:
@@ -396,6 +450,12 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
             section_errors: dict[str, str] = {}
             networks: list[dict[str, Any]] = []
             events: list[dict[str, Any]] = []
+            engine8: dict[str, str] = {}
+
+            try:
+                engine8 = _fetch_host_engine8(insp, host["vds_id"])
+            except DataLoadError as exc:
+                section_errors["engine8"] = str(exc)
 
             try:
                 networks = _fetch_host_networks(insp, host["vds_id"])
@@ -447,6 +507,7 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
                 },
                 "networks": networks,
                 "events": events,
+                "engine8": engine8,
                 "section_errors": section_errors,
                 "nav_data": {
                     "cluster_id": host["cluster_id"],

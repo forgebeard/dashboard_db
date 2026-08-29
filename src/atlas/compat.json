@@ -1,0 +1,44 @@
+{
+  "tables": {
+    "infrastructure_backup": { "until": "7.3" },
+    "infrastructure_backup_file_map": { "until": "7.3" },
+    "infrastructure_backups": { "since": "8" },
+    "infrastructure_backup_plans": { "since": "8" },
+    "infrastructure_backup_storages": { "since": "8" },
+    "infrastructure_backup_plan_storage_map": { "since": "8" },
+    "host_template": { "since": "8" },
+    "sp_events": { "since": "8" }
+  },
+  "columns": {
+    "vm_static.virtio_scsi_multi_queues_enabled": {
+      "until": "7.3",
+      "successor": "vm_static.virtio_scsi_multi_queues"
+    },
+    "vm_static.virtio_scsi_multi_queues": {
+      "since": "8",
+      "predecessor": "vm_static.virtio_scsi_multi_queues_enabled"
+    },
+    "vm_backups.is_live_backup": { "until": "7.3" },
+    "vm_backups.backup_type": { "since": "8" },
+    "vm_backups.is_stopped": { "since": "8" },
+    "vm_backups.snapshot_id": { "since": "8" },
+    "vm_backup_disk_map.disk_snapshot_id": { "since": "8" },
+    "cluster.parallel_migrations": { "since": "8" },
+    "cluster.upgrade_correlation_id": { "since": "8" },
+    "cluster.upgrade_percent_complete": { "since": "8" },
+    "images.sequence_number": { "since": "8" },
+    "storage_server_connections.transport": { "since": "8" },
+    "users.user_and_domain": { "since": "8" },
+    "vds_dynamic.cpu_topology": { "since": "8" },
+    "vds_dynamic.ovn_configured": { "since": "8" },
+    "vds_dynamic.vdsm_cpus_affinity": { "since": "8" },
+    "vm_dynamic.current_cores": { "since": "8" },
+    "vm_dynamic.current_cpu_pinning": { "since": "8" },
+    "vm_dynamic.current_numa_pinning": { "since": "8" },
+    "vm_dynamic.current_sockets": { "since": "8" },
+    "vm_dynamic.current_threads": { "since": "8" },
+    "vm_static.console_disconnect_action_delay": { "since": "8" },
+    "vm_static.cpu_pinning_policy": { "since": "8" },
+    "vm_static.parallel_migrations": { "since": "8" }
+  }
+}

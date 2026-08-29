@@ -183,3 +183,47 @@ def test_fetch_host_networks_does_not_retry_timeout():
     with pytest.raises(DataLoadError, match="statement timeout"):
         _fetch_host_networks(insp, "guid")
     assert insp.fetch_all.call_count == 1
+
+
+def test_fetch_host_engine8_skips_missing_columns():
+    from unittest.mock import MagicMock
+
+    from core.exceptions import DataLoadError
+    from hosts.host_inspector_sql import _fetch_host_engine8
+
+    insp = MagicMock()
+    insp.fetch_one.side_effect = DataLoadError(
+        'column "cpu_topology" does not exist', kind="undefined_column"
+    )
+    assert _fetch_host_engine8(insp, "guid") == {}
+
+
+def test_fetch_host_engine8_stringifies_topology():
+    from unittest.mock import MagicMock
+
+    from hosts.host_inspector_sql import _fetch_host_engine8, format_host_report
+
+    insp = MagicMock()
+    insp.fetch_one.return_value = {
+        "cpu_topology": {"sockets": [{"id": 0}]},
+        "ovn_configured": True,
+        "vdsm_cpus_affinity": "0-3",
+    }
+    extra = _fetch_host_engine8(insp, "guid")
+    assert extra["cpu_topology"] == '{"sockets": [{"id": 0}]}'
+    assert extra["ovn_configured"] == "да"
+    text = format_host_report(
+        {
+            "generated_at": "01.01.2026 00:00:00",
+            "header": {"name": "h1"},
+            "metrics": {},
+            "versions": {},
+            "networks": [],
+            "events": [],
+            "engine8": extra,
+        }
+    )
+    assert "РЕД ВИРТ 8" in text
+    assert "CPU topology" in text
+    assert "OVN" in text
+

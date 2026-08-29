@@ -53,6 +53,23 @@
       ],
       "columns": [],
       "relations": []
+    },
+    "sp_events": {
+      "name": "sp_events",
+      "summary": "Компактный журнал служебных событий: код, группа, время, текст",
+      "subgroup": "Audit Log",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор события",
+        "severity": "Уровень: info, warning, error и др.",
+        "code": "Числовой код события",
+        "group_events_id": "Идентификатор группы связанных событий",
+        "time": "Время события",
+        "message": "Текст сообщения"
+      },
+      "relations_doc": [],
+      "columns": [],
+      "relations": []
     }
   }
 }

@@ -14,7 +14,7 @@ from core.constants import (
     MIGRATE_ON_ERROR_MAP,
     VM_STATUS_UP,
 )
-from core.exceptions import DataLoadError
+from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE
 from core.report_text import _kv as _kv_core
@@ -120,6 +120,16 @@ def format_cluster_report(payload: dict[str, Any]) -> str:
     for extra in policy.get("fencing_extra") or []:
         lines.append(_kv(extra[0], extra[1]))
 
+    engine8 = payload.get("engine8") or {}
+    if engine8:
+        lines += ["", "РЕД ВИРТ 8", BAR_SINGLE]
+        if "parallel_migrations" in engine8:
+            lines.append(_kv("Паралл. миграции", engine8["parallel_migrations"]))
+        if "upgrade_correlation_id" in engine8:
+            lines.append(_kv("Upgrade id", engine8["upgrade_correlation_id"]))
+        if "upgrade_percent_complete" in engine8:
+            lines.append(_kv("Upgrade %", engine8["upgrade_percent_complete"]))
+
     lines += ["", "ХОСТЫ", BAR_SINGLE]
     if section_errors.get("hosts"):
         lines.append(f"  ошибка чтения ({section_errors['hosts']})")
@@ -175,6 +185,33 @@ def _group_affinity(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return groups
 
 
+def _fetch_cluster_engine8(insp: InspectorBase, cluster_id: str) -> dict[str, Any]:
+    try:
+        row = insp.fetch_one(
+            """
+            SELECT parallel_migrations, upgrade_correlation_id, upgrade_percent_complete
+            FROM cluster
+            WHERE cluster_id::text = :cluster_id
+            LIMIT 1
+            """,
+            {"cluster_id": cluster_id},
+        )
+    except DataLoadError as exc:
+        if not should_retry_narrow_sql(exc):
+            raise
+        return {}
+    if not row:
+        return {}
+    extra: dict[str, Any] = {}
+    if row.get("parallel_migrations") is not None:
+        extra["parallel_migrations"] = row["parallel_migrations"]
+    if row.get("upgrade_correlation_id") not in (None, ""):
+        extra["upgrade_correlation_id"] = row["upgrade_correlation_id"]
+    if row.get("upgrade_percent_complete") is not None:
+        extra["upgrade_percent_complete"] = row["upgrade_percent_complete"]
+    return extra
+
+
 def get_cluster_inspector_report(db_name: str, cluster_id: str) -> dict:
     cluster_search = str(cluster_id).strip().lower()
 
@@ -211,7 +248,13 @@ def get_cluster_inspector_report(db_name: str, cluster_id: str) -> dict:
             host_rows: list[dict[str, Any]] = []
             vm_row: dict[str, Any] | None = None
             affinity_rows: list[dict[str, Any]] = []
+            engine8: dict[str, Any] = {}
             params = {"cluster_id": cluster_search}
+
+            try:
+                engine8 = _fetch_cluster_engine8(insp, cluster_search)
+            except DataLoadError as exc:
+                section_errors["engine8"] = str(exc)
 
             try:
                 host_rows = insp.fetch_all(
@@ -335,6 +378,7 @@ def get_cluster_inspector_report(db_name: str, cluster_id: str) -> dict:
                 },
                 "hosts": hosts,
                 "affinity": _group_affinity(affinity_rows),
+                "engine8": engine8,
                 "section_errors": section_errors,
                 "nav_data": {
                     "cluster_id": cluster.get("cluster_id"),

@@ -97,26 +97,24 @@ def render_global_sql(active_db: str) -> None:
 
             if df_res.empty:
                 st.info(f"Запрос выполнен за {elapsed_ms:.0f} мс. Данных нет.")
-            else:
-                if len(df_res) >= MAX_ROW_LIMIT:
-                    st.warning(
-                        f"Показаны первые {MAX_ROW_LIMIT} строк. "
-                        "Добавьте свой LIMIT или сузьте фильтр."
-                    )
-                elif len(df_res) > _WARNING_ROW_THRESHOLD:
-                    st.warning(
-                        f"Результат содержит {len(df_res)} строк. "
-                        "Рекомендуется добавить LIMIT в запрос."
-                    )
-
-                st.caption(f"Найдено строк: **{len(df_res)}** | Время: **{elapsed_ms:.0f} мс**")
-
-                st.dataframe(
-                    df_res,
-                    width="stretch",
-                    height=400,
-                    hide_index=True,
+            elif len(df_res) >= MAX_ROW_LIMIT:
+                st.warning(
+                    f"Показаны первые {MAX_ROW_LIMIT} строк. "
+                    "Добавьте свой LIMIT или сузьте фильтр."
                 )
+            elif len(df_res) > _WARNING_ROW_THRESHOLD:
+                st.warning(
+                    f"Результат содержит {len(df_res)} строк. "
+                    "Рекомендуется добавить LIMIT в запрос."
+                )
+
+            st.caption(f"Найдено строк: **{len(df_res)}** | Время: **{elapsed_ms:.0f} мс**")
+            st.dataframe(
+                df_res,
+                width="stretch",
+                height=400,
+                hide_index=True,
+            )
 
         except ValueError as e:
             st.error(str(e))

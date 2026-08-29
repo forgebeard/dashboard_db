@@ -17,6 +17,7 @@ HOST_TABLES = {
         "vds_kdump_status": "Статус kdump на хосте",
         "vds_spm_id_map": "Маппинг SPM",
         "host_device": "Физические устройства хоста (PCI, USB)",
+        "host_template": "Шаблон установки хоста",
     },
 }
 

@@ -30,7 +30,12 @@
         "bios_type": "Тип BIOS: 0=SeaBIOS (Legacy), 1=OVMF (UEFI). Критично для Secure Boot",
         "custom_emulated_machine": "Переопределение типа эмулируемой машины (q35, pc-i440fx) для тонкой настройки совместимости",
         "lease_sd_id": "Домен хранения для lease-файла блокировки SAN. Связан с таблицей storage_domain_static через поле id",
-        "resume_behavior": "Поведение после сбоя хоста: AUTO_RESUME, KILL, LEAVE_ALONE. Политика HA"
+        "resume_behavior": "Поведение после сбоя хоста: AUTO_RESUME, KILL, LEAVE_ALONE. Политика HA",
+        "virtio_scsi_multi_queues_enabled": "Включены ли несколько очередей virtio-scsi (bool, РЕД ВИРТ 7.3)",
+        "virtio_scsi_multi_queues": "Число очередей virtio-scsi (int, РЕД ВИРТ 8)",
+        "console_disconnect_action_delay": "Задержка действия при отключении консоли, секунды",
+        "cpu_pinning_policy": "Политика CPU pinning: none / manual / resize-and-pin и др.",
+        "parallel_migrations": "Лимит параллельных миграций для этой ВМ"
       },
       "relations_doc": [
         "→ cluster (через cluster_id): Кластер размещения и политик",
@@ -61,7 +66,12 @@
         "qemu_guest_agent_status": "Статус QGA: 0=Disconnected, 1=Connected, 2=Unresponsive. Критичен для получения IP и freeze/snapshot",
         "is_update_available": "Флаг доступного обновления конфигурации. ВМ требует перезапуска для применения изменений",
         "volatile_run": "Флаг запуска без сохранения состояния для Stateless ВМ",
-        "downtime": "Допустимое время простоя при миграции в мс. Превышение приводит к abort migration"
+        "downtime": "Допустимое время простоя при миграции в мс. Превышение приводит к abort migration",
+        "current_cores": "Фактическое число ядер на работающей ВМ",
+        "current_cpu_pinning": "Текущий CPU pinning гостя",
+        "current_numa_pinning": "Текущий NUMA pinning гостя",
+        "current_sockets": "Фактическое число сокетов на работающей ВМ",
+        "current_threads": "Фактическое число потоков на работающей ВМ"
       },
       "relations_doc": [
         "→ vm_static (через vm_guid): Конфигурация ВМ",
@@ -327,7 +337,8 @@
       "fields_doc": {
         "backup_id": "Идентификатор задачи бэкапа. Связан с таблицей vm_backups через поле backup_id",
         "disk_id": "Идентификатор диска для копирования. Связан с таблицей base_disks через поле disk_id",
-        "backup_url": "URL назначения для этого диска если отличается от дефолтного"
+        "backup_url": "URL назначения для этого диска если отличается от дефолтного",
+        "disk_snapshot_id": "Снимок диска включённый в задачу бэкапа"
       },
       "relations_doc": [
         "→ vm_backups (через backup_id): Задача бэкапа",
@@ -348,7 +359,10 @@
         "to_checkpoint_id": "Конечный чекпоинт. Связан с таблицей vm_checkpoints через поле checkpoint_id",
         "phase": "Фаза бэкапа: Starting, InProgress, Finished, Failed",
         "is_live_backup": "Флаг live backup без остановки ВМ. Требует QGA и поддержку чекпоинтов",
-        "host_id": "Хост выполняющий backup для distributed backup. Связан с таблицей vds_static через поле vds_id"
+        "host_id": "Хост выполняющий backup для distributed backup. Связан с таблицей vds_static через поле vds_id",
+        "backup_type": "Тип задачи бэкапа",
+        "is_stopped": "Задача остановлена",
+        "snapshot_id": "Снимок связанный с задачей. Связан с таблицей snapshots"
       },
       "relations_doc": [
         "→ vm_static (через vm_id): Копируемая ВМ",

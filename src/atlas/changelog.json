@@ -1,0 +1,65 @@
+{
+  "tables_added": [
+    {"name": "sp_events", "group": "Журнал событий"},
+    {"name": "host_template", "group": "Хосты"},
+    {"name": "infrastructure_backup_plan_storage_map", "group": "Хранилище"},
+    {"name": "infrastructure_backup_plans", "group": "Хранилище"},
+    {"name": "infrastructure_backup_storages", "group": "Хранилище"},
+    {"name": "infrastructure_backups", "group": "Хранилище"}
+  ],
+  "tables_removed": [
+    {"name": "infrastructure_backup", "group": "Хранилище"},
+    {"name": "infrastructure_backup_file_map", "group": "Хранилище"}
+  ],
+  "renames": [
+    {
+      "from": "vm_static.virtio_scsi_multi_queues_enabled",
+      "to": "vm_static.virtio_scsi_multi_queues",
+      "from_type": "bool",
+      "to_type": "int4"
+    }
+  ],
+  "columns_removed": [
+    {"name": "vm_backups.is_live_backup", "type": "bool"}
+  ],
+  "columns_added": [
+    {"table": "cluster", "column": "parallel_migrations", "type": "int2"},
+    {"table": "cluster", "column": "upgrade_correlation_id", "type": "varchar"},
+    {"table": "cluster", "column": "upgrade_percent_complete", "type": "int2"},
+    {"table": "images", "column": "sequence_number", "type": "int4"},
+    {"table": "storage_server_connections", "column": "transport", "type": "varchar"},
+    {"table": "users", "column": "user_and_domain", "type": "varchar"},
+    {"table": "vds_dynamic", "column": "cpu_topology", "type": "jsonb"},
+    {"table": "vds_dynamic", "column": "ovn_configured", "type": "bool"},
+    {"table": "vds_dynamic", "column": "vdsm_cpus_affinity", "type": "varchar"},
+    {"table": "vm_backup_disk_map", "column": "disk_snapshot_id", "type": "uuid"},
+    {"table": "vm_backups", "column": "backup_type", "type": "varchar"},
+    {"table": "vm_backups", "column": "is_stopped", "type": "bool"},
+    {"table": "vm_backups", "column": "snapshot_id", "type": "uuid"},
+    {"table": "vm_dynamic", "column": "current_cores", "type": "int4"},
+    {"table": "vm_dynamic", "column": "current_cpu_pinning", "type": "varchar"},
+    {"table": "vm_dynamic", "column": "current_numa_pinning", "type": "varchar"},
+    {"table": "vm_dynamic", "column": "current_sockets", "type": "int4"},
+    {"table": "vm_dynamic", "column": "current_threads", "type": "int4"},
+    {"table": "vm_static", "column": "console_disconnect_action_delay", "type": "int4"},
+    {"table": "vm_static", "column": "cpu_pinning_policy", "type": "int2"},
+    {"table": "vm_static", "column": "parallel_migrations", "type": "int2"}
+  ],
+  "columns_type": [
+    {
+      "name": "storage_domain_dr.gluster_scheduler_job_id",
+      "from": "varchar",
+      "to": "uuid"
+    },
+    {"name": "vds_interface_statistics.rx_offset", "from": "int8", "to": "numeric"},
+    {"name": "vds_interface_statistics.rx_total", "from": "int8", "to": "numeric"},
+    {"name": "vds_interface_statistics.tx_offset", "from": "int8", "to": "numeric"},
+    {"name": "vds_interface_statistics.tx_total", "from": "int8", "to": "numeric"},
+    {"name": "vm_interface_statistics.rx_offset", "from": "int8", "to": "numeric"},
+    {"name": "vm_interface_statistics.rx_total", "from": "int8", "to": "numeric"},
+    {"name": "vm_interface_statistics.tx_offset", "from": "int8", "to": "numeric"},
+    {"name": "vm_interface_statistics.tx_total", "from": "int8", "to": "numeric"},
+    {"name": "vm_statistics.guest_mem_buffered", "from": "int4", "to": "int8"},
+    {"name": "vm_statistics.guest_mem_cached", "from": "int4", "to": "int8"}
+  ]
+}

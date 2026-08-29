@@ -19,6 +19,12 @@ STORAGE_TABLES = {
         "cinder_storage": "Интеграция с OpenStack Cinder",
         "unregistered_disks": "Незарегистрированные диски",
         "external_leases": "Внешние аренды (блокировки)",
+        "infrastructure_backup": "Резервные копии инфраструктуры Engine",
+        "infrastructure_backup_file_map": "Файлы копий инфраструктуры",
+        "infrastructure_backups": "Снятые копии инфраструктуры",
+        "infrastructure_backup_plans": "Планы копий инфраструктуры",
+        "infrastructure_backup_storages": "Цели хранения копий инфраструктуры",
+        "infrastructure_backup_plan_storage_map": "Связь планов и целей хранения",
     },
 }
 

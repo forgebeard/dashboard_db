@@ -9,9 +9,10 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
+from atlas.data_loader import filter_groups_for_release, release_key_from_label
 from core.config import DEFAULT_ROW_LIMIT, MAX_ROW_LIMIT, ROW_STEP
 from core.db_utils import get_sqlalchemy_engine, read_sql_df
-from core.exceptions import DataLoadError
+from core.exceptions import DataLoadError, is_undefined_table
 from core.ui_utils import fix_uuid_columns
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -80,6 +81,13 @@ def render_grouped_table_preview(
         )
     row_limit = min(int(row_limit), MAX_ROW_LIMIT)
 
+    meta = st.session_state.get("cluster_meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    groups = filter_groups_for_release(
+        groups, release_key_from_label(meta.get("engine_release"))
+    )
+
     order_overrides = order_overrides or {}
     row_limit_overrides = row_limit_overrides or {}
     mask_columns = mask_columns or {}
@@ -107,18 +115,21 @@ def render_grouped_table_preview(
                         df_table = _stringify_json_columns(
                             df_table, json_text_columns.get(table_name, [])
                         )
+                        height = min(max(len(df_table) * 35 + 60, 200), 400)
+                        st.dataframe(
+                            df_table,
+                            width="stretch",
+                            height=height,
+                            hide_index=True,
+                        )
                         if df_table.empty:
-                            st.info(f"Таблица `{table_name}` пуста.")
+                            st.caption(f"0 записей в `{table_name}`")
                         else:
-                            height = min(max(len(df_table) * 35 + 60, 200), 400)
-                            st.dataframe(
-                                df_table,
-                                width="stretch",
-                                height=height,
-                                hide_index=True,
-                            )
                             st.caption(f"Показано {len(df_table)} записей из `{table_name}`")
                     except DataLoadError as e:
-                        st.error(f"Не удалось загрузить `{table_name}`: {e}")
+                        if is_undefined_table(e):
+                            st.caption(f"Таблицы `{table_name}` нет в этом дампе")
+                        else:
+                            st.error(f"Не удалось загрузить `{table_name}`: {e}")
     except DataLoadError as e:
         st.error(f"Не удалось подключиться для просмотра таблиц: {e}")

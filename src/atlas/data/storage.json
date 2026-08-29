@@ -165,7 +165,8 @@
         "nfs_version": "Версия NFS протокола (3, 4, 4.1, 4.2)",
         "nfs_timeo": "Таймаут NFS операций в децисекундах",
         "nfs_retrans": "Количество повторных попыток NFS",
-        "gluster_volume_id": "Том Gluster если подключение типа GlusterFS. Связан с таблицей gluster_volumes через поле id"
+        "gluster_volume_id": "Том Gluster если подключение типа GlusterFS. Связан с таблицей gluster_volumes через поле id",
+        "transport": "Транспорт подключения (например TCP)"
       },
       "relations_doc": [
         "→ gluster_volumes (через gluster_volume_id): Том GlusterFS"
@@ -319,6 +320,98 @@
       },
       "relations_doc": [
         "→ infrastructure_backup (через backup_id): Родительская задача"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "infrastructure_backup_storages": {
+      "name": "infrastructure_backup_storages",
+      "summary": "Цели хранения копий инфраструктуры Engine: тип, путь, LUN",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор цели хранения",
+        "storage_type": "Тип цели (NFS, iSCSI и др.)",
+        "storage_path": "Путь или адрес хранилища копий",
+        "mnt_path": "Точка монтирования если цель монтируется на Engine",
+        "target": "iSCSI target если применимо",
+        "lun_wwid": "WWID LUN для блочной цели"
+      },
+      "relations_doc": [
+        "← infrastructure_backup_plan_storage_map (через backup_storage_id): Планы которые пишут на эту цель"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "infrastructure_backup_plans": {
+      "name": "infrastructure_backup_plans",
+      "summary": "Планы резервного копирования инфраструктуры: состав (scope), расписание, ротация",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор плана",
+        "name": "Имя плана",
+        "description": "Описание назначения",
+        "scope_engine_files": "Включены ли файлы конфигурации Engine",
+        "scope_engine_db": "Включена ли БД Engine",
+        "scope_dwh_db": "Включена ли БД DWH",
+        "scope_cinderlib_db": "Включена ли БД CinderLib",
+        "scope_grafana_db": "Включена ли БД Grafana",
+        "scope_keycloak_db": "Включена ли БД Keycloak",
+        "schedule_type": "Тип расписания",
+        "days_of_week": "Дни недели запуска",
+        "days_of_month": "Дни месяца запуска",
+        "last_month_day": "Запускать в последний день месяца",
+        "time": "Время запуска (HH:MM)",
+        "is_active": "План включён",
+        "last_creation_date": "Время последнего снятия копии по плану",
+        "max_count": "Максимальное количество хранимых копий (ротация)"
+      },
+      "relations_doc": [
+        "→ infrastructure_backup_plan_storage_map (через id): Цели хранения плана",
+        "→ infrastructure_backups (через id): Снятые копии по плану"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "infrastructure_backup_plan_storage_map": {
+      "name": "infrastructure_backup_plan_storage_map",
+      "summary": "Связь планов резервного копирования инфраструктуры с целями хранения",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["backup_plan_id", "backup_storage_id"],
+      "fields_doc": {
+        "backup_plan_id": "План. Связан с таблицей infrastructure_backup_plans через поле id",
+        "backup_storage_id": "Цель хранения. Связан с таблицей infrastructure_backup_storages через поле id"
+      },
+      "relations_doc": [
+        "→ infrastructure_backup_plans (через backup_plan_id): План",
+        "→ infrastructure_backup_storages (через backup_storage_id): Цель хранения"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "infrastructure_backups": {
+      "name": "infrastructure_backups",
+      "summary": "Факт снятой копии инфраструктуры Engine: план, цель, scope, статус",
+      "subgroup": "Backup & Infra",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор копии",
+        "backup_plan_id": "План по которому снята копия. Связан с таблицей infrastructure_backup_plans через поле id",
+        "storage_id": "Цель хранения. Связан с таблицей infrastructure_backup_storages через поле id",
+        "scope_engine_files": "В копию вошли файлы конфигурации Engine",
+        "scope_engine_db": "В копию вошла БД Engine",
+        "scope_dwh_db": "В копию вошла БД DWH",
+        "scope_cinderlib_db": "В копию вошла БД CinderLib",
+        "scope_grafana_db": "В копию вошла БД Grafana",
+        "scope_keycloak_db": "В копию вошла БД Keycloak",
+        "file_path": "Путь к файлу копии",
+        "creation_date": "Время создания копии",
+        "status": "Статус прогона"
+      },
+      "relations_doc": [
+        "→ infrastructure_backup_plans (через backup_plan_id): План",
+        "→ infrastructure_backup_storages (через storage_id): Цель хранения"
       ],
       "columns": [],
       "relations": []

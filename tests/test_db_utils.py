@@ -21,6 +21,7 @@ from core.exceptions import (
     format_load_error,
     is_statement_timeout,
     is_undefined_column,
+    is_undefined_table,
     should_retry_narrow_sql,
     wrap_load_error,
 )
@@ -279,6 +280,13 @@ def test_is_undefined_column():
     assert not is_undefined_column(Exception("syntax error"))
 
 
+def test_is_undefined_table():
+    assert is_undefined_table(Exception('relation "host_template" does not exist'))
+    assert is_undefined_table(type("UndefinedTable", (Exception,), {})("x"))
+    assert not is_undefined_table(Exception('column "cpu_topology" of relation "vds_dynamic" does not exist'))
+    assert not is_undefined_table(Exception("syntax error"))
+
+
 def test_should_retry_narrow_sql():
     missing = DataLoadError('column "network_name" does not exist')
     timeout = DataLoadError("statement timeout")
@@ -288,6 +296,7 @@ def test_should_retry_narrow_sql():
     assert should_retry_narrow_sql(other) is False
     assert should_retry_narrow_sql(DataLoadError("x", kind="undefined_column")) is True
     assert should_retry_narrow_sql(DataLoadError("x", kind="timeout")) is False
+    assert should_retry_narrow_sql(DataLoadError("x", kind="undefined_table")) is False
 
 
 def test_wrap_load_error_sets_kind():
@@ -296,5 +305,7 @@ def test_wrap_load_error_sets_kind():
     assert "таймауту" in str(wrapped)
     col = wrap_load_error(Exception('column "network_name" does not exist'))
     assert col.kind == "undefined_column"
+    missing_tbl = wrap_load_error(Exception('relation "host_template" does not exist'))
+    assert missing_tbl.kind == "undefined_table"
     existing = DataLoadError("keep", kind="timeout")
     assert wrap_load_error(existing) is existing

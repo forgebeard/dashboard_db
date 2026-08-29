@@ -48,7 +48,10 @@
         "cpu_flags": "Дополнительные флаги CPU которые нужно эмулировать или пробрасывать",
         "is_migrate_encrypted": "Шифровать ли трафик live migration",
         "managed": "Управляется ли кластер движком (false для external clusters)",
-        "fips_mode": "Режим FIPS: 0=Disabled, 1=Enabled"
+        "fips_mode": "Режим FIPS: 0=Disabled, 1=Enabled",
+        "parallel_migrations": "Лимит параллельных миграций в кластере",
+        "upgrade_correlation_id": "Correlation id текущего upgrade кластера",
+        "upgrade_percent_complete": "Процент завершения upgrade кластера"
       },
       "relations_doc": [
         "→ storage_pool (через storage_pool_id): Data Center владельца",

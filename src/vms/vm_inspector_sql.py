@@ -16,7 +16,7 @@ from core.constants import (
     VM_STATUS_MAP,
     VM_STATUS_UP,
 )
-from core.exceptions import DataLoadError
+from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
 from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
@@ -356,6 +356,23 @@ def format_vm_report(payload: dict[str, Any]) -> str:
         _kv("QEMU agent", metrics.get("qemu_agent")),
         _kv("oVirt agent", metrics.get("ovirt_agent")),
         "",
+    ]
+
+    engine = payload.get("engine_compat") or {}
+    if engine:
+        lines += [
+            "СХЕМА ENGINE",
+            BAR_SINGLE,
+        ]
+        if "virtio_scsi" in engine:
+            lines.append(_kv("virtio-scsi queues", engine["virtio_scsi"]))
+        if "cpu_pinning_policy" in engine:
+            lines.append(_kv("CPU pinning", engine["cpu_pinning_policy"]))
+        if "parallel_migrations" in engine:
+            lines.append(_kv("Паралл. миграции", engine["parallel_migrations"]))
+        lines.append("")
+
+    lines += [
         "ДИСКИ",
         BAR_SINGLE,
     ]
@@ -469,6 +486,42 @@ def format_vm_report(payload: dict[str, Any]) -> str:
 
     lines += ["", BAR_DOUBLE, ""]
     return "\n".join(lines)
+
+
+def _fetch_vm_engine_compat(insp: InspectorBase, vm_guid: Any) -> dict[str, Any]:
+    params = {"vm_guid": vm_guid}
+    try:
+        row = insp.fetch_one(
+            """
+            SELECT virtio_scsi_multi_queues, cpu_pinning_policy, parallel_migrations
+            FROM vm_static
+            WHERE vm_guid = :vm_guid
+            """,
+            params,
+        )
+        extra: dict[str, Any] = {}
+        if row:
+            if row.get("virtio_scsi_multi_queues") is not None:
+                extra["virtio_scsi"] = row["virtio_scsi_multi_queues"]
+            if row.get("cpu_pinning_policy") is not None:
+                extra["cpu_pinning_policy"] = row["cpu_pinning_policy"]
+            if row.get("parallel_migrations") is not None:
+                extra["parallel_migrations"] = row["parallel_migrations"]
+        return extra
+    except DataLoadError as exc:
+        if not should_retry_narrow_sql(exc):
+            raise
+    row = insp.fetch_one(
+        """
+        SELECT virtio_scsi_multi_queues_enabled
+        FROM vm_static
+        WHERE vm_guid = :vm_guid
+        """,
+        params,
+    )
+    if not row or row.get("virtio_scsi_multi_queues_enabled") is None:
+        return {}
+    return {"virtio_scsi": row["virtio_scsi_multi_queues_enabled"]}
 
 
 def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
@@ -644,6 +697,12 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
             except DataLoadError as exc:
                 section_errors["events"] = str(exc)
 
+            engine_compat: dict[str, Any] = {}
+            try:
+                engine_compat = _fetch_vm_engine_compat(insp, vm["vm_guid"])
+            except DataLoadError as exc:
+                section_errors["engine_compat"] = str(exc)
+
             bios_code = vm["bios_type"]
             try:
                 bios_key = int(bios_code) if bios_code is not None else None
@@ -691,6 +750,7 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                 "snapshots": snapshots,
                 "networks": nics,
                 "events": events,
+                "engine_compat": engine_compat,
                 "section_errors": section_errors,
                 "nav_data": {
                     "host_id": vm["vds_id"],

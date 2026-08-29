@@ -43,7 +43,8 @@
         "image_group_id": "Группа образов (логический диск). Связан с таблицей base_disks через поле disk_id",
         "active": "Является ли этот образ активным (последним в цепочке)",
         "volume_classification": "Классификация: 0=Base, 1=Snapshot, 2=Leaf",
-        "qcow_compat": "Версия совместимости QCOW2: 0=0.10, 1=1.1"
+        "qcow_compat": "Версия совместимости QCOW2: 0=0.10, 1=1.1",
+        "sequence_number": "Порядковый номер слоя в цепочке образов"
       },
       "relations_doc": [
         "→ base_disks (через image_group_id): Логический диск",

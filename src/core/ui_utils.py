@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeVar
@@ -23,18 +24,39 @@ from core.exceptions import DataLoadError
 T = TypeVar("T")
 
 
+def _stringify_nested_value(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, default=str)
+    return value
+
+
 def fix_uuid_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Конвертирует uuid.UUID в строки для Streamlit. Модифицирует df inplace."""
+    """Готовит object-колонки к st.dataframe (Arrow).
+
+    UUID → str; jsonb dict/list (как vds_dynamic.cpu_topology в РЕД ВИРТ 8) → JSON-текст.
+    В дампе 7.3 такой колонки нет — цикл её просто не увидит. Модифицирует df inplace.
+    """
     if df.empty:
         return df
 
     for col in df.columns:
         if df[col].dtype != "object":
             continue
-        has_uuid = any(isinstance(val, uuid.UUID) for val in df[col])
-        if not has_uuid:
-            continue
-        df[col] = df[col].apply(lambda x: str(x) if isinstance(x, uuid.UUID) else x)
+        series = df[col]
+        has_uuid = False
+        has_nested = False
+        for val in series:
+            if isinstance(val, uuid.UUID):
+                has_uuid = True
+            elif isinstance(val, (dict, list)):
+                has_nested = True
+            if has_uuid and has_nested:
+                break
+        if has_nested:
+            df[col] = series.map(_stringify_nested_value)
+            series = df[col]
+        if has_uuid:
+            df[col] = series.map(lambda x: str(x) if isinstance(x, uuid.UUID) else x)
 
     return df
 

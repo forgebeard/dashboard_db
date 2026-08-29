@@ -100,7 +100,10 @@
         "tsc_frequency": "Частота TSC счетчика. Важно для точного времени в ВМ",
         "tsc_scaling": "Разрешено ли масштабирование TSC для миграции между разными CPU",
         "fips_enabled": "Включен ли режим FIPS 140-2",
-        "nmstate_version": "Версия nmstate для управления сетью"
+        "nmstate_version": "Версия nmstate для управления сетью",
+        "cpu_topology": "Топология CPU хоста в JSON (сокеты, ядра, SMT)",
+        "ovn_configured": "Настроен ли OVN на хосте",
+        "vdsm_cpus_affinity": "Affinity CPU для процессов VDSM"
       },
       "relations_doc": [
         "→ vds_static (через vds_id): Статическая конфигурация хоста"
@@ -290,6 +293,37 @@
       "relations_doc": [
         "→ vds_static (через host_id): Хост-владелец устройства",
         "→ vm_static (через vm_id): ВМ которой проброшено устройство"
+      ],
+      "columns": [],
+      "relations": []
+    },
+    "host_template": {
+      "name": "host_template",
+      "summary": "Шаблон установки хоста: кластер, SPM, vGPU, параметры ядра и HostedEngine",
+      "subgroup": "Hardware & Config",
+      "key_fields": ["id"],
+      "fields_doc": {
+        "id": "Уникальный идентификатор шаблона",
+        "name": "Имя шаблона",
+        "description": "Описание назначения",
+        "activate_host_after_install": "Активировать хост после установки",
+        "reboot_host_after_install": "Перезагрузить хост после установки",
+        "cluster": "Кластер размещения. Связан с таблицей cluster через поле cluster_id",
+        "spm": "Приоритет или режим SPM для хостов из шаблона",
+        "vgpu_placement_consolidated": "Политика vGPU Consolidated",
+        "vgpu_placement_separated": "Политика vGPU Separated",
+        "kernel_cmd_line_iommu": "Добавить IOMMU в cmdline ядра",
+        "kernel_cmd_line_kvm_nested": "Включить nested KVM в cmdline",
+        "kernel_cmd_line_unsafe_interrupts": "Разрешить unsafe interrupts в cmdline",
+        "kernel_cmd_line_pci_realloc": "Включить pci=realloc в cmdline",
+        "kernel_cmd_line_blacklist_nouveau": "Заблокировать nouveau в cmdline",
+        "kernel_cmd_line_fips": "Включить FIPS в cmdline",
+        "kernel_cmd_line_smt_disabled": "Отключить SMT в cmdline",
+        "kernel_cmd_line": "Полная строка параметров ядра",
+        "hosted_engine": "Роль HostedEngine для хостов из шаблона"
+      },
+      "relations_doc": [
+        "→ cluster (через cluster): Кластер размещения устанавливаемых хостов"
       ],
       "columns": [],
       "relations": []

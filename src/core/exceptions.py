@@ -6,7 +6,7 @@ from typing import Literal
 
 from core.config import statement_timeout_ms
 
-LoadErrorKind = Literal["timeout", "undefined_column", "read_only", "other"]
+LoadErrorKind = Literal["timeout", "undefined_column", "undefined_table", "read_only", "other"]
 
 
 class DataLoadError(Exception):
@@ -57,6 +57,22 @@ def is_undefined_column(exc: BaseException) -> bool:
     return False
 
 
+def is_undefined_table(exc: BaseException) -> bool:
+    for current in _walk_exceptions(exc):
+        if isinstance(current, DataLoadError) and current.kind == "undefined_table":
+            return True
+        if type(current).__name__ == "UndefinedTable":
+            return True
+        lowered = str(current).lower()
+        if "undefined table" in lowered or "undefinedtable" in lowered:
+            return True
+        if "relation" in lowered and "does not exist" in lowered:
+            if "column" in lowered:
+                continue
+            return True
+    return False
+
+
 def should_retry_narrow_sql(exc: BaseException) -> bool:
     """Узкий SELECT только при отсутствии колонки, не при timeout/сети."""
     if isinstance(exc, DataLoadError) and exc.kind != "other":
@@ -71,6 +87,8 @@ def _kind_from_exc(exc: BaseException) -> LoadErrorKind:
         return "timeout"
     if is_undefined_column(exc):
         return "undefined_column"
+    if is_undefined_table(exc):
+        return "undefined_table"
     lowered = str(exc).lower()
     if "read-only" in lowered or "read only" in lowered:
         return "read_only"
