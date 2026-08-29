@@ -23,9 +23,8 @@ from core.constants import (
     VM_STATUS_MAP,
 )
 from core.inspector_base import InspectorBase
-
-BAR_DOUBLE = "═" * 78
-BAR_SINGLE = "─" * 78
+from core.report_text import BAR_DOUBLE, BAR_SINGLE
+from core.report_text import _kv as _kv_core
 
 EXTERNAL_STATUS_MAP = {0: "OK", 1: "Warning", 2: "Error"}
 BLOCK_STORAGE_TYPES = frozenset({2, 3})  # FCP, iSCSI
@@ -38,8 +37,7 @@ BAD_IMAGE_STATUSES = (
 
 
 def _kv(label: str, value: Any, width: int = 18) -> str:
-    text = "—" if value is None or value == "" else str(value)
-    return f"  {(label + ':'):<{width}}{text}"
+    return _kv_core(label, value, width)
 
 
 def _as_float(value: Any) -> float | None:

@@ -12,12 +12,12 @@ from core.constants import (
     host_is_maintenance,
     host_is_problem,
     host_status_tone,
-    storage_health_counts,
-    storage_is_problem,
-    storage_status_tone,
     image_health_counts,
     image_is_problem,
     image_status_tone,
+    storage_health_counts,
+    storage_is_problem,
+    storage_status_tone,
     vm_health_counts,
     vm_is_problem,
     vm_layer_tone,
@@ -149,7 +149,11 @@ def test_architecture_and_bios_maps():
 
 
 def test_disk_content_and_network_status_maps():
-    from core.constants import DISK_CONTENT_TYPE_MAP, NETWORK_STATUS_MAP, mapped_code_label
+    from core.constants import (
+        DISK_CONTENT_TYPE_MAP,
+        NETWORK_STATUS_MAP,
+        mapped_code_label,
+    )
 
     assert DISK_CONTENT_TYPE_MAP[0] == "DATA"
     assert DISK_CONTENT_TYPE_MAP[4] == "ISO"

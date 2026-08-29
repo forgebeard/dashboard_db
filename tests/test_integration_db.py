@@ -39,8 +39,8 @@ def test_get_available_databases(check_env):
 
 
 def test_load_cluster_metadata_real_db(check_env):
-    from core.db_utils import get_available_databases
     from core.data_loader import load_cluster_metadata
+    from core.db_utils import get_available_databases
 
     dbs = get_available_databases()
     if not dbs:

@@ -7,7 +7,7 @@ from typing import Any
 
 from core.constants import NETWORK_STATUS_MAP, mapped_code_label
 from core.inspector_base import InspectorBase
-from vms.vm_inspector_sql import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
 VM_LIST_LIMIT = 50
 

@@ -9,17 +9,19 @@
 """
 
 # --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os               # Доступ к переменным окружения (METADATA_CACHE_TTL)
-import logging          # Логирование процесса загрузки метаданных и ошибок
+import logging  # Логирование процесса загрузки метаданных и ошибок
+import os  # Доступ к переменным окружения (METADATA_CACHE_TTL)
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import pandas as pd          # Работа с табличными данными и SQL-запросами
+import pandas as pd  # Работа с табличными данными и SQL-запросами
+import streamlit as st  # Декоратор кэширования данных (@st.cache_data)
 from sqlalchemy import text  # Безопасное выполнение параметризованных SQL-выражений
 from sqlalchemy.engine import Engine  # Типизация объекта движка SQLAlchemy
-import streamlit as st       # Декоратор кэширования данных (@st.cache_data)
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА (CORE) ---
-from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
+from core.db_utils import (
+    get_sqlalchemy_engine,  # Утилита создания подключений к PostgreSQL
+)
 
 logger = logging.getLogger(__name__)
 

@@ -30,36 +30,35 @@ def _configure_logging() -> None:
 
 _configure_logging()
 
-from core.config import APP_TITLE, APP_LAYOUT, FONT_SIZE_CSS
-from core.db_utils import get_available_databases
-from core.data_loader import load_cluster_metadata
-from core.sql_editor import render_global_sql
-
-from vms.vms_module import render_vms_list
-from vms.vms_diagnostics import render_vms_diagnostics
-from snapshots.snapshots_module import render_snapshots_list
-from snapshots.snapshots_diagnostics import render_snapshots_diagnostics
-from hosts.hosts_module import render_hosts_list
-from hosts.hosts_diagnostics import render_hosts_diagnostics
-from clusters.clusters_module import render_clusters_list
-from clusters.clusters_diagnostics import render_clusters_diagnostics
-from storage.storage_module import render_storage_list
-from storage.storage_diagnostics import render_storage_diagnostics
-from disks.disks_module import render_disks_list
-from disks.disks_diagnostics import render_disks_diagnostics
-from gluster.gluster_module import render_gluster_list
-from gluster.gluster_diagnostics import render_gluster_diagnostics
-from tasks.tasks_module import render_tasks_list
-from tasks.tasks_diagnostics import render_tasks_diagnostics
-from audit.audit_module import render_audit_log
-from audit.audit_diagnostics import render_audit_diagnostics
-from cert.certificates import render_certificates
-from networks.network_module import render_networks_list
-from networks.network_diagnostics import render_networks_diagnostics
-from system.system_module import render_system_list
-from users.users_module import render_users_list
-from users.users_diagnostics import render_users_diagnostics
 from atlas.atlas_module import render_schema_atlas
+from audit.audit_diagnostics import render_audit_diagnostics
+from audit.audit_module import render_audit_log
+from cert.certificates import render_certificates
+from clusters.clusters_diagnostics import render_clusters_diagnostics
+from clusters.clusters_module import render_clusters_list
+from core.config import APP_LAYOUT, APP_TITLE, FONT_SIZE_CSS
+from core.data_loader import load_cluster_metadata
+from core.db_utils import get_available_databases
+from core.sql_editor import render_global_sql
+from disks.disks_diagnostics import render_disks_diagnostics
+from disks.disks_module import render_disks_list
+from gluster.gluster_diagnostics import render_gluster_diagnostics
+from gluster.gluster_module import render_gluster_list
+from hosts.hosts_diagnostics import render_hosts_diagnostics
+from hosts.hosts_module import render_hosts_list
+from networks.network_diagnostics import render_networks_diagnostics
+from networks.network_module import render_networks_list
+from snapshots.snapshots_diagnostics import render_snapshots_diagnostics
+from snapshots.snapshots_module import render_snapshots_list
+from storage.storage_diagnostics import render_storage_diagnostics
+from storage.storage_module import render_storage_list
+from system.system_module import render_system_list
+from tasks.tasks_diagnostics import render_tasks_diagnostics
+from tasks.tasks_module import render_tasks_list
+from users.users_diagnostics import render_users_diagnostics
+from users.users_module import render_users_list
+from vms.vms_diagnostics import render_vms_diagnostics
+from vms.vms_module import render_vms_list
 
 # Разделы с собственным page header (фаза A).
 _SHELL_SECTIONS = frozenset({

@@ -24,132 +24,81 @@
 
 ## Быстрый старт
 
-### Требования
+Нужны Docker (Compose) и PostgreSQL с восстановленным дампом. ОС не важна: Linux, macOS и Windows запускаются одинаково через `./start.sh` или `start.bat`. Python на хост ставить не нужно.
 
-- Docker и Docker Compose
-- PostgreSQL 15 с загруженными дампами oVirt Engine
+### 1. Восстановление дампа
 
----
+Дашборд читает дамп (или доступную PostgreSQL), не пишет в Engine. Режим правок и скриптов для заказчика — в разработке.
 
-### Шаг 1. Настройка PostgreSQL (только Linux, один раз)
+В DBeaver подключитесь к локальному PostgreSQL (`localhost`).
 
-> **Windows:** Docker Desktop предоставляет `host.docker.internal` из коробки. Если PostgreSQL установлен на той же Windows-машине и слушает `0.0.0.0` — этот шаг можно пропустить.
+1. ПКМ на «Databases» → «Create New Database». Имя, например `ovirt_diag`, владелец — ваш пользователь Postgres.
+2. ПКМ на созданной базе → **Tools** → **Restore**. Выберите `.dump` или `.sql`.
+3. Включите **Do not save owner** и **Do not save privileges**. **Start**, дождитесь успеха.
 
-По умолчанию PostgreSQL на Linux слушает только `127.0.0.1`. Контейнер не сможет подключиться без этих изменений.
+Подключение дашборда настраивается скриптом запуска (`DB_HOST=host.docker.internal` из контейнера), а не ручным `.env` с `localhost`.
 
-**1.1 Разрешить прослушивание всех интерфейсов**
+### 2. Запуск
+
+**Linux / macOS:** `./start.sh`  
+**Windows:** `start.bat`
+
+При первом запуске скрипт спросит параметры и соберёт контейнер.
+
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `DB_HOST` | `host.docker.internal` | Postgres на той же машине, что Docker |
+| `DB_PORT` | `5432` | Порт PostgreSQL |
+| `DB_NAME` | `engine` | Имя базы с дампом |
+| `DB_USER` | `postgres` | Пользователь БД |
+| `DB_PASSWORD` | — | Пароль (обязательно) |
+
+Откройте **http://localhost:8502**
+
+**Управление**
+
+```bash
+./start.sh              # Запуск / перезапуск (Linux/macOS)
+./start.sh -r           # Перенастроить .env
+start.bat               # То же на Windows
+start.bat -r
+docker compose down     # Остановить
+docker compose logs -f  # Логи контейнера
+```
+
+### 3. Если контейнер не видит PostgreSQL (Linux)
+
+На Linux Postgres часто слушает только `127.0.0.1`, а контейнер ходит на хост с адреса docker-моста. Windows / Docker Desktop: этот раздел обычно не нужен, если Postgres слушает `0.0.0.0` и `host.docker.internal` резолвится.
+
+Разрешить прослушивание (путь к data dir может отличаться):
 
 ```bash
 sudo sed -i "s/^#*listen_addresses.*/listen_addresses = '*'/" \
   /var/lib/pgsql/15/data/postgresql.conf
-
 sudo systemctl restart postgresql-15
-```
-
-Проверка:
-
-```bash
 ss -tlnp | grep 5432
 # Ожидается: 0.0.0.0:5432
 ```
-## Работа с дампом БД
-## Приложение поддерживает только чтение. Режим редактирования и подключения к живой базе находится в разработке.
 
-### 1. Создание локальной базы
-1. В DBeaver подключитесь к вашему локальному PostgreSQL (localhost).
-2. Нажмите ПКМ на «Databases» -> «Create New Database».
-3. Укажите имя (например, `ovirt_diag`) и владельца (`postgres`). Нажмите OK.
+`listen_addresses = '*'` означает, что порт 5432 слушает **все интерфейсы хоста**. Ограничение доступа — файрвол и `pg_hba.conf`.
 
-### 2. Восстановление дампа
-1. В дереве навигации найдите созданную базу `ovirt_diag`.
-2. Нажмите ПКМ -> **Tools** -> **Restore**.
-3. Выберите файл дампа (`.dump` или `.sql`) из файловой системы.
-4. В настройках восстановления убедитесь, что стоят галочки:
-   - [x] Do not save owner
-   - [x] Do not save privileges
-5. Нажмите **Start**. Дождитесь завершения операции без ошибок.
-
-### 3. Подключение дашборда
-Настройте файл `.env`, указав параметры вашей локальной базы:
-
-```env
-DB_USER=postgres
-DB_PASSWORD=<пароль_локального_postgres>
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=ovirt_diag
-```
-
-**1.2 Разрешить подключения из Docker-сети**
+Пример строки `pg_hba` (метод `md5`, как часто уже настроено; пароль Postgres не перевыпускать ради scram):
 
 ```bash
 echo "host    all    all    172.16.0.0/12    md5" | \
   sudo tee -a /var/lib/pgsql/15/data/pg_hba.conf
-
 sudo systemctl reload postgresql-15
 ```
 
-> `172.16.0.0/12` — это только внутренняя сеть Docker. Внешние IP не пропускаются.
-
----
-
-### Шаг 2. Запуск приложения
-
-**Linux / macOS:**
-
-```bash
-./start.sh
-```
-
-**Windows:**
-
-```cmd
-start.bat
-```
-
-При первом запуске скрипт попросит ввести параметры подключения:
-
-| Параметр | По умолчанию | Описание |
-|---|---|---|
-| `DB_HOST` | `host.docker.internal` | Адрес БД (хост машины) |
-| `DB_PORT` | `5432` | Порт PostgreSQL |
-| `DB_NAME` | `engine` | Имя базы по умолчанию |
-| `DB_USER` | `postgres` | Пользователь БД |
-| `DB_PASSWORD` | — | Пароль (обязательно) |
-
-После ввода контейнер соберётся и запустится автоматически.
-
-Откройте в браузере: **http://localhost:8502**
-
----
-
-### Управление
-
-**Linux / macOS:**
-
-```bash
-./start.sh              # Запуск / перезапуск
-./start.sh -r           # Перенастроить подключение
-docker compose down     # Остановить
-docker compose logs -f  # Смотреть логи
-```
-
-**Windows:**
-
-```cmd
-start.bat               :: Запуск / перезапуск
-start.bat -r            :: Перенастроить подключение
-docker compose down     :: Остановить
-docker compose logs -f  :: Смотреть логи
-```
-
----
+`172.16.0.0/12` — широкий диапазон частных адресов (в том числе типичные сети Docker), **не** «только Docker». Клиенты из интернета в этот CIDR не входят, поэтому этой строкой снаружи не пускаются. Адреса LAN/VPN из того же `/12` — пускаются. Не копируйте эту строку на Windows как обязательный шаг.
 
 ### Если БД на удалённом сервере
 
-Вместо `host.docker.internal` укажите IP-адрес сервера при настройке, либо измените `.env` вручную и выполните перенастройку (`./start.sh -r` или `start.bat -r`).
+В `start.sh` / `start.bat` (или `.env`) укажите IP сервера вместо `host.docker.internal`, затем `-r` если `.env` уже был. На удалённом Postgres должны быть разрешены подключения **с того адреса, с которого выходит Docker-хост** (не «docker-подсеть ноутбука»). Настройка listen/`pg_hba` — на стороне того сервера, в его дистрибутиве, не через `sed` из этого README как универсальный рецепт.
 
-На стороне удалённого PostgreSQL (если это Linux) должны быть выполнены шаги 1.1 и 1.2.
+## CI
+
+При push и pull request GitHub Actions запускает `ruff check`, unit-тесты pytest (без интеграционных, им нужна живая БД) и сборку Docker-образа. Чтобы красный CI блокировал merge, включите required checks в настройках ветки на GitHub.
 
 ## Структура проекта
 
@@ -161,6 +110,8 @@ docker compose logs -f  :: Смотреть логи
 ├── docker-compose.yml          # Оркестрация контейнера
 ├── start.sh                    # Интерактивный запуск и настройка (Linux/macOS)
 ├── start.bat                   # Интерактивный запуск и настройка (Windows)
+├── ruff.toml                   # Узкий линт (E, F, I)
+├── .github/workflows/ci.yml    # ruff, pytest, docker build
 ├── .env.example                # Шаблон переменных окружения
 ├── requirements.txt            # Runtime-зависимости Python
 ├── requirements-dev.txt        # pytest, ruff (не ставятся в Docker-образ)

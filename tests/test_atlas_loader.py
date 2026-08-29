@@ -1,14 +1,15 @@
 """
 Unit-тесты для src/atlas/data_loader.py.
 """
-import pytest
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-# sys и Path для sys.path больше не нужны для импорта модулей проекта
+from unittest.mock import patch
 
+import pytest
+
+# sys и Path для sys.path больше не нужны для импорта модулей проекта
 import atlas.data_loader
 from atlas.data_loader import load_atlas_data
+
 
 @pytest.fixture
 def mock_streamlit():

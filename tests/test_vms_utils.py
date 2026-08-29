@@ -1,14 +1,16 @@
 """
 Unit-тесты для src/vms/vms_utils.py.
 """
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
-from unittest.mock import patch, MagicMock
+
+from core.constants import VM_STATUS_MAP
 from vms.vms_utils import (
     fetch_vms_data,
     format_vm_layer_issues,
     process_vm_dataframe,
 )
-from core.constants import VM_STATUS_MAP
 
 EXPECTED_COLS = [
     "Имя ВМ",

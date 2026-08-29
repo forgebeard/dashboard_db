@@ -2,8 +2,8 @@
 """SQL и подготовка списка пользователей."""
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
 from core.constants import vdc_object_type_label
 from core.db_utils import get_sqlalchemy_engine

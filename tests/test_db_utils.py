@@ -1,15 +1,16 @@
 """
 Unit-тесты для src/core/db_utils.py.
 """
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from core.db_utils import (
     PG_READ_ONLY_OPTIONS,
+    get_available_databases,
     get_db_params,
     get_psycopg2_connect_kwargs,
     get_table_list,
-    get_available_databases,
 )
 
 # --- Тесты для get_db_params ---

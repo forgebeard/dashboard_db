@@ -8,14 +8,21 @@
 """
 
 # --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
-import os               # Чтение переменных окружения (.env) для параметров подключения
-import logging          # Логирование ошибок и событий подключения
+import logging  # Логирование ошибок и событий подключения
+import os  # Чтение переменных окружения (.env) для параметров подключения
+
+import psycopg2  # Драйвер PostgreSQL для служебных запросов (системные таблицы)
+import streamlit as st  # Декоратор кэширования ресурсов (@st.cache_resource)
+from dotenv import (
+    load_dotenv,  # Загрузка переменных из файла .env перед чтением через os.getenv
+)
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
-from sqlalchemy import create_engine, text, URL  # Создание DB-движка, безопасный SQL и конструктор URL
-from dotenv import load_dotenv   # Загрузка переменных из файла .env перед чтением через os.getenv
-import psycopg2                  # Драйвер PostgreSQL для служебных запросов (системные таблицы)
-import streamlit as st           # Декоратор кэширования ресурсов (@st.cache_resource)
+from sqlalchemy import (  # Создание DB-движка, безопасный SQL и конструктор URL
+    URL,
+    create_engine,
+    text,
+)
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -121,15 +128,14 @@ def get_available_databases() -> list[str]:
     for sys_db in system_dbs:
         try:
             params = get_psycopg2_connect_kwargs(sys_db)
-            with psycopg2.connect(**params) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
+            with psycopg2.connect(**params) as conn, conn.cursor() as cur:
+                cur.execute("""
                         SELECT datname FROM pg_database 
                         WHERE datistemplate = false AND datallowconn = true 
                         ORDER BY datname;
                     """)
-                    dbs = [row[0] for row in cur.fetchall()]
-                    return dbs
+                dbs = [row[0] for row in cur.fetchall()]
+                return dbs
         except Exception as e:
             logger.debug(f"Не удалось подключиться к '{sys_db}': {e}")
             continue

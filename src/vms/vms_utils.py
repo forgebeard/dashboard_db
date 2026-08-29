@@ -8,10 +8,9 @@
 from __future__ import annotations
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
 from core.constants import (
     IMAGE_LAYER_ISSUE_ORDER,
     IMAGE_STATUS_ILLEGAL,
@@ -23,6 +22,7 @@ from core.constants import (
     VM_STATUS_UP,
     vm_is_problem,
 )
+from core.db_utils import get_sqlalchemy_engine
 
 
 def _layer_issue_codes(raw: object) -> list[int]:

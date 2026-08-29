@@ -1,9 +1,11 @@
 """
 Unit-тесты для src/core/data_loader.py.
 """
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock
+
+import pandas as pd
+import pytest
+
 # sys.path.append удален
 
 @pytest.fixture(autouse=True)

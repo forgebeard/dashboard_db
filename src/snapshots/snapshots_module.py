@@ -168,7 +168,9 @@ def render_snapshots_list(active_db: str, cluster_meta: dict) -> None:
                 f"ВМ UUID: `{selected['_vm_id']}` | снапшот: `{snap_id}` ({snap_type})"
             )
             with st.spinner("Генерация полного отчета Snapshot-Inspector..."):
-                from snapshots.snapshot_inspector_sql import get_snapshot_inspector_report
+                from snapshots.snapshot_inspector_sql import (
+                    get_snapshot_inspector_report,
+                )
 
                 result = get_snapshot_inspector_report(
                     active_db, str(selected["_vm_id"]), str(snap_id)

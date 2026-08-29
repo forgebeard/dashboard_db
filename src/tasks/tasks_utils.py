@@ -5,9 +5,9 @@
 Не зависит от Streamlit. Тестируется изолированно.
 """
 
-from sqlalchemy import text
+
 import pandas as pd
-from typing import Optional
+from sqlalchemy import text
 
 from core.constants import (
     action_type_label,
@@ -21,9 +21,9 @@ from core.constants import (
 
 
 def build_audit_correlation_sql(
-    host_id: Optional[str] = None,
-    host_ids: Optional[list] = None,
-    vm_search: Optional[str] = None,
+    host_id: str | None = None,
+    host_ids: list | None = None,
+    vm_search: str | None = None,
     start_dt=None,
     end_dt=None
 ) -> tuple[str, dict]:
@@ -58,10 +58,10 @@ def build_audit_correlation_sql(
 
 
 def build_tasks_list_sql(
-    allowed_correlation_ids: Optional[list] = None,
+    allowed_correlation_ids: list | None = None,
     start_dt=None,
     end_dt=None,
-    search_id: Optional[str] = None,
+    search_id: str | None = None,
     limit: int = 500
 ) -> tuple[text, dict]:
     """

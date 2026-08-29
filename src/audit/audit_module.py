@@ -3,12 +3,6 @@
 
 import streamlit as st
 
-from .audit_utils import (
-    fetch_audit_logs,
-    format_audit_event_detail,
-    load_audit_infrastructure_maps,
-    process_audit_dataframe,
-)
 from core.constants import audit_health_counts, audit_severity_tone
 from core.data_loader import host_ids_for_infra_filters
 from core.ui_utils import (
@@ -18,6 +12,13 @@ from core.ui_utils import (
     render_health_filter,
     render_page_header,
     style_status_column,
+)
+
+from .audit_utils import (
+    fetch_audit_logs,
+    format_audit_event_detail,
+    load_audit_infrastructure_maps,
+    process_audit_dataframe,
 )
 
 AUDIT_FILTER_DEFAULTS = {

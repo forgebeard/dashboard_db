@@ -2,8 +2,8 @@
 """Данные раздела «Системные»: сессии, фенсинг, квоты, трансферы."""
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
 from core.db_utils import get_sqlalchemy_engine
 from core.ui_utils import fix_uuid_columns

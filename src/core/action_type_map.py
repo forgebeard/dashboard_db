@@ -6,9 +6,8 @@
     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/action/ActionType.java
 """
 
-from typing import Dict
 
-ACTION_TYPE_MAP: Dict[int, str] = {
+ACTION_TYPE_MAP: dict[int, str] = {
     0: 'Unknown',
     1: 'AddVm',
     2: 'AddVmFromTemplate',

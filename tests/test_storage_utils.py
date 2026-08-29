@@ -107,7 +107,11 @@ def test_health_filter_active_and_problems():
 
 
 def test_engine_storage_type_and_shared_status_codes():
-    from core.constants import SHARED_STATUS_MAP, STORAGE_DOMAIN_TYPE_MAP, STORAGE_TYPE_MAP
+    from core.constants import (
+        SHARED_STATUS_MAP,
+        STORAGE_DOMAIN_TYPE_MAP,
+        STORAGE_TYPE_MAP,
+    )
 
     assert STORAGE_TYPE_MAP[2] == "FCP"
     assert STORAGE_TYPE_MAP[3] == "iSCSI"

@@ -8,8 +8,8 @@
 from __future__ import annotations
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
 from core.constants import (
     CLUSTER_STATUS_MAP,

@@ -8,7 +8,7 @@
 """
 
 from collections.abc import Iterable
-from typing import Dict, Literal
+from typing import Literal
 
 from core.action_type_map import ACTION_TYPE_MAP
 
@@ -22,7 +22,7 @@ HOST_NEUTRAL_CODES = frozenset({0, 1})  # Unassigned, Down
 # Сводный статус кластера (нет кода Engine): по составу хостов.
 CLUSTER_STATUS_OK = 0
 CLUSTER_STATUS_PROBLEMS = 1
-CLUSTER_STATUS_MAP: Dict[int, str] = {
+CLUSTER_STATUS_MAP: dict[int, str] = {
     CLUSTER_STATUS_OK: "Ok",
     CLUSTER_STATUS_PROBLEMS: "Проблемы",
 }
@@ -33,7 +33,7 @@ VM_STATUS_PAUSED = 4
 VM_CRITICAL_CODES = frozenset({7, 8, 14, 15})  # Unknown, NotResponding, ImageIllegal, ImageLocked
 
 # --- СТАТУСЫ ВИРТУАЛЬНЫХ МАШИН (VmStatus.java) ---
-VM_STATUS_MAP: Dict[int, str] = {
+VM_STATUS_MAP: dict[int, str] = {
     -1: 'Unassigned',        # Статус не назначен
     0: 'Down',               # ВМ выключена
     1: 'Up',                 # ВМ запущена и работает
@@ -54,10 +54,10 @@ VM_STATUS_MAP: Dict[int, str] = {
 }
 
 # Обратный маппинг: Имя статуса -> Код
-VM_NAME_TO_STATUS: Dict[str, int] = {v: k for k, v in VM_STATUS_MAP.items()}
+VM_NAME_TO_STATUS: dict[str, int] = {v: k for k, v in VM_STATUS_MAP.items()}
 
 # --- СТАТУСЫ ХОСТОВ (VDSStatus.java) ---
-HOST_STATUS_MAP: Dict[int, str] = {
+HOST_STATUS_MAP: dict[int, str] = {
     0: 'Unassigned',               # Статус не назначен
     1: 'Down',                     # Хост выключен/недоступен
     2: 'Maintenance',              # Режим обслуживания
@@ -77,7 +77,7 @@ HOST_STATUS_MAP: Dict[int, str] = {
 }
 
 # Обратный маппинг: Имя статуса -> Код
-HOST_NAME_TO_STATUS: Dict[str, int] = {v: k for k, v in HOST_STATUS_MAP.items()}
+HOST_NAME_TO_STATUS: dict[str, int] = {v: k for k, v in HOST_STATUS_MAP.items()}
 
 # --- АРХИТЕКТУРА (ArchitectureType) ---
 # Коды как в Engine PostgreSQL (cluster.architecture, vm_static.cpu_architecture).
@@ -85,7 +85,7 @@ HOST_NAME_TO_STATUS: Dict[str, int] = {v: k for k, v in HOST_STATUS_MAP.items()}
 #   oVirt Engine ArchitectureType.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/compat/ArchitectureType.java
 # Дамп 4.6: Cascadelake → architecture=1 (x86_64). Не путать с 0=x86_64 / 1=aarch64.
-ARCHITECTURE_MAP: Dict[int, str] = {
+ARCHITECTURE_MAP: dict[int, str] = {
     0: "undefined",
     1: "x86_64",
     2: "ppc64",
@@ -99,7 +99,7 @@ ARCHITECTURE_MAP: Dict[int, str] = {
 # Источник:
 #   oVirt Engine BiosType.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/BiosType.java
-BIOS_TYPE_MAP: Dict[int, str] = {
+BIOS_TYPE_MAP: dict[int, str] = {
     0: "Cluster default",
     1: "i440FX SeaBIOS",
     2: "Q35 SeaBIOS",
@@ -109,7 +109,7 @@ BIOS_TYPE_MAP: Dict[int, str] = {
 
 # --- МИГРАЦИЯ ПРИ ОШИБКЕ ХОСТА (MigrateOnError) ---
 # cluster.migrate_on_error
-MIGRATE_ON_ERROR_MAP: Dict[int, str] = {
+MIGRATE_ON_ERROR_MAP: dict[int, str] = {
     0: "DoNothing",
     1: "Migrate",
     2: "Shutdown",
@@ -125,7 +125,7 @@ AUDIT_SEVERITY_NORMAL = 0
 AUDIT_SEVERITY_WARNING = 1
 AUDIT_SEVERITY_ERROR = 2
 AUDIT_SEVERITY_ALERT = 3
-AUDIT_SEVERITY_MAP: Dict[int, str] = {
+AUDIT_SEVERITY_MAP: dict[int, str] = {
     AUDIT_SEVERITY_NORMAL: "Normal",
     AUDIT_SEVERITY_WARNING: "Warning",
     AUDIT_SEVERITY_ERROR: "Error",
@@ -138,7 +138,7 @@ AUDIT_SEVERITY_MAP: Dict[int, str] = {
 #   oVirt Engine VdcObjectType.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/VdcObjectType.java
 # Дамп: DiskOperator на object_type_id=19 (Disk).
-VDC_OBJECT_TYPE_MAP: Dict[int, str] = {
+VDC_OBJECT_TYPE_MAP: dict[int, str] = {
     1: "каталог",
     2: "система",
     3: "хранилище",
@@ -174,7 +174,7 @@ ASYNC_TASK_STATUS_RUNNING = 2
 ASYNC_TASK_STATUS_FINISHED = 3
 ASYNC_TASK_STATUS_ABORTING = 4
 ASYNC_TASK_STATUS_CLEANING = 5
-ASYNC_TASK_STATUS_MAP: Dict[int, str] = {
+ASYNC_TASK_STATUS_MAP: dict[int, str] = {
     ASYNC_TASK_STATUS_UNKNOWN: "unknown",
     ASYNC_TASK_STATUS_INIT: "init",
     ASYNC_TASK_STATUS_RUNNING: "running",
@@ -201,7 +201,7 @@ ASYNC_TASK_RESULT_FAILURE = 1
 ASYNC_TASK_RESULT_CLEAN_SUCCESS = 2
 ASYNC_TASK_RESULT_CLEAN_FAILURE = 3
 ASYNC_TASK_RESULT_UNKNOWN = 4
-ASYNC_TASK_RESULT_MAP: Dict[int, str] = {
+ASYNC_TASK_RESULT_MAP: dict[int, str] = {
     ASYNC_TASK_RESULT_SUCCESS: "success",
     ASYNC_TASK_RESULT_FAILURE: "failure",
     ASYNC_TASK_RESULT_CLEAN_SUCCESS: "cleanSuccess",
@@ -221,7 +221,7 @@ ASYNC_TASK_BUCKET_ERRORS = 2
 #   oVirt Engine StorageDomainType.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/StorageDomainType.java
 #   VDSM lib/vdsm/storage/sd.py (классы DATA/ISO/BACKUP — параллельный enum ролей)
-STORAGE_DOMAIN_TYPE_MAP: Dict[int, str] = {
+STORAGE_DOMAIN_TYPE_MAP: dict[int, str] = {
     0: "Master",
     1: "Data",
     2: "ISO",
@@ -240,7 +240,7 @@ STORAGE_DOMAIN_TYPE_MAP: Dict[int, str] = {
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/storage/StorageType.java
 #   VDSM lib/vdsm/storage/sd.py (NFS_DOMAIN=1, FCP_DOMAIN=2, ISCSI_DOMAIN=3, ...)
 # Код 5 в актуальном Engine пропущен; в VDSM 5 = CIFS.
-STORAGE_TYPE_MAP: Dict[int, str] = {
+STORAGE_TYPE_MAP: dict[int, str] = {
     0: "UNKNOWN",
     1: "NFS",
     2: "FCP",
@@ -259,7 +259,7 @@ IMAGE_STATUS_OK = 1
 IMAGE_STATUS_LOCKED = 2
 IMAGE_STATUS_ILLEGAL = 3
 IMAGE_STATUS_MERGING = 4
-IMAGE_STATUS_MAP: Dict[int, str] = {
+IMAGE_STATUS_MAP: dict[int, str] = {
     IMAGE_STATUS_OK: "OK",
     IMAGE_STATUS_LOCKED: "LOCKED",     # Заблокирован операцией (snapshot, migrate)
     IMAGE_STATUS_ILLEGAL: "ILLEGAL",    # Поврежден или несогласован
@@ -277,7 +277,7 @@ IMAGE_LAYER_ISSUE_ORDER: tuple[int, ...] = (
 # Источник:
 #   oVirt Engine DiskContentType.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/storage/DiskContentType.java
-DISK_CONTENT_TYPE_MAP: Dict[int, str] = {
+DISK_CONTENT_TYPE_MAP: dict[int, str] = {
     0: "DATA",
     1: "OVF_STORE",
     2: "MEMORY_DUMP_VOLUME",
@@ -298,7 +298,7 @@ DISK_CONTENT_TYPE_MAP: Dict[int, str] = {
 # network.type в Engine — Integer без Identifiable enum (Network.java); неизвестное = Code N.
 NETWORK_STATUS_NON_OPERATIONAL = 0
 NETWORK_STATUS_OPERATIONAL = 1
-NETWORK_STATUS_MAP: Dict[int, str] = {
+NETWORK_STATUS_MAP: dict[int, str] = {
     NETWORK_STATUS_NON_OPERATIONAL: "NonOperational",
     NETWORK_STATUS_OPERATIONAL: "Operational",
 }
@@ -312,7 +312,7 @@ STORAGE_SHARED_UNATTACHED = 0
 STORAGE_SHARED_ACTIVE = 1
 STORAGE_SHARED_INACTIVE = 2
 STORAGE_SHARED_MIXED = 3
-SHARED_STATUS_MAP: Dict[int, str] = {
+SHARED_STATUS_MAP: dict[int, str] = {
     STORAGE_SHARED_UNATTACHED: "Unattached",
     STORAGE_SHARED_ACTIVE: "Active",
     STORAGE_SHARED_INACTIVE: "Inactive",
@@ -325,7 +325,7 @@ SHARED_STATUS_MAP: Dict[int, str] = {
 #   oVirt Engine StorageDomainStatus.java
 #     https://github.com/oVirt/ovirt-engine/blob/master/backend/manager/modules/common/src/main/java/org/ovirt/engine/core/common/businessentities/StorageDomainStatus.java
 STORAGE_DOMAIN_STATUS_ACTIVE = 3
-STORAGE_DOMAIN_STATUS_MAP: Dict[int, str] = {
+STORAGE_DOMAIN_STATUS_MAP: dict[int, str] = {
     0: "Unknown",
     1: "Uninitialized",
     2: "Unattached",
@@ -339,7 +339,7 @@ STORAGE_DOMAIN_STATUS_MAP: Dict[int, str] = {
 }
 
 # storage_pool.status
-STORAGE_POOL_STATUS_MAP: Dict[int, str] = {
+STORAGE_POOL_STATUS_MAP: dict[int, str] = {
     0: "Uninitialized",
     1: "Up",
     2: "Maintenance",
@@ -488,7 +488,7 @@ def cluster_status_tone(status_code: object) -> StatusTone:
     return "neutral"
 
 
-def mapped_code_label(code: object, mapping: Dict[int, str]) -> str:
+def mapped_code_label(code: object, mapping: dict[int, str]) -> str:
     parsed = _as_int_code(code)
     if parsed is None:
         return "—"

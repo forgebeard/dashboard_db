@@ -15,9 +15,8 @@ from core.constants import (
     VM_STATUS_UP,
 )
 from core.inspector_base import InspectorBase
-
-BAR_DOUBLE = "═" * 78
-BAR_SINGLE = "─" * 78
+from core.report_text import BAR_DOUBLE, BAR_SINGLE
+from core.report_text import _kv as _kv_core
 
 
 def _fmt_size_mb(mb: Any) -> str:
@@ -30,8 +29,7 @@ def _fmt_size_mb(mb: Any) -> str:
 
 
 def _kv(label: str, value: Any, width: int = 18) -> str:
-    text = "—" if value is None or value == "" else str(value)
-    return f"  {(label + ':'):<{width}}{text}"
+    return _kv_core(label, value, width)
 
 
 def _on_off(flag: Any) -> str:

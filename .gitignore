@@ -45,3 +45,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Локальный дамп ruff check
+ruff.txt

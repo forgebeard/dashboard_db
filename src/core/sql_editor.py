@@ -9,15 +9,14 @@
 
 import time
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
 from core.config import MAX_ROW_LIMIT
-from core.ui_utils import fix_uuid_columns
+from core.db_utils import get_sqlalchemy_engine
 from core.sql_guard import apply_max_row_limit, validate_adhoc_sql
-
+from core.ui_utils import fix_uuid_columns
 
 _MAX_HISTORY_SIZE = 10
 _WARNING_ROW_THRESHOLD = 1000

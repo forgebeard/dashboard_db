@@ -4,17 +4,18 @@
 """
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
-from core.data_loader import build_infra_filter_maps
 from core.constants import (
     AUDIT_SEVERITY_ALERT,
     AUDIT_SEVERITY_ERROR,
     AUDIT_SEVERITY_WARNING,
     audit_severity_label,
 )
+from core.data_loader import build_infra_filter_maps
+from core.db_utils import get_sqlalchemy_engine
+
 
 def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
     """Справочники фильтров: из cluster_meta, без полного скана audit_log."""

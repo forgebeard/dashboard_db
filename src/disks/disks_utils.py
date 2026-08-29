@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
 from core.constants import (
     IMAGE_LAYER_ISSUE_ORDER,
@@ -56,22 +56,6 @@ def fetch_disks_data(
         LEFT JOIN vm_static vm ON vd.vm_id = vm.vm_guid
         WHERE TRUE
     """
-
-    no_search = not any([search_disk, search_vm, search_sd])
-    if no_search:
-        base_sql = base_sql.replace(
-            "FROM images i\n        JOIN base_disks bd ON i.image_group_id = bd.disk_id",
-            """FROM images i
-        JOIN (
-            SELECT image_group_id
-            FROM images
-            GROUP BY image_group_id
-            ORDER BY MAX(creation_date) DESC
-            LIMIT 500
-        ) newest ON newest.image_group_id = i.image_group_id
-        JOIN base_disks bd ON i.image_group_id = bd.disk_id""",
-            1,
-        )
 
     conditions = []
     params: dict[str, object] = {}

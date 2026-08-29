@@ -1,0 +1,35 @@
+# Узкий линт: явные ошибки и импорты. Не ALL.
+src = ["src", "tests"]
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I"]
+ignore = [
+    "EXE002",
+    "BLE001",
+    "DTZ",
+    "E501",
+]
+
+[lint.per-file-ignores]
+"src/app.py" = ["E402"]
+
+[lint.isort]
+known-first-party = [
+    "atlas",
+    "audit",
+    "cert",
+    "clusters",
+    "core",
+    "disks",
+    "gluster",
+    "hosts",
+    "networks",
+    "snapshots",
+    "storage",
+    "system",
+    "tasks",
+    "users",
+    "vms",
+]

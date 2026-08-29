@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
 from core.constants import (
     SHARED_STATUS_MAP,
     STORAGE_DOMAIN_TYPE_MAP,
@@ -14,6 +13,7 @@ from core.constants import (
     STORAGE_TYPE_MAP,
     storage_is_problem,
 )
+from core.db_utils import get_sqlalchemy_engine
 
 
 def fetch_storage_data(

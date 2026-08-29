@@ -9,15 +9,19 @@
 
 from __future__ import annotations
 
-import logging              # Логирование жизненного цикла соединений
+import logging  # Логирование жизненного цикла соединений
 from datetime import datetime  # Работа с датой/временем для хелперов форматирования
-from typing import Any      # Type hints для универсальных параметров
+from typing import Any  # Type hints для универсальных параметров
 
-from sqlalchemy import text           # Параметризованные запросы с :param синтаксисом
-from sqlalchemy.sql.expression import TextClause  # Тип для проверки готовых SQL-объектов
-from sqlalchemy.engine import Engine   # Тип движка SQLAlchemy для type hints
+from sqlalchemy import text  # Параметризованные запросы с :param синтаксисом
+from sqlalchemy.engine import Engine  # Тип движка SQLAlchemy для type hints
+from sqlalchemy.sql.expression import (
+    TextClause,  # Тип для проверки готовых SQL-объектов
+)
 
-from core.db_utils import get_sqlalchemy_engine  # Единая точка получения кэшированного движка
+from core.db_utils import (
+    get_sqlalchemy_engine,  # Единая точка получения кэшированного движка
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +60,7 @@ class InspectorBase:
         self._engine: Engine | None = None  # Ссылка на кэшированный движок
         self._conn = None                   # Активное соединение (открывается в __enter__)
 
-    def __enter__(self) -> "InspectorBase":
+    def __enter__(self) -> InspectorBase:
         """
         Открывает соединение при входе в контекст.
 

@@ -17,9 +17,7 @@ from core.constants import (
     VM_STATUS_UP,
 )
 from core.inspector_base import InspectorBase
-
-BAR_DOUBLE = "═" * 78
-BAR_SINGLE = "─" * 78
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
 VOLUME_TYPE_MAP = {0: "Unassigned", 1: "Preallocated", 2: "Sparse"}
 VOLUME_FORMAT_MAP = {1: "RAW", 4: "COW"}
@@ -85,15 +83,6 @@ def _fmt_ts(dt: Any) -> str:
     return parsed.strftime("%d.%m.%Y %H:%M:%S")
 
 
-def _kv_at(indent: str, label: str, value: Any, width: int = 16) -> str:
-    text = "—" if value is None or value == "" else str(value)
-    return f"{indent}{(label + ':'):<{width}}{text}"
-
-
-def _kv(label: str, value: Any, width: int = 16) -> str:
-    return _kv_at("  ", label, value, width)
-
-
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
 
@@ -105,10 +94,6 @@ def _norm_id(raw: Any) -> str:
 
 def _is_nil_id(raw: Any) -> bool:
     return _norm_id(raw) in ("", NIL_UUID)
-
-
-def _yes_no(flag: Any) -> str:
-    return "да" if flag in (True, 1, "1", "t", "true", "True") else "нет"
 
 
 def _id_text(raw: Any) -> str | None:
@@ -469,7 +454,7 @@ def format_vm_report(payload: dict[str, Any]) -> str:
                 extra.append(str(net))
             tail = ("    " + "    ".join(extra)) if extra else ""
             lines.append(
-                f"    {str(nic.get('name') or '—'):<14}{nic.get('ipv4') or '—'}{tail}"
+                f"    {nic.get('name') or '—'!s:<14}{nic.get('ipv4') or '—'}{tail}"
             )
 
     lines += ["", "ЖУРНАЛ СОБЫТИЙ (последние 5)", BAR_SINGLE]

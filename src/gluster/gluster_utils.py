@@ -6,12 +6,14 @@
 """
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import pandas as pd          # Работа с табличными данными и выполнение SQL-запросов
+import pandas as pd  # Работа с табличными данными и выполнение SQL-запросов
+import streamlit as st  # Фреймворк UI (используется для вывода ошибок/предупреждений)
 from sqlalchemy import text  # Безопасное формирование параметризованных SQL-запросов
-import streamlit as st       # Фреймворк UI (используется для вывода ошибок/предупреждений)
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА (CORE) ---
-from core.db_utils import get_sqlalchemy_engine  # Утилита создания подключений к PostgreSQL
+from core.db_utils import (
+    get_sqlalchemy_engine,  # Утилита создания подключений к PostgreSQL
+)
 from core.ui_utils import fix_uuid_columns
 
 

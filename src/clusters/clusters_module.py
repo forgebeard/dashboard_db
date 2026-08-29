@@ -3,6 +3,7 @@
 
 import streamlit as st
 
+from clusters.clusters_utils import fetch_clusters_data, process_cluster_dataframe
 from core.constants import (
     cluster_health_counts,
     cluster_status_from_hosts,
@@ -16,7 +17,6 @@ from core.ui_utils import (
     render_page_header,
     style_status_column,
 )
-from clusters.clusters_utils import fetch_clusters_data, process_cluster_dataframe
 
 CLUSTER_FILTER_DEFAULTS = {
     "cluster_dc_filter": "Все ДЦ",

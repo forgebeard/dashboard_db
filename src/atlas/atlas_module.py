@@ -3,8 +3,9 @@
 Координирует загрузку данных, фильтрацию и отрисовку.
 """
 
-import streamlit as st
 from collections import defaultdict
+
+import streamlit as st
 
 # Внутренние импорты пакета atlas
 from .data_loader import load_atlas_data

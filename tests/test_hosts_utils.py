@@ -1,19 +1,16 @@
 """
 Unit-тесты для src/hosts/hosts_utils.py.
 """
-import pytest
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
-from unittest.mock import patch, MagicMock, ANY
-import sys
-from pathlib import Path
 
 # Импортируем модуль
 from hosts.hosts_utils import (
-    process_host_dataframe, 
-    fetch_hosts_data, 
-    load_host_infrastructure_maps
+    fetch_hosts_data,
+    load_host_infrastructure_maps,
+    process_host_dataframe,
 )
-from core.constants import HOST_STATUS_MAP
 
 # --- Тесты для process_host_dataframe (Чистая логика) ---
 

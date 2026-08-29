@@ -1,8 +1,9 @@
 # tests/test_tasks_utils.py
-import pytest
-import pandas as pd
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
+import pytest
 
 from tasks.tasks_diagnostics import render_tasks_diagnostics
 from tasks.tasks_module import render_tasks_list

@@ -4,16 +4,17 @@
 """
 
 import pandas as pd
-from sqlalchemy import text
 import streamlit as st
+from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
 from core.constants import (
     HOST_MAINTENANCE_CODES,
     HOST_STATUS_MAP,
     HOST_STATUS_UP,
     host_is_problem,
 )
+from core.db_utils import get_sqlalchemy_engine
+
 
 def load_host_infrastructure_maps(active_db):
     """Загружает маппинги ДЦ и Кластеров для фильтрации хостов."""

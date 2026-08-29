@@ -88,12 +88,8 @@ def test_fetch_no_status_in_sql(mock_engine, mock_read_sql):
     sql_text = str(mock_read_sql.call_args[0][0])
     sql_l = sql_text.lower()
     assert "imagestatus IN" not in sql_text
-    assert "limit 500" in sql_l
-    assert "max(creation_date)" in sql_l
-    assert "newest.image_group_id" in sql_l
-    assert sql_l.count("limit 500") == 1
-    after_outer_group = sql_l.rsplit("group by", 1)[-1]
-    assert "limit 500" not in after_outer_group
+    assert "limit 500" not in sql_l
+    assert "newest.image_group_id" not in sql_l
 
 
 @patch("disks.disks_utils.pd.read_sql")

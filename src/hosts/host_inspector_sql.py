@@ -12,9 +12,7 @@ from typing import Any
 
 from core.constants import HOST_STATUS_MAP
 from core.inspector_base import InspectorBase
-
-BAR_DOUBLE = "═" * 78
-BAR_SINGLE = "─" * 78
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv
 
 KDUMP_MAP = {0: "Disabled", 1: "Enabled", 2: "Timeout"}
 
@@ -57,11 +55,6 @@ def _fmt_date(dt: Any) -> str:
     if parsed is None:
         return "—"
     return parsed.strftime("%d.%m.%Y %H:%M")
-
-
-def _kv(label: str, value: Any, width: int = 16) -> str:
-    text = "—" if value is None or value == "" else str(value)
-    return f"  {(label + ':'):<{width}}{text}"
 
 
 def _fmt_speed(mbps: Any) -> str:
@@ -271,7 +264,7 @@ def format_host_report(payload: dict[str, Any]) -> str:
                         extra.append(f"MAC {mac}")
                     tail = ("    " + "    ".join(extra)) if extra else ""
                     lines.append(
-                        f"    {str(iface.get('name') or '—'):<14}{iface.get('addr') or '—'}{tail}"
+                        f"    {iface.get('name') or '—'!s:<14}{iface.get('addr') or '—'}{tail}"
                     )
                 lines.append("")
             for bond in grouped["bonds"]:
@@ -319,7 +312,7 @@ def format_host_report(payload: dict[str, Any]) -> str:
                     if mac:
                         extra.append(f"MAC {mac}")
                     tail = ("    " + "    ".join(extra)) if extra else ""
-                    lines.append(f"    {str(iface.get('name') or '—'):<14}{tail}".rstrip())
+                    lines.append(f"    {iface.get('name') or '—'!s:<14}{tail}".rstrip())
 
     lines += ["", "ЖУРНАЛ СОБЫТИЙ (последние 5)", BAR_SINGLE]
     if section_errors.get("events"):

@@ -5,19 +5,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from core.constants import mapped_code_label, IMAGE_STATUS_MAP
+from core.constants import IMAGE_STATUS_MAP, mapped_code_label
 from core.inspector_base import InspectorBase
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 from vms.vm_inspector_sql import (
-    BAR_DOUBLE,
-    BAR_SINGLE,
     _fmt_size_bytes,
     _fmt_ts,
     _id_text,
-    _kv,
-    _kv_at,
     _norm_id,
     _volume_bit,
-    _yes_no,
     order_layers_by_parent,
     snapshot_type_label,
 )

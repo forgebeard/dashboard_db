@@ -11,7 +11,11 @@ from core.ui_utils import (
     render_page_header,
     style_status_column,
 )
-from disks.disks_utils import fetch_disks_data, prepare_disk_rows, process_disks_dataframe
+from disks.disks_utils import (
+    fetch_disks_data,
+    prepare_disk_rows,
+    process_disks_dataframe,
+)
 
 DISK_FILTER_DEFAULTS = {
     "disk_search_name": "",
@@ -81,16 +85,11 @@ def render_disks_list(active_db, cluster_meta):
         else raw_df
     )
 
-    no_search = not any([search_disk, search_vm, search_sd])
     with header_box:
         render_page_header(
             "Диски и образы",
             active_db,
-            details=[
-                f"последние {counts['total']}"
-                if no_search
-                else f"{counts['total']} дисков"
-            ],
+            details=[f"{counts['total']} дисков"],
         )
 
     if raw_df.empty:
