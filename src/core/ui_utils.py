@@ -122,6 +122,10 @@ def render_page_header(
     """Заголовок раздела и контекст дампа."""
     st.subheader(title)
     parts = [f"`{db_name}`"]
+    meta = st.session_state.get("cluster_meta") or {}
+    release = meta.get("engine_release")
+    if release:
+        parts.append(str(release))
     if details:
         parts.extend(str(item) for item in details if item)
     st.caption(" · ".join(parts))

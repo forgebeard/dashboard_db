@@ -11,6 +11,7 @@
 # --- СТАНДАРТНЫЕ БИБЛИОТЕКИ ---
 import logging  # Логирование процесса загрузки метаданных и ошибок
 import os  # Доступ к переменным окружения (METADATA_CACHE_TTL)
+from typing import Any
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
 import streamlit as st  # Декоратор кэширования данных (@st.cache_data)
@@ -28,6 +29,34 @@ logger = logging.getLogger(__name__)
 
 # TTL кэша метаданных (секунды). Можно переопределить через env-переменную
 _CACHE_TTL = int(os.getenv("METADATA_CACHE_TTL", "300"))
+
+_ENGINE_RELEASE_MARKERS_SQL = """
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN (
+      'host_template',
+      'infrastructure_backups',
+      'infrastructure_backup'
+  )
+"""
+
+
+def detect_engine_release(engine: Engine) -> str | None:
+    """RED Virt 8 / 7.3 по таблицам-маркерам; None если дамп обрезан."""
+    try:
+        df = read_sql_df(engine, text(_ENGINE_RELEASE_MARKERS_SQL))
+    except DataLoadError as exc:
+        logger.warning("Не удалось определить версию Engine: %s", exc)
+        return None
+    names = set()
+    if not df.empty and "table_name" in df.columns:
+        names = {str(name) for name in df["table_name"].dropna()}
+    if "host_template" in names or "infrastructure_backups" in names:
+        return "РЕД ВИРТ 8"
+    if "infrastructure_backup" in names:
+        return "РЕД ВИРТ 7.3"
+    return None
 
 
 def _safe_load_dict(engine: Engine, query: str, id_col: str, name_col: str) -> dict[str, str]:
@@ -65,7 +94,7 @@ def _safe_load_dict(engine: Engine, query: str, id_col: str, name_col: str) -> d
 
 
 @st.cache_data(ttl=_CACHE_TTL)
-def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
+def load_cluster_metadata(db_name: str) -> dict[str, Any]:
     """
     Загружает основные справочники кластера и связи инфраструктуры.
     
@@ -77,7 +106,7 @@ def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
         
     Returns:
         Словарь со справочниками: clusters, storage_domains, hosts, datacenters,
-                                  dc_to_clusters, cluster_to_hosts
+                                  dc_to_clusters, cluster_to_hosts, engine_release
     """
     if not db_name:
         logger.warning("Попытка загрузки метаданных с пустым db_name")
@@ -86,7 +115,7 @@ def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
     logger.info(f"Загрузка метаданных для БД: {db_name} (кэш промах)")
     
     engine: Engine = get_sqlalchemy_engine(db_name)
-    metadata: dict[str, dict | list] = {}
+    metadata: dict[str, Any] = {}
 
     # 1. Кластеры
     metadata['clusters'] = _safe_load_dict(
@@ -145,6 +174,8 @@ def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
     except DataLoadError as e:
         logger.warning(f"Ошибка загрузки связей Кластер->Хосты: {e}")
         metadata['cluster_to_hosts'] = {}
+
+    metadata["engine_release"] = detect_engine_release(engine)
 
     logger.info(f"Метаданные для '{db_name}' загружены: "
                 f"DC={len(metadata.get('datacenters', {}))}, "

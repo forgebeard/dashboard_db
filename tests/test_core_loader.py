@@ -70,7 +70,8 @@ def test_load_cluster_metadata_structure(mock_db_dependencies):
         pd.DataFrame({'vds_id': ['h1'], 'vds_name': ['Host1']}),
         pd.DataFrame({'id': ['dc1'], 'name': ['DC1']}),
         pd.DataFrame({'spid': ['dc1'], 'cid': ['c1']}),
-        pd.DataFrame({'cid': ['c1'], 'vid': ['h1']})
+        pd.DataFrame({'cid': ['c1'], 'vid': ['h1']}),
+        pd.DataFrame({'table_name': ['host_template']}),
     ]
     mock_db_dependencies["read_sql"].side_effect = dfs
     result = load_cluster_metadata("test_db")
@@ -79,6 +80,7 @@ def test_load_cluster_metadata_structure(mock_db_dependencies):
     assert 'hosts' in result
     assert result['clusters'] == {'c1': 'Cluster1'}
     assert result['hosts'] == {'h1': 'Host1'}
+    assert result["engine_release"] == "РЕД ВИРТ 8"
     mock_db_dependencies["engine"].dispose.assert_not_called()
 
 def test_load_cluster_metadata_empty_db(mock_db_dependencies):
@@ -87,6 +89,7 @@ def test_load_cluster_metadata_empty_db(mock_db_dependencies):
     result = load_cluster_metadata("empty_db")
     assert result['clusters'] == {}
     assert result['hosts'] == {}
+    assert result["engine_release"] is None
     mock_db_dependencies["engine"].dispose.assert_not_called()
 
 
@@ -131,3 +134,28 @@ def test_host_ids_for_infra_filters():
     assert host_ids_for_infra_filters(maps, "DC_PROD", "Cluster_A", "Host_B") == ["h-2"]
     assert host_ids_for_infra_filters(maps, "DC_EMPTY", "Все кластеры", "Все хосты") == []
     assert host_ids_for_infra_filters(maps, "Все ДЦ", "Cluster_Empty", "Все хосты") == []
+
+
+def test_detect_engine_release_8(mock_db_dependencies):
+    from core.data_loader import detect_engine_release
+
+    mock_db_dependencies["read_sql"].return_value = pd.DataFrame(
+        {"table_name": ["host_template", "infrastructure_backups"]}
+    )
+    assert detect_engine_release(mock_db_dependencies["engine"]) == "РЕД ВИРТ 8"
+
+
+def test_detect_engine_release_73(mock_db_dependencies):
+    from core.data_loader import detect_engine_release
+
+    mock_db_dependencies["read_sql"].return_value = pd.DataFrame(
+        {"table_name": ["infrastructure_backup"]}
+    )
+    assert detect_engine_release(mock_db_dependencies["engine"]) == "РЕД ВИРТ 7.3"
+
+
+def test_detect_engine_release_unknown(mock_db_dependencies):
+    from core.data_loader import detect_engine_release
+
+    mock_db_dependencies["read_sql"].return_value = pd.DataFrame()
+    assert detect_engine_release(mock_db_dependencies["engine"]) is None
