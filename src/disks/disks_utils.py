@@ -57,6 +57,22 @@ def fetch_disks_data(
         WHERE TRUE
     """
 
+    no_search = not any([search_disk, search_vm, search_sd])
+    if no_search:
+        base_sql = base_sql.replace(
+            "FROM images i\n        JOIN base_disks bd ON i.image_group_id = bd.disk_id",
+            """FROM images i
+        JOIN (
+            SELECT image_group_id
+            FROM images
+            GROUP BY image_group_id
+            ORDER BY MAX(creation_date) DESC
+            LIMIT 500
+        ) newest ON newest.image_group_id = i.image_group_id
+        JOIN base_disks bd ON i.image_group_id = bd.disk_id""",
+            1,
+        )
+
     conditions = []
     params: dict[str, object] = {}
 
@@ -89,12 +105,8 @@ def fetch_disks_data(
             did.actual_size,
             i.active,
             i.creation_date
+        ORDER BY bd.disk_alias
     """
-
-    if not any([search_disk, search_vm, search_sd]):
-        base_sql += " ORDER BY i.creation_date DESC LIMIT 500"
-    else:
-        base_sql += " ORDER BY bd.disk_alias"
 
     try:
         engine = get_sqlalchemy_engine(active_db)

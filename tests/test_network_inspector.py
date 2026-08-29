@@ -1,6 +1,11 @@
 """Юнит-тесты Network-Inspector без БД."""
 
-from networks.network_inspector_sql import HOST_ATTACHMENTS_SQL, format_network_report
+from networks.network_inspector_sql import (
+    HOST_ATTACHMENTS_SQL,
+    NETWORK_VMS_SQL,
+    VM_LIST_LIMIT,
+    format_network_report,
+)
 
 NET_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 CLUSTER_A = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -131,6 +136,26 @@ def test_two_vms_full_uuid():
     assert VM_B in vms
     assert "web-01" in vms
     assert "web-02" in vms
+    assert "показаны первые 50" not in text
+
+
+def test_fifty_vms_caption():
+    vms = [
+        {
+            "vm_name": f"vm-{i:02d}",
+            "vm_id": f"{i:08x}-aaaa-bbbb-cccc-0000000000aa",
+            "mac_addr": "00:1a:4a:16:01:01",
+            "profile_name": "ovirtmgmt",
+        }
+        for i in range(VM_LIST_LIMIT)
+    ]
+    text = format_network_report(_payload(vms=vms))
+    assert "показаны первые 50" in text.split("\nВМ\n")[1]
+
+
+def test_vms_sql_limited_to_50():
+    sql = " ".join(NETWORK_VMS_SQL.lower().split())
+    assert sql.endswith("limit 50")
 
 
 def test_unknown_type_and_cluster_status_codes():

@@ -74,12 +74,14 @@ def fetch_snapshots_data(
             s.snapshot_type,
             i.image_guid::text AS image_guid,
             i.size,
+            did.actual_size,
             i.imagestatus AS _image_status_code,
             sd.storage_name
         FROM snapshots s
         JOIN vm_static v ON s.vm_id = v.vm_guid
         JOIN cluster c ON v.cluster_id = c.cluster_id
         LEFT JOIN images i ON s.snapshot_id = i.vm_snapshot_id
+        LEFT JOIN disk_image_dynamic did ON did.image_id = i.image_guid
         LEFT JOIN image_storage_domain_map isdm ON i.image_guid = isdm.image_id
         LEFT JOIN storage_domain_static sd ON isdm.storage_domain_id = sd.id
         WHERE TRUE
@@ -95,6 +97,7 @@ def fetch_snapshots_data(
             NULL::text AS snapshot_type,
             i.image_guid::text AS image_guid,
             i.size,
+            did.actual_size,
             i.imagestatus AS _image_status_code,
             sd.storage_name
         FROM images i
@@ -103,6 +106,7 @@ def fetch_snapshots_data(
         JOIN vm_static v ON v.vm_guid = vd.vm_id
         JOIN cluster c ON v.cluster_id = c.cluster_id
         LEFT JOIN snapshots s ON s.snapshot_id = i.vm_snapshot_id
+        LEFT JOIN disk_image_dynamic did ON did.image_id = i.image_guid
         LEFT JOIN image_storage_domain_map isdm ON i.image_guid = isdm.image_id
         LEFT JOIN storage_domain_static sd ON isdm.storage_domain_id = sd.id
         WHERE (
@@ -202,7 +206,7 @@ def prepare_snapshot_rows(df: pd.DataFrame) -> pd.DataFrame:
         first = group.iloc[0]
         layers = group.drop_duplicates(subset=["image_guid"], keep="first")
         codes = [_int_status(v) for v in layers["_image_status_code"]]
-        sizes = pd.to_numeric(layers["size"], errors="coerce")
+        sizes = pd.to_numeric(layers["actual_size"], errors="coerce")
         size_sum = float(sizes.sum()) if sizes.notna().any() else None
         layer_ids = [
             str(guid).strip()

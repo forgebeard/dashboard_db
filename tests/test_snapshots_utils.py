@@ -19,6 +19,7 @@ def _row(**kwargs):
         "snapshot_type": "REGULAR",
         "image_guid": "img-a",
         "size": GIB,
+        "actual_size": GIB,
         "_image_status_code": 1,
         "storage_name": "data01",
     }
@@ -33,8 +34,8 @@ def test_process_empty_dataframe():
 def test_two_images_same_snapshot_collapse():
     df = pd.DataFrame(
         [
-            _row(image_guid="img-1", size=10 * GIB),
-            _row(image_guid="img-2", size=5 * GIB, storage_name="data02"),
+            _row(image_guid="img-1", size=10 * GIB, actual_size=10 * GIB),
+            _row(image_guid="img-2", size=5 * GIB, actual_size=5 * GIB, storage_name="data02"),
         ]
     )
     result = process_snapshot_dataframe(df)
@@ -51,8 +52,8 @@ def test_two_images_same_snapshot_collapse():
 def test_same_image_two_storages_does_not_double_size():
     df = pd.DataFrame(
         [
-            _row(image_guid="img-1", size=10 * GIB, storage_name="data01"),
-            _row(image_guid="img-1", size=10 * GIB, storage_name="data02"),
+            _row(image_guid="img-1", size=99 * GIB, actual_size=10 * GIB, storage_name="data01"),
+            _row(image_guid="img-1", size=99 * GIB, actual_size=10 * GIB, storage_name="data02"),
         ]
     )
     result = process_snapshot_dataframe(df)
@@ -115,6 +116,12 @@ def test_display_columns_and_types():
     ]
     assert list(result["Тип"]) == ["REGULAR", "ACTIVE"]
     assert "Снапшот" not in result.columns
+
+
+def test_missing_actual_size_is_empty_not_zero():
+    df = pd.DataFrame([_row(actual_size=None)])
+    result = process_snapshot_dataframe(df)
+    assert result.iloc[0]["Размер"] is None or pd.isna(result.iloc[0]["Размер"])
 
 
 def test_health_filter_ok_and_problems():
@@ -194,6 +201,8 @@ def test_fetch_sql_no_status_filter(mock_engine, mock_read_sql):
     assert "vm_snapshot_id" in sql_text
     assert "s.snapshot_id" in sql_text
     assert "imagestatus IN" not in sql_text
+    assert "did.actual_size" in sql_text
+    assert sql_l.count("disk_image_dynamic") == 2
 
 
 @patch("snapshots.snapshots_utils.pd.read_sql")

@@ -9,6 +9,22 @@ from core.constants import NETWORK_STATUS_MAP, mapped_code_label
 from core.inspector_base import InspectorBase
 from vms.vm_inspector_sql import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
 
+VM_LIST_LIMIT = 50
+
+NETWORK_VMS_SQL = f"""
+SELECT
+    vm.vm_name,
+    vm.vm_guid::text AS vm_id,
+    vni.mac_addr,
+    vp.name AS profile_name
+FROM vm_interface vni
+JOIN vnic_profiles vp ON vni.vnic_profile_id = vp.id
+JOIN vm_static vm ON vni.vm_guid = vm.vm_guid
+WHERE vp.network_id::text = :network_id
+ORDER BY vm.vm_name, vni.name
+LIMIT {VM_LIST_LIMIT}
+"""
+
 HOST_ATTACHMENTS_SQL = """
 SELECT
     v.vds_name,
@@ -144,6 +160,8 @@ def format_network_report(payload: dict[str, Any]) -> str:
     elif not vms:
         lines.append("  нет ВМ")
     else:
+        if len(vms) == VM_LIST_LIMIT:
+            lines.append("  показаны первые 50")
         for row in vms:
             lines.append(_kv_at("    ", "ВМ", row.get("vm_name") or "—"))
             lines.append(_kv_at("    ", "UUID", row.get("vm_id")))
@@ -263,21 +281,7 @@ def get_network_inspector_report(db_name: str, network_id: str) -> dict:
 
             vms: list[dict[str, Any]] = []
             try:
-                vms = insp.fetch_all(
-                    """
-                    SELECT
-                        vm.vm_name,
-                        vm.vm_guid::text AS vm_id,
-                        vni.mac_addr,
-                        vp.name AS profile_name
-                    FROM vm_interface vni
-                    JOIN vnic_profiles vp ON vni.vnic_profile_id = vp.id
-                    JOIN vm_static vm ON vni.vm_guid = vm.vm_guid
-                    WHERE vp.network_id::text = :network_id
-                    ORDER BY vm.vm_name, vni.name
-                    """,
-                    params,
-                )
+                vms = insp.fetch_all(NETWORK_VMS_SQL, params)
             except Exception as exc:
                 section_errors["vms"] = str(exc)
 
