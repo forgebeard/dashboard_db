@@ -15,6 +15,7 @@ APP_LAYOUT = "wide"               # Режим разметки: 'centered' (у�
 DEFAULT_ROW_LIMIT = 50      # Стандартный лимит строк для превью таблиц
 MAX_ROW_LIMIT = 2000        # Жесткий потолок защиты от переполнения памяти Streamlit
 ROW_STEP = 10               # Шаг изменения лимита в виджете number_input
+STATEMENT_TIMEOUT_MS = 30000  # PostgreSQL statement_timeout (мс); LIMIT не ограничивает время JOIN/ORDER BY
 
 # --- НАСТРОЙКИ ОТОБРАЖЕНИЯ (UI) ---
 DATAFRAME_HEIGHT = 500      # Потолок высоты st.dataframe (px)

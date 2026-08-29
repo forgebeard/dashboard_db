@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
 from core.constants import (
@@ -13,7 +12,7 @@ from core.constants import (
     STORAGE_TYPE_MAP,
     storage_is_problem,
 )
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
 
 
 def fetch_storage_data(
@@ -74,14 +73,10 @@ def fetch_storage_data(
         ORDER BY sds.storage_name
     """
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        return pd.read_sql(
-            text(base_sql), engine, params=sql_params if sql_params else None
-        )
-    except Exception as e:
-        st.error(f"Ошибка загрузки хранилищ: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    return read_sql_df(
+        engine, text(base_sql), params=sql_params if sql_params else None
+    )
 
 
 def _resolve_health_filter(show_problems: bool, health_filter: str | None) -> str:

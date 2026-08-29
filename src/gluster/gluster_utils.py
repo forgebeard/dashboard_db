@@ -6,13 +6,13 @@
 """
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import pandas as pd  # Работа с табличными данными и выполнение SQL-запросов
-import streamlit as st  # Фреймворк UI (используется для вывода ошибок/предупреждений)
-from sqlalchemy import text  # Безопасное формирование параметризованных SQL-запросов
+import pandas as pd
+from sqlalchemy import text
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА (CORE) ---
 from core.db_utils import (
-    get_sqlalchemy_engine,  # Утилита создания подключений к PostgreSQL
+    get_sqlalchemy_engine,
+    read_sql_df,
 )
 from core.ui_utils import fix_uuid_columns
 
@@ -71,13 +71,9 @@ def fetch_gluster_volumes(
         
     base_sql += " ORDER BY v.vol_name"
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(text(base_sql), engine, params=sql_params if sql_params else None)
-        return fix_uuid_columns(df)
-    except Exception as e:
-        st.error(f"Ошибка загрузки томов Gluster: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    df = read_sql_df(engine, text(base_sql), params=sql_params if sql_params else None)
+    return fix_uuid_columns(df)
 
 
 def process_gluster_dataframe(df: pd.DataFrame) -> pd.DataFrame:

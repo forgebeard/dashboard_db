@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
 from core.ui_utils import fix_uuid_columns
 
 
@@ -51,15 +50,11 @@ def fetch_networks_data(
         base_sql += " AND " + " AND ".join(conditions)
     base_sql += " ORDER BY n.name"
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(
-            text(base_sql), engine, params=sql_params if sql_params else None
-        )
-        return fix_uuid_columns(df)
-    except Exception as e:
-        st.error(f"Ошибка загрузки сетей: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    df = read_sql_df(
+        engine, text(base_sql), params=sql_params if sql_params else None
+    )
+    return fix_uuid_columns(df)
 
 
 def process_networks_dataframe(

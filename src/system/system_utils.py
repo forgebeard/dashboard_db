@@ -1,12 +1,16 @@
 # src/system/system_utils.py
 """Данные раздела «Системные»: сессии, фенсинг, квоты, трансферы."""
 
+import logging
+
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.exceptions import DataLoadError
 from core.ui_utils import fix_uuid_columns
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_TAB_SQL = {
     "sessions": """
@@ -81,13 +85,9 @@ def fence_agents_caption(fence_configured: int) -> str:
 
 def fetch_system_tab(active_db: str, tab_id: str) -> pd.DataFrame:
     sql = SYSTEM_TAB_SQL[tab_id]
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(text(sql), engine)
-        return fix_uuid_columns(df)
-    except Exception as e:
-        st.error(f"Ошибка загрузки «{SYSTEM_TAB_LABELS.get(tab_id, tab_id)}»: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    df = read_sql_df(engine, text(sql))
+    return fix_uuid_columns(df)
 
 
 def get_system_summary(active_db: str) -> dict:
@@ -101,14 +101,15 @@ def get_system_summary(active_db: str) -> dict:
     }
     try:
         engine = get_sqlalchemy_engine(active_db)
-        df_ver = pd.read_sql(
-            text("SELECT version FROM schema_version WHERE current = true LIMIT 1"),
+        df_ver = read_sql_df(
             engine,
+            text("SELECT version FROM schema_version WHERE current = true LIMIT 1"),
         )
         if not df_ver.empty:
             summary["schema_version"] = df_ver.iloc[0]["version"]
 
-        counts = pd.read_sql(
+        counts = read_sql_df(
+            engine,
             text(
                 """
             SELECT
@@ -120,7 +121,6 @@ def get_system_summary(active_db: str) -> dict:
                 (SELECT COUNT(*) FROM quota) as quota
             """
             ),
-            engine,
         )
         if not counts.empty:
             row = counts.iloc[0]
@@ -129,6 +129,6 @@ def get_system_summary(active_db: str) -> dict:
             summary["active_transfers"] = int(row["trans"])
             summary["custom_options"] = int(row["opts"])
             summary["quota_count"] = int(row["quota"])
-    except Exception as e:
-        st.warning(f"Не удалось загрузить сводку: {e}")
+    except (DataLoadError, Exception) as e:
+        logger.warning("Не удалось загрузить сводку: %s", e)
     return summary

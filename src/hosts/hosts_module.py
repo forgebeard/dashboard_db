@@ -4,11 +4,13 @@
 import streamlit as st
 
 from core.constants import host_health_counts, host_status_tone
+from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
+    render_load_error,
     render_page_header,
     style_status_column,
 )
@@ -80,7 +82,11 @@ def render_hosts_list(active_db, cluster_meta):
             render_clear_filters_button(HOST_FILTER_DEFAULTS, key="host_clear_filters")
 
     filters = (selected_dc_name, selected_cluster_name, search_term)
-    raw_df = fetch_hosts_data(active_db, filters, clusters, dc_id_to_name)
+    try:
+        raw_df = fetch_hosts_data(active_db, filters, clusters, dc_id_to_name)
+    except DataLoadError as exc:
+        render_load_error(exc, "хостов")
+        return
     counts = host_health_counts(raw_df["status_code"] if not raw_df.empty else [])
 
     health = "all"

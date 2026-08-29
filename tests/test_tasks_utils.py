@@ -36,7 +36,7 @@ class TestTasksDiagnostics:
 
     @patch("core.table_preview.st")
     @patch("core.table_preview.get_sqlalchemy_engine")
-    @patch("core.table_preview.pd.read_sql_query")
+    @patch("core.table_preview.read_sql_df")
     def test_render_success(self, mock_read_sql, mock_get_engine, mock_st, mock_active_db):
         mock_engine = MagicMock()
         mock_get_engine.return_value = mock_engine
@@ -186,7 +186,7 @@ class TestTasksModuleSQL:
     @patch("tasks.tasks_module.st")
     @patch("tasks.tasks_module.get_sqlalchemy_engine")
     @patch("tasks.tasks_module.load_audit_infrastructure_maps")
-    @patch("tasks.tasks_module.pd.read_sql")
+    @patch("tasks.tasks_module.read_sql_df")
     def test_sql_generation_with_host_filter(
         self, mock_read_sql, mock_load_maps, mock_get_engine, mock_st, mock_ui_st,
         mock_active_db, mock_infra_maps
@@ -205,12 +205,12 @@ class TestTasksModuleSQL:
 
         render_tasks_list(mock_active_db)
 
-        corr_sql = str(mock_read_sql.call_args_list[0][0][0])
+        corr_sql = str(mock_read_sql.call_args_list[0][0][1])
         assert "IN :h_ids" in corr_sql
         assert mock_read_sql.call_args_list[0][1]["params"]["h_ids"] == ("h-1",)
 
         main_call = mock_read_sql.call_args_list[1]
-        sql_text = str(main_call[0][0])
+        sql_text = str(main_call[0][1])
         assert "IN :corr_ids" in sql_text or "IN (" in sql_text
         params = main_call[1]["params"]
         assert "corr_ids" in params
@@ -224,7 +224,7 @@ class TestTasksModuleSQL:
     @patch("tasks.tasks_module.st")
     @patch("tasks.tasks_module.get_sqlalchemy_engine")
     @patch("tasks.tasks_module.load_audit_infrastructure_maps")
-    @patch("tasks.tasks_module.pd.read_sql")
+    @patch("tasks.tasks_module.read_sql_df")
     def test_dc_filter_uses_all_cluster_hosts(
         self, mock_read_sql, mock_load_maps, mock_get_engine, mock_st, mock_ui_st,
         mock_active_db, mock_infra_maps
@@ -250,7 +250,7 @@ class TestTasksModuleSQL:
     @patch("tasks.tasks_module.st")
     @patch("tasks.tasks_module.get_sqlalchemy_engine")
     @patch("tasks.tasks_module.load_audit_infrastructure_maps")
-    @patch("tasks.tasks_module.pd.read_sql")
+    @patch("tasks.tasks_module.read_sql_df")
     def test_empty_correlation_ids_returns_nothing(
         self, mock_read_sql, mock_load_maps, mock_get_engine, mock_st, mock_ui_st,
         mock_active_db, mock_infra_maps
@@ -263,7 +263,7 @@ class TestTasksModuleSQL:
         render_tasks_list(mock_active_db)
 
         main_call = mock_read_sql.call_args_list[1]
-        sql_text = str(main_call[0][0])
+        sql_text = str(main_call[0][1])
         assert "AND 1=0" in sql_text
 
 

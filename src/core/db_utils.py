@@ -11,6 +11,7 @@
 import logging  # Логирование ошибок и событий подключения
 import os  # Чтение переменных окружения (.env) для параметров подключения
 
+import pandas as pd
 import psycopg2  # Драйвер PostgreSQL для служебных запросов (системные таблицы)
 import streamlit as st  # Декоратор кэширования ресурсов (@st.cache_resource)
 from dotenv import (
@@ -23,6 +24,11 @@ from sqlalchemy import (  # Создание DB-движка, безопасны
     create_engine,
     text,
 )
+from sqlalchemy.engine import Engine
+from sqlalchemy.sql.expression import TextClause
+
+from core.config import STATEMENT_TIMEOUT_MS
+from core.exceptions import DataLoadError, format_load_error
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -31,8 +37,11 @@ logger = logging.getLogger(__name__)
 DB_SCHEMA = "public"              # Схема по умолчанию для oVirt Engine
 CONNECT_TIMEOUT = 10              # Таймаут соединения в секундах
 ENGINE_CACHE_MAXSIZE = 8          # Максимум кэшированных движков (для локальных дампов достаточно)
-# Сессия PostgreSQL только на чтение (диагностика дампов, без DML).
-PG_READ_ONLY_OPTIONS = "-c default_transaction_read_only=on"
+# Сессия PostgreSQL: только чтение + потолок времени запроса.
+PG_READ_ONLY_OPTIONS = (
+    "-c default_transaction_read_only=on "
+    f"-c statement_timeout={STATEMENT_TIMEOUT_MS}ms"
+)
 
 
 def get_db_params(db_name: str | None = None) -> dict[str, str | int]:
@@ -113,6 +122,36 @@ def get_sqlalchemy_engine(db_name: str):
         pool_size=5,
         max_overflow=10,
     )
+
+
+def read_sql_df(
+    engine: Engine,
+    sql: str | TextClause,
+    params: dict | None = None,
+) -> pd.DataFrame:
+    """Выполняет SELECT и при ошибке драйвера/таймауте поднимает DataLoadError."""
+    try:
+        stmt = sql if isinstance(sql, TextClause) else text(sql)
+        return pd.read_sql(stmt, engine, params=params)
+    except DataLoadError:
+        raise
+    except Exception as exc:
+        raise DataLoadError(format_load_error(exc)) from exc
+
+
+def load_sql_df(
+    db_name: str,
+    sql: str | TextClause,
+    params: dict | None = None,
+) -> pd.DataFrame:
+    """Движок по имени БД + read_sql_df. Ошибки подключения тоже DataLoadError."""
+    try:
+        engine = get_sqlalchemy_engine(db_name)
+    except DataLoadError:
+        raise
+    except Exception as exc:
+        raise DataLoadError(format_load_error(exc)) from exc
+    return read_sql_df(engine, sql, params)
 
 
 def get_available_databases() -> list[str]:

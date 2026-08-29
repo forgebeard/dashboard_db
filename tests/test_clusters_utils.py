@@ -81,20 +81,20 @@ def test_process_cluster_dataframe_empty():
     assert process_cluster_dataframe(pd.DataFrame(), {}).empty
 
 
-@patch("clusters.clusters_utils.pd.read_sql")
+@patch("clusters.clusters_utils.read_sql_df")
 @patch("clusters.clusters_utils.get_sqlalchemy_engine")
 def test_fetch_clusters_data_no_filters(mock_get_engine, mock_read_sql):
     mock_get_engine.return_value = MagicMock()
     mock_read_sql.return_value = pd.DataFrame({"cluster_id": ["c1"]})
     df = fetch_clusters_data("test_db", ("Все ДЦ", ""), {})
     assert not df.empty
-    sql = str(mock_read_sql.call_args[0][0])
+    sql = str(mock_read_sql.call_args[0][1])
     assert "host_problems" in sql
     assert "FILTER" in sql
     assert mock_read_sql.call_args.kwargs.get("params") in (None, {})
 
 
-@patch("clusters.clusters_utils.pd.read_sql")
+@patch("clusters.clusters_utils.read_sql_df")
 @patch("clusters.clusters_utils.get_sqlalchemy_engine")
 def test_fetch_clusters_data_dc_and_search(mock_get_engine, mock_read_sql):
     mock_get_engine.return_value = MagicMock()

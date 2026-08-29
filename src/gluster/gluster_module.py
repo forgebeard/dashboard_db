@@ -2,10 +2,12 @@
 
 import streamlit as st
 
+from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
+    render_load_error,
     render_page_header,
 )
 from gluster.gluster_utils import fetch_gluster_volumes, process_gluster_dataframe
@@ -49,7 +51,11 @@ def render_gluster_list(active_db: str, cluster_meta: dict) -> None:
                 GLUSTER_FILTER_DEFAULTS, key="gluster_clear_filters"
             )
 
-    raw_df = fetch_gluster_volumes(active_db, (selected_cluster, search_term))
+    try:
+        raw_df = fetch_gluster_volumes(active_db, (selected_cluster, search_term))
+    except DataLoadError as exc:
+        render_load_error(exc, "томов Gluster")
+        return
     display_df = process_gluster_dataframe(raw_df) if not raw_df.empty else raw_df
 
     with header_box:

@@ -1,7 +1,6 @@
 # src/tasks/tasks_module.py
 """Список async-задач: фильтры, pills и сущности задачи по клику."""
 
-import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
@@ -12,12 +11,14 @@ from core.constants import (
     async_task_result_tone,
 )
 from core.data_loader import host_ids_for_infra_filters
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
+    render_load_error,
     render_page_header,
     style_status_column,
 )
@@ -125,11 +126,11 @@ def render_tasks_list(active_db, cluster_meta=None):
             )
             try:
                 engine_temp = get_sqlalchemy_engine(active_db)
-                df_corr = pd.read_sql(text(audit_sql), engine_temp, params=audit_params)
+                df_corr = read_sql_df(engine_temp, text(audit_sql), params=audit_params)
                 allowed_correlation_ids = (
                     df_corr["correlation_id"].tolist() if not df_corr.empty else []
                 )
-            except Exception:
+            except DataLoadError:
                 allowed_correlation_ids = None
 
     sql, params = build_tasks_list_sql(
@@ -142,10 +143,9 @@ def render_tasks_list(active_db, cluster_meta=None):
 
     try:
         engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(sql, engine, params=params)
-    except Exception as e:
-        st.error(f"Ошибка загрузки задач: {e}")
-        st.exception(e)
+        df = read_sql_df(engine, sql, params=params)
+    except DataLoadError as e:
+        render_load_error(e, "задач")
         return
 
     pairs = (
@@ -222,7 +222,7 @@ def render_tasks_list(active_db, cluster_meta=None):
     )
     try:
         ent_sql, ent_params = build_task_entities_sql(task_id)
-        entities = pd.read_sql(text(ent_sql), engine, params=ent_params)
+        entities = read_sql_df(engine, text(ent_sql), params=ent_params)
         detail = process_task_entities(entities)
         if detail.empty:
             st.info("Объекты не привязаны.")
@@ -233,5 +233,5 @@ def render_tasks_list(active_db, cluster_meta=None):
                 hide_index=True,
                 height=dataframe_height(len(detail)),
             )
-    except Exception as e:
-        st.error(f"Не удалось загрузить объекты задачи: {e}")
+    except DataLoadError as e:
+        render_load_error(e, "объектов задачи")

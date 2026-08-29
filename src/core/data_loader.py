@@ -13,15 +13,16 @@ import logging  # Логирование процесса загрузки ме�
 import os  # Доступ к переменным окружения (METADATA_CACHE_TTL)
 
 # --- СТОРОННИЕ БИБЛИОТЕКИ ---
-import pandas as pd  # Работа с табличными данными и SQL-запросами
 import streamlit as st  # Декоратор кэширования данных (@st.cache_data)
 from sqlalchemy import text  # Безопасное выполнение параметризованных SQL-выражений
 from sqlalchemy.engine import Engine  # Типизация объекта движка SQLAlchemy
 
 # --- ВНУТРЕННИЕ МОДУЛИ ПРОЕКТА (CORE) ---
 from core.db_utils import (
-    get_sqlalchemy_engine,  # Утилита создания подключений к PostgreSQL
+    get_sqlalchemy_engine,
+    read_sql_df,
 )
+from core.exceptions import DataLoadError
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def _safe_load_dict(engine: Engine, query: str, id_col: str, name_col: str) -> d
         Словарь {id: name} или пустой словарь при ошибке
     """
     try:
-        df = pd.read_sql(text(query), engine)
+        df = read_sql_df(engine, text(query))
         
         if df.empty:
             return {}
@@ -58,7 +59,7 @@ def _safe_load_dict(engine: Engine, query: str, id_col: str, name_col: str) -> d
         logger.debug(f"Загружено записей в '{name_col}': {len(result)}")
         return result
         
-    except Exception as e:
+    except DataLoadError as e:
         logger.warning(f"Ошибка загрузки '{name_col}' ({id_col}): {e}")
         return {}
 
@@ -117,31 +118,31 @@ def load_cluster_metadata(db_name: str) -> dict[str, dict | list]:
 
     # 5. Связи: ДЦ -> Кластеры
     try:
-        df_dc_cl = pd.read_sql(
+        df_dc_cl = read_sql_df(
+            engine,
             text("SELECT storage_pool_id::text as spid, cluster_id::text as cid FROM cluster"),
-            engine
         )
         dc_to_clusters: dict[str, list[str]] = {}
         if not df_dc_cl.empty:
             for _, row in df_dc_cl.iterrows():
                 dc_to_clusters.setdefault(row['spid'], []).append(row['cid'])
         metadata['dc_to_clusters'] = dc_to_clusters
-    except Exception as e:
+    except DataLoadError as e:
         logger.warning(f"Ошибка загрузки связей ДЦ->Кластеры: {e}")
         metadata['dc_to_clusters'] = {}
 
     # 6. Связи: Кластер -> Хосты
     try:
-        df_cl_h = pd.read_sql(
+        df_cl_h = read_sql_df(
+            engine,
             text("SELECT cluster_id::text as cid, vds_id::text as vid FROM vds_static"),
-            engine
         )
         cluster_to_hosts: dict[str, list[str]] = {}
         if not df_cl_h.empty:
             for _, row in df_cl_h.iterrows():
                 cluster_to_hosts.setdefault(row['cid'], []).append(row['vid'])
         metadata['cluster_to_hosts'] = cluster_to_hosts
-    except Exception as e:
+    except DataLoadError as e:
         logger.warning(f"Ошибка загрузки связей Кластер->Хосты: {e}")
         metadata['cluster_to_hosts'] = {}
 

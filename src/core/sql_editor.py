@@ -13,8 +13,9 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
-from core.config import MAX_ROW_LIMIT
+from core.config import MAX_ROW_LIMIT, STATEMENT_TIMEOUT_MS
 from core.db_utils import get_sqlalchemy_engine
+from core.exceptions import format_load_error
 from core.sql_guard import apply_max_row_limit, validate_adhoc_sql
 from core.ui_utils import fix_uuid_columns
 
@@ -36,14 +37,7 @@ def _add_to_history(query: str) -> None:
 
 
 def _format_sql_error(exc: Exception) -> str:
-    message = str(exc)
-    lowered = message.lower()
-    if "read-only" in lowered or "read only" in lowered:
-        return (
-            "База в режиме только чтение: изменение данных запрещено. "
-            f"Детали: {message}"
-        )
-    return f"Ошибка выполнения: {message}"
+    return f"Ошибка выполнения: {format_load_error(exc)}"
 
 
 def render_global_sql(active_db: str) -> None:
@@ -53,7 +47,7 @@ def render_global_sql(active_db: str) -> None:
     """
     st.caption(
         f"Только SELECT/WITH. Результат ограничен {MAX_ROW_LIMIT} строками. "
-        "Сессия PostgreSQL — read-only."
+        f"Сессия PostgreSQL — read-only, statement_timeout {STATEMENT_TIMEOUT_MS // 1000} с."
     )
     _ensure_history()
 

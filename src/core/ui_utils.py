@@ -86,6 +86,11 @@ def style_status_column(
     return styled if styled is not None else df
 
 
+def render_load_error(exc: BaseException, what: str) -> None:
+    """Сообщение об ошибке загрузки данных (не путать с пустым результатом)."""
+    st.error(f"Ошибка загрузки {what}: {exc}")
+
+
 def render_page_header(
     title: str,
     db_name: str,

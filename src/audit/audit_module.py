@@ -5,11 +5,13 @@ import streamlit as st
 
 from core.constants import audit_health_counts, audit_severity_tone
 from core.data_loader import host_ids_for_infra_filters
+from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
+    render_load_error,
     render_page_header,
     style_status_column,
 )
@@ -110,7 +112,11 @@ def render_audit_log(active_db, cluster_meta=None):
         "end_dt": end_dt,
     }
 
-    df = fetch_audit_logs(active_db, filters, limit_val)
+    try:
+        df = fetch_audit_logs(active_db, filters, limit_val)
+    except DataLoadError as exc:
+        render_load_error(exc, "журнала событий")
+        return
     counts = audit_health_counts(df["severity"] if not df.empty else [])
 
     health = "all"

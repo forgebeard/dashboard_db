@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
 from core.constants import (
@@ -19,7 +18,7 @@ from core.constants import (
     HOST_STATUS_UP,
     cluster_status_from_hosts,
 )
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
 
 _MAINT_SQL = ", ".join(str(code) for code in sorted(HOST_MAINTENANCE_CODES))
 
@@ -88,14 +87,10 @@ def fetch_clusters_data(
         ORDER BY c.name
     """
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        return pd.read_sql(
-            text(base_sql), engine, params=sql_params if sql_params else None
-        )
-    except Exception as e:
-        st.error(f"Ошибка загрузки кластеров: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    return read_sql_df(
+        engine, text(base_sql), params=sql_params if sql_params else None
+    )
 
 
 def process_cluster_dataframe(

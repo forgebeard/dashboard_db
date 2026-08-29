@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
 from core.constants import (
@@ -14,7 +13,7 @@ from core.constants import (
     image_is_problem,
     mapped_code_label,
 )
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
 from core.ui_utils import fix_uuid_columns
 
 NIL_UUID = "00000000-0000-0000-0000-000000000000"
@@ -126,15 +125,9 @@ def fetch_snapshots_data(
         ORDER BY vm_name, creation_date
     """
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(
-            text(base_sql), engine, params=sql_params
-        )
-        return fix_uuid_columns(df)
-    except Exception as e:
-        st.error(f"Ошибка загрузки снапшотов: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    df = read_sql_df(engine, text(base_sql), params=sql_params)
+    return fix_uuid_columns(df)
 
 
 def _int_status(raw: object) -> int | None:

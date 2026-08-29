@@ -98,7 +98,7 @@ sudo systemctl reload postgresql-15
 
 ## CI
 
-При push и pull request GitHub Actions запускает `ruff check`, unit-тесты pytest (без интеграционных, им нужна живая БД) и сборку Docker-образа. Чтобы красный CI блокировал merge, включите required checks в настройках ветки на GitHub.
+При push и pull request GitHub Actions запускает `ruff check`, unit-тесты pytest с отчётом покрытия (без интеграционных, им нужна живая БД; fail-under только на sql_guard/константы статусов/инспекторы) и сборку Docker-образа. Чтобы красный CI блокировал merge, включите required checks в настройках ветки на GitHub.
 
 ## Структура проекта
 
@@ -110,11 +110,13 @@ sudo systemctl reload postgresql-15
 ├── docker-compose.yml          # Оркестрация контейнера
 ├── start.sh                    # Интерактивный запуск и настройка (Linux/macOS)
 ├── start.bat                   # Интерактивный запуск и настройка (Windows)
+├── pyproject.toml              # Прямые runtime/dev-зависимости
+├── uv.lock                     # Lock-файл uv (воспроизводимые транзитивы)
 ├── ruff.toml                   # Узкий линт (E, F, I)
-├── .github/workflows/ci.yml    # ruff, pytest, docker build
+├── .github/workflows/ci.yml    # ruff, pytest+coverage, docker build
 ├── .env.example                # Шаблон переменных окружения
-├── requirements.txt            # Runtime-зависимости Python
-├── requirements-dev.txt        # pytest, ruff (не ставятся в Docker-образ)
+├── requirements.txt            # Экспорт runtime из uv.lock (Docker)
+├── requirements-dev.txt        # Экспорт runtime+dev из uv.lock (CI)
 │
 └── src/
     ├── app.py                  # Точка входа: маршрутизация вкладок
@@ -122,6 +124,7 @@ sudo systemctl reload postgresql-15
     │   ├── config.py           # Глобальные настройки (лимиты, CSS)
     │   ├── constants.py        # Справочники статусов (VM/HOST_STATUS_MAP)
     │   ├── db_utils.py         # Движок подключения к БД
+    │   ├── exceptions.py       # DataLoadError, форматирование ошибок SQL
     │   ├── data_loader.py      # Загрузка метаданных инфраструктуры
     │   ├── sql_editor.py       # Компонент глобального SQL-редактора
     │   └── ui_utils.py         # Утилиты UI (форматирование UUID, дат)
@@ -216,7 +219,9 @@ sudo systemctl reload postgresql-15
 1.  **Конфиденциальность:** Дампы БД содержат чувствительные данные. Храните их в защищенном месте.
 2.  **Память:** При работе с `audit_log` или `event_history` используйте фильтр по дате. Выборка автоматически ограничена, но требует внимания при ручных запросах.
 3.  **Локальный контур:** `docker-compose` публикует порт только на `127.0.0.1:8502`. С LAN и других интерфейсов хоста UI недоступен. Внутри контейнера Streamlit слушает `0.0.0.0:8501` — это нужно для проброса порта, не для внешнего доступа.
-4.  **Режим чтения:** Каждое подключение к PostgreSQL открывается с `default_transaction_read_only=on`. SQL-редактор принимает только SELECT/WITH (и EXPLAIN к ним), несколько стейтментов запрещены, выборка ограничена `MAX_ROW_LIMIT`. DML отклоняется и фильтром редактора, и самой БД.
+4.  **Режим чтения:** Каждое подключение к PostgreSQL открывается с `default_transaction_read_only=on` и `statement_timeout` (см. `STATEMENT_TIMEOUT_MS`). SQL-редактор принимает только SELECT/WITH (и EXPLAIN к ним), несколько стейтментов запрещены, выборка ограничена `MAX_ROW_LIMIT`. DML отклоняется и фильтром редактора, и самой БД.
+
+Обновление зависимостей: правите прямые пакеты в `pyproject.toml`, затем `uv lock` и `uv export --frozen --no-dev --no-hashes -o requirements.txt` / `uv export --frozen --no-hashes -o requirements-dev.txt`. Docker по-прежнему ставит `requirements.txt`.
 
 ---
 *Разработано для нужд технической поддержки виртуализации РЕД СОФТ.*

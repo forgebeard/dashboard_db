@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
+from core.exceptions import DataLoadError
+
 # sys.path.append удален
 
 @pytest.fixture(autouse=True)
@@ -24,7 +26,7 @@ def mock_db_dependencies(monkeypatch):
     mock_read_sql = MagicMock()
     
     monkeypatch.setattr("core.data_loader.get_sqlalchemy_engine", mock_get_engine)
-    monkeypatch.setattr("core.data_loader.pd.read_sql", mock_read_sql)
+    monkeypatch.setattr("core.data_loader.read_sql_df", mock_read_sql)
     
     return {
         "engine": mock_engine,
@@ -56,7 +58,7 @@ def test_safe_load_dict_null_ids(mock_db_dependencies):
 
 def test_safe_load_dict_exception(mock_db_dependencies):
     from core.data_loader import _safe_load_dict
-    mock_db_dependencies["read_sql"].side_effect = Exception("DB Connection Error")
+    mock_db_dependencies["read_sql"].side_effect = DataLoadError("DB Connection Error")
     result = _safe_load_dict(mock_db_dependencies["engine"], "SELECT ...", 'id', 'name')
     assert result == {}
 

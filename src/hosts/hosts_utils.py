@@ -3,8 +3,9 @@
 Утилиты для работы с данными Хостов.
 """
 
+import logging
+
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
 from core.constants import (
@@ -13,7 +14,9 @@ from core.constants import (
     HOST_STATUS_UP,
     host_is_problem,
 )
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+
+logger = logging.getLogger(__name__)
 
 
 def load_host_infrastructure_maps(active_db):
@@ -26,23 +29,23 @@ def load_host_infrastructure_maps(active_db):
         engine = get_sqlalchemy_engine(active_db)
         
         # 1. Связь Cluster -> DC (UUID)
-        df_cl_dc = pd.read_sql(
-            text("SELECT cluster_id::text as cid, storage_pool_id::text as spid FROM cluster"), 
-            engine
+        df_cl_dc = read_sql_df(
+            engine,
+            text("SELECT cluster_id::text as cid, storage_pool_id::text as spid FROM cluster"),
         )
         for _, row in df_cl_dc.iterrows():
             dc_to_clusters.setdefault(row['spid'], []).append(row['cid'])
             
         # 2. Маппинг UUID ДЦ -> Имя ДЦ
-        df_dcs = pd.read_sql(
-            text("SELECT id::text as dc_id, name as dc_name FROM storage_pool"), 
-            engine
+        df_dcs = read_sql_df(
+            engine,
+            text("SELECT id::text as dc_id, name as dc_name FROM storage_pool"),
         )
         for _, row in df_dcs.iterrows():
             dc_id_to_name[row['dc_id']] = row['dc_name']
             dc_names_set.add(row['dc_name'])
     except Exception as e:
-        st.warning(f"Не удалось загрузить связи инфраструктуры хостов: {e}")
+        logger.warning("Не удалось загрузить связи инфраструктуры хостов: %s", e)
         
     return dc_to_clusters, dc_id_to_name, dc_names_set
 
@@ -93,13 +96,8 @@ def fetch_hosts_data(active_db, filters, clusters, dc_id_to_name):
         base_sql += " WHERE " + " AND ".join(conditions)
     base_sql += " ORDER BY s.vds_name"
 
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(text(base_sql), engine, params=sql_params if sql_params else None)
-        return df
-    except Exception as e:
-        st.error(f"Ошибка загрузки хостов: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    return read_sql_df(engine, text(base_sql), params=sql_params if sql_params else None)
 
 def _resolve_health_filter(show_problems: bool, health_filter: str | None) -> str:
     if health_filter:

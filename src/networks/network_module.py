@@ -2,10 +2,12 @@
 
 import streamlit as st
 
+from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
+    render_load_error,
     render_page_header,
 )
 from networks.network_utils import fetch_networks_data, process_networks_dataframe
@@ -46,7 +48,11 @@ def render_networks_list(active_db, cluster_meta):
         with clear_col:
             render_clear_filters_button(NET_FILTER_DEFAULTS, key="net_clear_filters")
 
-    raw_df = fetch_networks_data(active_db, (selected_dc, search_term), dc_map)
+    try:
+        raw_df = fetch_networks_data(active_db, (selected_dc, search_term), dc_map)
+    except DataLoadError as exc:
+        render_load_error(exc, "сетей")
+        return
     display_df = (
         process_networks_dataframe(raw_df, dc_map) if not raw_df.empty else raw_df
     )

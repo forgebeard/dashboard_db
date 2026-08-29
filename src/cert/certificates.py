@@ -4,8 +4,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from core.db_utils import get_sqlalchemy_engine
-from core.ui_utils import dataframe_height
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.exceptions import DataLoadError
+from core.ui_utils import dataframe_height, render_load_error
 
 COLUMN_CONFIG = {
     "Файл": st.column_config.TextColumn(width=220),
@@ -96,7 +97,7 @@ def render_certificates(db_name):
 
     try:
         engine = get_sqlalchemy_engine(db_name)
-        df = pd.read_sql_query(query, engine)
+        df = read_sql_df(engine, query)
 
         if df.empty:
             st.info("Сертификаты не найдены.")
@@ -125,5 +126,5 @@ def render_certificates(db_name):
             else:
                 _show_table(host_df)
 
-    except Exception as e:
-        st.error(f"Ошибка при загрузке сертификатов: {e}")
+    except DataLoadError as e:
+        render_load_error(e, "сертификатов")

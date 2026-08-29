@@ -3,6 +3,8 @@
 Утилиты для работы с журналом событий (Audit Log).
 """
 
+import logging
+
 import pandas as pd
 import streamlit as st
 from sqlalchemy import text
@@ -14,7 +16,9 @@ from core.constants import (
     audit_severity_label,
 )
 from core.data_loader import build_infra_filter_maps
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+
+logger = logging.getLogger(__name__)
 
 
 def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
@@ -25,12 +29,12 @@ def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
     maps = build_infra_filter_maps({})
     try:
         engine = get_sqlalchemy_engine(active_db)
-        df_dc_cl = pd.read_sql(text("""
+        df_dc_cl = read_sql_df(engine, text("""
             SELECT sp.id::text as dc_id, sp.name as dc_name,
                    c.cluster_id::text as cl_id, c.name as cl_name
             FROM storage_pool sp
             LEFT JOIN cluster c ON sp.id = c.storage_pool_id
-        """), engine)
+        """))
         for _, r in df_dc_cl.iterrows():
             dc_name = str(r["dc_name"]) if r["dc_name"] else f"DC-{str(r['dc_id'])[:8]}"
             cl_name = str(r["cl_name"]) if r["cl_name"] else f"Cluster-{str(r['cl_id'])[:8]}"
@@ -39,18 +43,18 @@ def load_audit_infrastructure_maps(active_db, cluster_meta: dict | None = None):
             if r["cl_id"]:
                 maps["dc_to_clusters"].setdefault(r["dc_id"], []).append(r["cl_id"])
 
-        df_cl_host = pd.read_sql(text("""
+        df_cl_host = read_sql_df(engine, text("""
             SELECT c.cluster_id::text as cl_id, v.vds_id::text as h_id, v.vds_name as h_name
             FROM cluster c
             LEFT JOIN vds_static v ON c.cluster_id = v.cluster_id
-        """), engine)
+        """))
         for _, r in df_cl_host.iterrows():
             host_name = str(r["h_name"]) if r["h_name"] else f"Host-{str(r['h_id'])[:8]}"
             maps["host_id_to_name"][r["h_id"]] = host_name
             if r["h_id"]:
                 maps["cluster_to_hosts"].setdefault(r["cl_id"], []).append(r["h_id"])
     except Exception as e:
-        st.warning(f"Не удалось загрузить связи для журнала: {e}")
+        logger.warning("Не удалось загрузить связи для журнала: %s", e)
     return maps
 
 
@@ -110,16 +114,12 @@ def build_audit_logs_sql(filters: dict, limit_val: int) -> tuple[str, dict]:
 def fetch_audit_logs(active_db, filters, limit_val):
     """Выполняет параметризованный запрос к audit_log."""
     sql, params = build_audit_logs_sql(filters, limit_val)
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(text(sql), engine, params=params)
+    engine = get_sqlalchemy_engine(active_db)
+    df = read_sql_df(engine, text(sql), params=params)
 
-        if not df.empty:
-            df["log_time"] = pd.to_datetime(df["log_time"]).dt.strftime("%d.%m.%Y %H:%M:%S")
-        return df
-    except Exception as e:
-        st.error(f"Ошибка чтения audit_log: {e}")
-        return pd.DataFrame()
+    if not df.empty:
+        df["log_time"] = pd.to_datetime(df["log_time"]).dt.strftime("%d.%m.%Y %H:%M:%S")
+    return df
 
 
 def process_audit_dataframe(

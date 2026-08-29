@@ -4,6 +4,9 @@ Unit-тесты для src/hosts/hosts_utils.py.
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
+
+from core.exceptions import DataLoadError
 
 # Импортируем модуль
 from hosts.hosts_utils import (
@@ -100,7 +103,7 @@ def test_process_host_dataframe_empty():
 
 # --- Тесты для fetch_hosts_data (SQL логика с моками) ---
 
-@patch("hosts.hosts_utils.pd.read_sql")
+@patch("hosts.hosts_utils.read_sql_df")
 @patch("hosts.hosts_utils.get_sqlalchemy_engine")
 def test_fetch_hosts_data_no_filters(mock_get_engine, mock_read_sql):
     """Тест запроса без фильтров."""
@@ -120,7 +123,7 @@ def test_fetch_hosts_data_no_filters(mock_get_engine, mock_read_sql):
     
     # Проверяем, что в SQL нет WHERE
     call_args = mock_read_sql.call_args
-    sql_text = str(call_args[0][0]) # Первый аргумент - text object
+    sql_text = str(call_args[0][1]) # Первый аргумент - text object
     assert "WHERE" not in sql_text.upper() or "WHERE" in sql_text.upper() and "AND" not in sql_text.upper() 
     # Точнее: если условий нет, WHERE не добавляется вообще в коде: if conditions: base_sql += " WHERE ..."
     # Значит WHERE не должно быть
@@ -129,7 +132,7 @@ def test_fetch_hosts_data_no_filters(mock_get_engine, mock_read_sql):
     assert "spm_vds_id" in sql_text
     assert "storage_pool" in sql_text
 
-@patch("hosts.hosts_utils.pd.read_sql")
+@patch("hosts.hosts_utils.read_sql_df")
 @patch("hosts.hosts_utils.get_sqlalchemy_engine")
 def test_fetch_hosts_data_with_search(mock_get_engine, mock_read_sql):
     """Тест запроса с поиском по имени."""
@@ -144,13 +147,13 @@ def test_fetch_hosts_data_with_search(mock_get_engine, mock_read_sql):
     fetch_hosts_data("test_db", filters, clusters, dc_map)
     
     call_args = mock_read_sql.call_args
-    sql_text = str(call_args[0][0])
+    sql_text = str(call_args[0][1])
     params = call_args[1]['params']
     
     assert "LIKE" in sql_text.upper()
     assert params['search'] == "%myhost%"
 
-@patch("hosts.hosts_utils.pd.read_sql")
+@patch("hosts.hosts_utils.read_sql_df")
 @patch("hosts.hosts_utils.get_sqlalchemy_engine")
 def test_fetch_hosts_data_with_dc_filter(mock_get_engine, mock_read_sql):
     """Тест фильтрации по Дата-центру."""
@@ -165,7 +168,7 @@ def test_fetch_hosts_data_with_dc_filter(mock_get_engine, mock_read_sql):
     fetch_hosts_data("test_db", filters, clusters, dc_map)
     
     call_args = mock_read_sql.call_args
-    sql_text = str(call_args[0][0])
+    sql_text = str(call_args[0][1])
     params = call_args[1]['params']
     
     assert "c.storage_pool_id = :dc_id" in sql_text
@@ -173,7 +176,7 @@ def test_fetch_hosts_data_with_dc_filter(mock_get_engine, mock_read_sql):
 
 # --- Тесты для load_host_infrastructure_maps ---
 
-@patch("hosts.hosts_utils.pd.read_sql")
+@patch("hosts.hosts_utils.read_sql_df")
 @patch("hosts.hosts_utils.get_sqlalchemy_engine")
 def test_load_host_infrastructure_maps(mock_get_engine, mock_read_sql):
     """Тест загрузки маппингов инфраструктуры."""
@@ -192,3 +195,12 @@ def test_load_host_infrastructure_maps(mock_get_engine, mock_read_sql):
     assert 'DC-One' in dc_names
     
     mock_engine.dispose.assert_not_called()
+
+
+@patch("hosts.hosts_utils.read_sql_df")
+@patch("hosts.hosts_utils.get_sqlalchemy_engine")
+def test_fetch_hosts_data_raises_dataloaderror(mock_get_engine, mock_read_sql):
+    mock_get_engine.return_value = MagicMock()
+    mock_read_sql.side_effect = DataLoadError("boom")
+    with pytest.raises(DataLoadError, match="boom"):
+        fetch_hosts_data("test_db", ("Все ДЦ", "Все кластеры", ""), {}, {})

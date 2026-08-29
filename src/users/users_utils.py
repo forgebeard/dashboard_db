@@ -2,11 +2,10 @@
 """SQL и подготовка списка пользователей."""
 
 import pandas as pd
-import streamlit as st
 from sqlalchemy import text
 
 from core.constants import vdc_object_type_label
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
 
 
 def build_users_list_sql(selected_domain: str, search_term: str) -> tuple[str, dict]:
@@ -75,37 +74,25 @@ def build_user_permissions_sql() -> str:
 
 
 def fetch_user_domains(active_db: str) -> list[str]:
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        df = pd.read_sql(text(build_user_domains_sql()), engine)
-        return [str(v) for v in df["domain"].tolist() if v]
-    except Exception as e:
-        st.error(f"Ошибка загрузки доменов: {e}")
-        return []
+    engine = get_sqlalchemy_engine(active_db)
+    df = read_sql_df(engine, text(build_user_domains_sql()))
+    return [str(v) for v in df["domain"].tolist() if v]
 
 
 def fetch_users_data(active_db: str, filters: tuple[str, str]) -> pd.DataFrame:
     selected_domain, search_term = filters
     sql, sql_params = build_users_list_sql(selected_domain, search_term.strip() if search_term else "")
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        return pd.read_sql(text(sql), engine, params=sql_params if sql_params else None)
-    except Exception as e:
-        st.error(f"Ошибка загрузки пользователей: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    return read_sql_df(engine, text(sql), params=sql_params if sql_params else None)
 
 
 def fetch_user_permissions(active_db: str, user_id: str) -> pd.DataFrame:
-    try:
-        engine = get_sqlalchemy_engine(active_db)
-        return pd.read_sql(
-            text(build_user_permissions_sql()),
-            engine,
-            params={"uid": str(user_id)},
-        )
-    except Exception as e:
-        st.error(f"Ошибка загрузки прав: {e}")
-        return pd.DataFrame()
+    engine = get_sqlalchemy_engine(active_db)
+    return read_sql_df(
+        engine,
+        text(build_user_permissions_sql()),
+        params={"uid": str(user_id)},
+    )
 
 
 def process_user_dataframe(df: pd.DataFrame) -> pd.DataFrame:

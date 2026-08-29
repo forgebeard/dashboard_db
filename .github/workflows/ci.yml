@@ -18,7 +18,23 @@ jobs:
       - name: Ruff
         run: ruff check
       - name: Pytest (unit)
-        run: pytest -m "not integration"
+        run: pytest -m "not integration" --cov=src --cov-report=term-missing
+      - name: Pytest coverage (sql_guard, statuses, inspectors)
+        run: >
+          pytest -m "not integration"
+          --cov=core.sql_guard
+          --cov=core.constants
+          --cov=core.inspector_base
+          --cov=hosts.host_inspector_sql
+          --cov=vms.vm_inspector_sql
+          --cov=snapshots.snapshot_inspector_sql
+          --cov=clusters.cluster_inspector_sql
+          --cov=disks.disks_inspector_sql
+          --cov=networks.network_inspector_sql
+          --cov=storage.storage_inspector_sql
+          --cov=gluster.gluster_inspector_sql
+          --cov-fail-under=60
+          --cov-report=term
 
   image:
     runs-on: ubuntu-latest

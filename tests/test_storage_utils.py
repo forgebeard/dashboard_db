@@ -139,7 +139,7 @@ def test_engine_storage_type_and_shared_status_codes():
     assert list(result["Тип домена"]) == ["Master", "Data", "Image"]
 
 
-@patch("storage.storage_utils.pd.read_sql")
+@patch("storage.storage_utils.read_sql_df")
 @patch("storage.storage_utils.get_sqlalchemy_engine")
 def test_fetch_storage_data_sql_shape(mock_get_engine, mock_read_sql):
     mock_get_engine.return_value = MagicMock()
@@ -147,7 +147,7 @@ def test_fetch_storage_data_sql_shape(mock_get_engine, mock_read_sql):
 
     fetch_storage_data("test_db", ("Все ДЦ", ""), {})
 
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     assert "used_disk_size" in sql_text
     assert "available_disk_size" in sql_text
     assert "used_disk_size /" not in sql_text.replace(" ", "")
@@ -159,7 +159,7 @@ def test_fetch_storage_data_sql_shape(mock_get_engine, mock_read_sql):
     assert "WHERE" not in sql_text
 
 
-@patch("storage.storage_utils.pd.read_sql")
+@patch("storage.storage_utils.read_sql_df")
 @patch("storage.storage_utils.get_sqlalchemy_engine")
 def test_fetch_storage_data_dc_and_search(mock_get_engine, mock_read_sql):
     mock_get_engine.return_value = MagicMock()
@@ -171,7 +171,7 @@ def test_fetch_storage_data_dc_and_search(mock_get_engine, mock_read_sql):
         {"dc_uuid_1": "MyDC"},
     )
 
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     params = mock_read_sql.call_args[1]["params"]
     assert "sp.id = :dc_id" in sql_text
     assert "storage_pool_iso_map" in sql_text

@@ -79,38 +79,38 @@ def test_two_layers_one_disk_worst_status():
     assert list(problems["UUID диска"]) == ["disk-1"]
 
 
-@patch("disks.disks_utils.pd.read_sql")
+@patch("disks.disks_utils.read_sql_df")
 @patch("disks.disks_utils.get_sqlalchemy_engine")
 def test_fetch_no_status_in_sql(mock_engine, mock_read_sql):
     mock_engine.return_value = MagicMock()
     mock_read_sql.return_value = pd.DataFrame()
     fetch_disks_data("db", ("", "", ""))
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     sql_l = sql_text.lower()
     assert "imagestatus IN" not in sql_text
     assert "limit 500" not in sql_l
     assert "newest.image_group_id" not in sql_l
 
 
-@patch("disks.disks_utils.pd.read_sql")
+@patch("disks.disks_utils.read_sql_df")
 @patch("disks.disks_utils.get_sqlalchemy_engine")
 def test_fetch_search_no_limit(mock_engine, mock_read_sql):
     mock_engine.return_value = MagicMock()
     mock_read_sql.return_value = pd.DataFrame()
     fetch_disks_data("db", ("os", "", ""))
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     params = mock_read_sql.call_args[1]["params"]
     assert "LIMIT 500" not in sql_text
     assert params["search_disk"] == "%os%"
 
 
-@patch("disks.disks_utils.pd.read_sql")
+@patch("disks.disks_utils.read_sql_df")
 @patch("disks.disks_utils.get_sqlalchemy_engine")
 def test_fetch_one_row_per_image(mock_engine, mock_read_sql):
     mock_engine.return_value = MagicMock()
     mock_read_sql.return_value = pd.DataFrame()
     fetch_disks_data("db", ("", "", ""))
-    sql = " ".join(str(mock_read_sql.call_args[0][0]).lower().split())
+    sql = " ".join(str(mock_read_sql.call_args[0][1]).lower().split())
     assert "string_agg(distinct vm.vm_name" in sql
     assert "string_agg(distinct sd.storage_name" in sql
     assert "group by" in sql

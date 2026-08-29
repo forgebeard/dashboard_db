@@ -115,7 +115,7 @@ def test_process_vm_dataframe_empty():
     assert result.empty
 
 
-@patch("vms.vms_utils.pd.read_sql")
+@patch("vms.vms_utils.read_sql_df")
 @patch("vms.vms_utils.get_sqlalchemy_engine")
 def test_fetch_vms_data_no_filters(mock_get_engine, mock_read_sql):
     mock_engine = MagicMock()
@@ -128,13 +128,13 @@ def test_fetch_vms_data_no_filters(mock_get_engine, mock_read_sql):
     df = fetch_vms_data("test_db", filters, clusters, hosts, dc_map)
 
     assert not df.empty
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     assert "layer_issue_codes" in sql_text
     assert "has_bad_images" not in sql_text
     assert "AND" not in sql_text.split("entity_type = 'VM'")[1].split("ORDER BY")[0]
 
 
-@patch("vms.vms_utils.pd.read_sql")
+@patch("vms.vms_utils.read_sql_df")
 @patch("vms.vms_utils.get_sqlalchemy_engine")
 def test_fetch_vms_data_with_host_filter(mock_get_engine, mock_read_sql):
     mock_engine = MagicMock()
@@ -147,14 +147,14 @@ def test_fetch_vms_data_with_host_filter(mock_get_engine, mock_read_sql):
 
     fetch_vms_data("test_db", filters, clusters, hosts, dc_map)
 
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     params = mock_read_sql.call_args[1]["params"]
 
     assert "vd.run_on_vds = :host_id" in sql_text
     assert params["host_id"] == "h_uuid_1"
 
 
-@patch("vms.vms_utils.pd.read_sql")
+@patch("vms.vms_utils.read_sql_df")
 @patch("vms.vms_utils.get_sqlalchemy_engine")
 def test_fetch_vms_data_with_search(mock_get_engine, mock_read_sql):
     mock_engine = MagicMock()
@@ -166,7 +166,7 @@ def test_fetch_vms_data_with_search(mock_get_engine, mock_read_sql):
 
     fetch_vms_data("test_db", filters, clusters, hosts, dc_map)
 
-    sql_text = str(mock_read_sql.call_args[0][0])
+    sql_text = str(mock_read_sql.call_args[0][1])
     params = mock_read_sql.call_args[1]["params"]
 
     assert "LOWER(vs.vm_name) LIKE LOWER(:search)" in sql_text

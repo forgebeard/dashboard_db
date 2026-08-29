@@ -5,13 +5,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.config import STATEMENT_TIMEOUT_MS
 from core.db_utils import (
     PG_READ_ONLY_OPTIONS,
     get_available_databases,
     get_db_params,
     get_psycopg2_connect_kwargs,
     get_table_list,
+    load_sql_df,
+    read_sql_df,
 )
+from core.exceptions import DataLoadError, format_load_error, is_statement_timeout
 
 # --- Тесты для get_db_params ---
 
@@ -30,6 +34,8 @@ def test_get_db_params_success(monkeypatch):
     assert params["password"] == "secret"
     assert params["dbname"] == "target_db"
     assert params["options"] == PG_READ_ONLY_OPTIONS
+    assert "default_transaction_read_only=on" in PG_READ_ONLY_OPTIONS
+    assert f"statement_timeout={STATEMENT_TIMEOUT_MS}ms" in PG_READ_ONLY_OPTIONS
 
 def test_get_db_params_defaults(monkeypatch):
     """Тест дефолтов. Явно удаляем переменные, чтобы перебить direnv/.env"""
@@ -54,6 +60,7 @@ def test_get_psycopg2_connect_kwargs_includes_timeout(monkeypatch):
     assert kwargs["dbname"] == "engine"
     assert kwargs["connect_timeout"] == 10
     assert kwargs["options"] == PG_READ_ONLY_OPTIONS
+    assert "statement_timeout=" in kwargs["options"]
 
 
 def test_get_db_params_missing_password(monkeypatch):
@@ -146,3 +153,28 @@ def test_get_available_databases_all_fail(mock_get_params, mock_connect):
     
     assert dbs == []
     assert mock_connect.call_count == 2
+
+
+def test_is_statement_timeout_by_message():
+    assert is_statement_timeout(Exception("canceling statement due to statement timeout"))
+    assert not is_statement_timeout(Exception("syntax error"))
+
+
+def test_format_load_error_timeout():
+    msg = format_load_error(Exception("statement timeout"))
+    assert "таймауту" in msg
+    assert str(STATEMENT_TIMEOUT_MS // 1000) in msg
+
+
+@patch("core.db_utils.pd.read_sql")
+def test_read_sql_df_wraps_errors(mock_read_sql):
+    mock_read_sql.side_effect = Exception("relation missing")
+    with pytest.raises(DataLoadError, match="relation missing"):
+        read_sql_df(MagicMock(), "SELECT 1")
+
+
+@patch("core.db_utils.get_sqlalchemy_engine")
+def test_load_sql_df_engine_failure(mock_get_engine):
+    mock_get_engine.side_effect = RuntimeError("pool down")
+    with pytest.raises(DataLoadError, match="pool down"):
+        load_sql_df("engine", "SELECT 1")

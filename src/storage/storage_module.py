@@ -3,11 +3,13 @@
 import streamlit as st
 
 from core.constants import storage_health_counts, storage_status_tone
+from core.exceptions import DataLoadError
 from core.ui_utils import (
     dataframe_height,
     filters_are_active,
     render_clear_filters_button,
     render_health_filter,
+    render_load_error,
     render_page_header,
     style_status_column,
 )
@@ -57,7 +59,11 @@ def render_storage_list(active_db, cluster_meta):
             )
 
     filters = (selected_dc_name, search_term)
-    raw_df = fetch_storage_data(active_db, filters, dc_id_to_name)
+    try:
+        raw_df = fetch_storage_data(active_db, filters, dc_id_to_name)
+    except DataLoadError as exc:
+        render_load_error(exc, "хранилищ")
+        return
     counts = storage_health_counts(
         raw_df["shared_status_code"] if not raw_df.empty else []
     )

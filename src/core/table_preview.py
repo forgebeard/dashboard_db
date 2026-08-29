@@ -10,7 +10,8 @@ import streamlit as st
 from sqlalchemy import text
 
 from core.config import DEFAULT_ROW_LIMIT, MAX_ROW_LIMIT, ROW_STEP
-from core.db_utils import get_sqlalchemy_engine
+from core.db_utils import get_sqlalchemy_engine, read_sql_df
+from core.exceptions import DataLoadError
 from core.ui_utils import fix_uuid_columns
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -100,7 +101,7 @@ def render_grouped_table_preview(
                             query = f"SELECT * FROM {ident} ORDER BY {order_sql} DESC LIMIT :lim"
                         else:
                             query = f"SELECT * FROM {ident} ORDER BY 1 DESC LIMIT :lim"
-                        df_table = pd.read_sql_query(text(query), engine, params={"lim": limit})
+                        df_table = read_sql_df(engine, text(query), params={"lim": limit})
                         df_table = fix_uuid_columns(df_table)
                         df_table = _mask_columns(df_table, mask_columns.get(table_name, []))
                         df_table = _stringify_json_columns(
@@ -117,7 +118,7 @@ def render_grouped_table_preview(
                                 hide_index=True,
                             )
                             st.caption(f"Показано {len(df_table)} записей из `{table_name}`")
-                    except Exception as e:
+                    except DataLoadError as e:
                         st.error(f"Не удалось загрузить `{table_name}`: {e}")
     except Exception as e:
         st.error(f"Не удалось подключиться для просмотра таблиц: {e}")
