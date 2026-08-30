@@ -24,7 +24,6 @@ from core.sql_guard import apply_max_row_limit, validate_adhoc_sql
         "SELECT $$ text /* not a comment */ $$",
         "SELECT $tag$ DELETE ; -- still literal $tag$",
         'SELECT "INTO"',
-        r"SELECT E'a\';b'",
         r"SELECT e'text -- x'",
     ],
 )
@@ -59,6 +58,12 @@ def test_validate_rejects_writes(sql):
 def test_validate_allows_e_string_with_escaped_quote():
     sql = r"SELECT E'a\';b'"
     assert validate_adhoc_sql(sql) == sql
+
+
+def test_validate_rejects_unclosed_literals():
+    for sql in ("SELECT E'oops", "SELECT 'oops", "SELECT $$oops"):
+        with pytest.raises(ValueError, match="Незакрытая строка"):
+            validate_adhoc_sql(sql)
 
 
 def test_validate_keeps_literal_payload():

@@ -16,6 +16,7 @@ _LEADING_EXPLAIN = re.compile(
     r"^\s*EXPLAIN(?:\s+ANALYZE)?(?:\s+VERBOSE)?\s+",
     re.IGNORECASE,
 )
+_UNCLOSED_STRING = "Незакрытая строка в SQL-запросе."
 _DOLLAR_TAG = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*\$")
 
 
@@ -53,7 +54,7 @@ def _scan_quoted(
                 continue
             return i + 1, sql[start : i + 1]
         i += 1
-    return n, sql[start:]
+    raise ValueError(_UNCLOSED_STRING)
 
 
 def _scan_dollar_quote(sql: str, start: int) -> tuple[int, str] | None:
@@ -71,7 +72,7 @@ def _scan_dollar_quote(sql: str, start: int) -> tuple[int, str] | None:
         tag_end = match.end()
     close = sql.find(tag, tag_end)
     if close == -1:
-        return n, sql[start:]
+        raise ValueError(_UNCLOSED_STRING)
     end = close + len(tag)
     return end, sql[start:end]
 
