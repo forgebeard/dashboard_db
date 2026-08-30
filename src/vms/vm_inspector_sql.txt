@@ -1,0 +1,104 @@
+══════════════════════════════════════════════════════════════════════════════
+  VM-Inspector                                     generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_vm_inspector_report / format_vm_report в vm_inspector_sql.py.
+Алиасы основного SELECT: v = vm_static, d = vm_dynamic, o = dwh_osinfo,
+tpl = vm_static (шаблон), c = cluster, dc = storage_pool, h = vds_static.
+
+СВЕДЕНИЯ О ВМ
+──────────────────────────────────────────────────────────────────────────────
+  Имя:            v.vm_name                           ←  vm_static
+  UUID:           v.vm_guid                           ←  vm_static
+  Описание:       v.description                       ←  vm_static
+  Комментарий:    v.free_text_comment                 ←  vm_static (строка только если не пусто)
+  ОС:             o.os_name, иначе v.os               ←  dwh_osinfo JOIN o.os_id = v.os
+  Гостевая ОС:    d.guestos_distribution + guestos_version,
+                  иначе d.guest_os                    ←  vm_dynamic
+  Шаблон:         tpl.vm_name                         ←  vm_static JOIN tpl.vm_guid = v.vmt_guid
+  BIOS:           v.bios_type                         ←  vm_static, BIOS_TYPE_MAP
+  Кластер:        c.name                              ←  cluster, JOIN v.cluster_id
+  Дата-центр:     dc.name                             ←  storage_pool, JOIN c.storage_pool_id
+  Хост:           h.vds_name                          ←  vds_static, JOIN d.run_on_vds = h.vds_id
+  Создан:         v._create_date                      ←  vm_static, ДД.ММ.ГГГГ ЧЧ:ММ
+  Обновлён:       v._update_date                      ←  vm_static, тот же формат
+
+РЕСУРСЫ
+──────────────────────────────────────────────────────────────────────────────
+  Статус:         d.status (vm_status_code)           ←  vm_dynamic, VM_STATUS_MAP
+  Uptime:         d.boot_time                         ←  vm_dynamic; только если статус Up
+  CPU:            v.num_of_sockets, cpu_per_socket, threads_per_cpu  ←  vm_static
+  RAM:            v.mem_size_mb                       ←  vm_static (МБ → ГБ)
+  IP:             d.vm_ip                             ←  vm_dynamic
+  QEMU agent:     d.qemu_guest_agent_status           ←  vm_dynamic, GUEST_AGENT_MAP
+  oVirt agent:    d.ovirt_guest_agent_status          ←  vm_dynamic, GUEST_AGENT_MAP
+
+РЕД ВИРТ 8 / РЕД ВИРТ 7.3
+──────────────────────────────────────────────────────────────────────────────
+  release_key != "7.3": сначала колонки 8 из vm_static:
+    virtio_scsi_multi_queues, cpu_pinning_policy, parallel_migrations
+    нет колонок 8 → retry: virtio_scsi_multi_queues_enabled (заголовок 7.3)
+  release_key == "7.3": только virtio_scsi_multi_queues_enabled
+  virtio-scsi queues / multi-queue  ←  vm_static
+  CPU pinning                       ←  vm_static.cpu_pinning_policy (только схема 8)
+  Паралл. миграции                  ←  vm_static.parallel_migrations (только схема 8)
+
+ДИСКИ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            bd.disk_alias                       ←  base_disks
+  UUID:           bd.disk_id                          ←  base_disks
+  Шина:           dve.disk_interface, иначе vd.device ←  disk_vm_element / vm_device
+  Boot:           dve.is_boot                         ←  disk_vm_element
+  Подключён:      vd.is_plugged                       ←  vm_device
+  Вирт. размер:   i.size (virt_bytes)                 ←  images, активный слой
+  Хранилище:      sd.storage_name                     ←  storage_domain_static
+                  JOIN image_storage_domain_map
+  Активный слой:  i.image_guid                        ←  images WHERE active
+  Статус:         i.imagestatus                       ←  images, IMAGE_STATUS_MAP
+                  WHERE vd.vm_id, vd.type = 'disk'
+
+СЛОИ
+──────────────────────────────────────────────────────────────────────────────
+  диск:           bd.disk_alias                       ←  base_disks
+  image_guid:     i.image_guid                        ←  images (все слои диска ВМ)
+  состояние:      i.active                            ←  images (строка «active» если true)
+  parentid:       i.parentid                          ←  images
+  it_guid:        i.it_guid                           ←  images
+  статус:         i.imagestatus                       ←  images, IMAGE_STATUS_MAP
+  тип:            i.volume_type, i.volume_format      ←  VOLUME_TYPE_MAP / VOLUME_FORMAT_MAP
+  размер:         did.actual_size                     ←  disk_image_dynamic
+  _create_date:   i._create_date                      ←  images
+  creation_date:  i.creation_date                     ←  images
+  _update_date:   i._update_date                      ←  images
+  снапшот:        i.vm_snapshot_id                    ←  images (nil UUID → «—»)
+  заметка:        s.snapshot_type, s.description      ←  snapshots JOIN snapshot_id
+                  порядок строк: order_layers_by_parent (Python)
+
+СНАПШОТЫ
+──────────────────────────────────────────────────────────────────────────────
+  snapshot_id:    s.snapshot_id                       ←  snapshots WHERE s.vm_id
+  тип:            s.snapshot_type                     ←  snapshots
+  статус:         s.status                            ←  snapshots
+  дата:           s.creation_date                     ←  snapshots
+  имя:            s.description                       ←  snapshots
+  слои:           image_guid слоёв с тем же vm_snapshot_id (из блока СЛОИ)
+  память:         s.memory_dump_disk_id или memory_metadata_disk_id (если заданы)
+
+СЕТЬ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            vni.name                            ←  vm_interface
+  IPv4:           ipv4_addresses                      ←  vm_guest_agent_interfaces
+                  сопоставление по MAC: merge_guest_ips
+  MAC:            vni.mac_addr                        ←  vm_interface
+  сеть:           n.name                              ←  network
+                  JOIN vnic_profiles, network
+
+ЖУРНАЛ СОБЫТИЙ (последние 5)
+──────────────────────────────────────────────────────────────────────────────
+  log_time, log_type_name, user_name, message
+                  ←  audit_log
+                  WHERE vm_id = guid ИЛИ vm_name = имя ВМ
+                  ORDER BY log_time DESC LIMIT 5
+  подписи типов:  AUDIT_TYPE_LABELS в vm_inspector_sql.py
+
+══════════════════════════════════════════════════════════════════════════════

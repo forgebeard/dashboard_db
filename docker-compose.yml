@@ -1,7 +1,7 @@
 services:
-  ovirt-analyzer:
+  red-virt-analytics:
     build: .
-    container_name: ovirt-dump-analyzer
+    container_name: red-virt-analytics
     restart: unless-stopped
     ports:
       # Только loopback хоста: с LAN дашборд недоступен.

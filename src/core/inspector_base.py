@@ -2,26 +2,23 @@
 """
 Базовая абстракция для SQL-инспекторов oVirt Engine.
 
-Унифицирует подключение к БД через SQLAlchemy, заменяет прямой psycopg2,
-предоставляет общие хелперы форматирования и контекстный менеджер
-для автоматического управления ресурсами.
+Контекстный менеджер соединения и параметризованные fetch_one / fetch_all.
 """
 
 from __future__ import annotations
 
-import logging  # Логирование жизненного цикла соединений
+import logging
 from collections.abc import Callable
-from datetime import datetime  # Работа с датой/временем для хелперов форматирования
-from typing import Any, TypeVar  # Type hints для универсальных параметров
+from typing import Any, TypeVar
 
-from sqlalchemy import text  # Параметризованные запросы с :param синтаксисом
-from sqlalchemy.engine import Engine  # Тип движка SQLAlchemy для type hints
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
 from sqlalchemy.sql.expression import (
-    TextClause,  # Тип для проверки готовых SQL-объектов
+    TextClause,
 )
 
 from core.db_utils import (
-    get_sqlalchemy_engine,  # Единая точка получения кэшированного движка
+    get_sqlalchemy_engine,
 )
 from core.exceptions import DataLoadError, wrap_load_error
 
@@ -34,8 +31,7 @@ class InspectorBase:
     Базовый класс для всех инспекторов дампов PostgreSQL oVirt Engine.
 
     Используется как контекстный менеджер для гарантированного освобождения
-    соединений. Предоставляет параметризованные запросы через sqlalchemy.text()
-    и общие утилиты форматирования.
+    соединений. Предоставляет параметризованные запросы через sqlalchemy.text().
 
     Пример использования:
         with InspectorBase("engine_dump_2024") as insp:
@@ -156,65 +152,3 @@ class InspectorBase:
         stmt = sql if isinstance(sql, TextClause) else text(sql)
         result = self._wrap_driver(lambda: self._conn.execute(stmt, params or {}))
         return [dict(row) for row in result.mappings().fetchall()]
-
-    # ─── Общие хелперы форматирования ────────────────────────────────
-    # Эти методы покрывают типовые потребности инспекторов oVirt.
-    # Специфичные для конкретного инспектора хелперы остаются в его модуле.
-
-    @staticmethod
-    def fmt_date(value: Any, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-        """
-        Форматирует дату/время для отображения в отчётах.
-
-        Args:
-            value: Объект datetime, строка или None.
-            fmt: Формат вывода strftime.
-
-        Returns:
-            Отформатированная строка или "N/A" при отсутствии значения.
-        """
-        if value is None:
-            return "N/A"
-        if isinstance(value, datetime):
-            return value.strftime(fmt)
-        return str(value)
-
-    @staticmethod
-    def fmt_size_gb(value: Any, precision: int = 2) -> str:
-        """
-        Форматирует размер в байтах в гигабайты для отображения.
-
-        Args:
-            value: Размер в байтах (int/float/str) или None.
-            precision: Количество знаков после запятой.
-
-        Returns:
-            Строка вида "123.45 GB" или "N/A".
-        """
-        if value is None:
-            return "N/A"
-        try:
-            gb = float(value) / (1024 ** 3)
-            return f"{gb:.{precision}f} GB"
-        except (ValueError, TypeError):
-            return "N/A"
-
-    @staticmethod
-    def fmt_status(status_code: Any, status_map: dict[int, str]) -> str:
-        """
-        Маппит числовой код статуса в человекочитаемую строку.
-
-        Args:
-            status_code: Числовой код статуса из БД.
-            status_map: Словарь маппинга {код: описание}.
-
-        Returns:
-            Описание статуса или "Unknown (<code>)".
-        """
-        if status_code is None:
-            return "N/A"
-        try:
-            code = int(status_code)
-        except (ValueError, TypeError):
-            return f"Invalid ({status_code})"
-        return status_map.get(code, f"Unknown ({code})")

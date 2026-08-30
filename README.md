@@ -45,6 +45,8 @@
 
 При первом запуске скрипт спросит параметры и соберёт контейнер.
 
+Если контейнер уже был запущен со старым именем (`ovirt-dump-analyzer` / сервис `ovirt-analyzer`), сначала `docker compose down`, затем снова `./start.sh` (или `start.bat`).
+
 | Параметр | По умолчанию | Описание |
 |---|---|---|
 | `DB_HOST` | `host.docker.internal` | Postgres на той же машине, что Docker |
@@ -106,97 +108,67 @@ sudo systemctl reload postgresql-15
 
 ```text
 .
-├── Dockerfile                  # Сборка Docker-образа
-├── docker-compose.yml          # Оркестрация контейнера
-├── start.sh                    # Интерактивный запуск и настройка (Linux/macOS)
-├── start.bat                   # Интерактивный запуск и настройка (Windows)
-├── pyproject.toml              # Прямые runtime/dev-зависимости
-├── uv.lock                     # Lock-файл uv (воспроизводимые транзитивы)
-├── ruff.toml                   # Узкий линт (E, F, I)
-├── .github/workflows/ci.yml    # ruff, pytest+coverage, docker build
-├── .env.example                # Шаблон переменных окружения
-├── requirements.txt            # Экспорт runtime из uv.lock (Docker)
-├── requirements-dev.txt        # Экспорт runtime+dev из uv.lock (CI)
+├── Dockerfile
+├── docker-compose.yml          # сервис и контейнер: red-virt-analytics
+├── start.sh / start.bat
+├── pyproject.toml              # name = red-virt-analytics
+├── uv.lock
+├── ruff.toml
+├── .github/workflows/ci.yml
+├── .env.example
+├── requirements.txt / requirements-dev.txt
 │
 └── src/
-    ├── app.py                  # Точка входа: маршрутизация вкладок
-    ├── core/                   # Базовые утилиты ядра
-    │   ├── config.py           # Глобальные настройки (лимиты, CSS)
-    │   ├── constants.py        # Справочники статусов (VM/HOST_STATUS_MAP)
-    │   ├── db_utils.py         # Движок подключения к БД
-    │   ├── exceptions.py       # DataLoadError, форматирование ошибок SQL
-    │   ├── data_loader.py      # Загрузка метаданных инфраструктуры
-    │   ├── sql_editor.py       # Компонент глобального SQL-редактора
-    │   └── ui_utils.py         # Утилиты UI (форматирование UUID, дат)
+    ├── app.py
+    ├── core/
+    │   ├── config.py
+    │   ├── constants.py
+    │   ├── db_utils.py
+    │   ├── exceptions.py
+    │   ├── data_loader.py
+    │   ├── inspector_base.py   # контекст SQL для инспекторов
+    │   ├── sql_guard.py        # ad-hoc SELECT/WITH
+    │   ├── sql_editor.py
+    │   ├── report_text.py      # рамки текстовых отчётов
+    │   ├── table_preview.py    # сырые таблицы (diagnostics)
+    │   └── ui_utils.py
     │
-    ├── vms/                    # Модуль Виртуальных машин
-    │   ├── vms_module.py       # UI: список, фильтры, инспектор
-    │   ├── vms_utils.py        # Логика: SQL-запросы, маппинги
-    │   ├── vms_diagnostics.py  # Просмотр таблиц vm_static/dynamic
-    │   └── vm_inspector_sql.py # Отчет по ВМ (диски, сеть, снапшоты)
-    │
-    ├── hosts/                  # Модуль Хостов
-    │   ├── hosts_module.py     # UI: список хостов, фильтры
-    │   ├── hosts_utils.py      # Логика: запросы к vds_static/dynamic
-    │   ├── hosts_diagnostics.py# Таблицы хостов и интерфейсов
-    │   └── host_inspector_sql.py # Отчет по хосту (CPU, RAM, Storage)
-    │
-    ├── storage/                # Модуль Хранилищ
-    │   ├── storage_module.py   # UI: список Storage Domains
-    │   ├── storage_utils.py    # Логика: связи SD <-> DC <-> Hosts
-    │   └── storage_diagnostics.py # Таблицы storage_domains, luns
-    │
-    ├── clusters/               # Модуль Кластеров
-    │   ├── clusters_module.py  # UI: список кластеров, версии
-    │   ├── clusters_utils.py   # Логика: параметры, scheduling policy
-    │   └── clusters_diagnostics.py # Таблицы cluster, cluster_policy
-    │
-    ├── networks/               # Модуль Сетей
-    │   ├── network_module.py   # UI: логические сети, vNIC profiles
-    │   ├── network_utils.py    # Логика: маппинг сетей на хосты
-    │   └── network_diagnostics.py # Таблицы network, vnic_profiles
-    │
-    ├── disks/                  # Модуль Дисков и Образов
-    │   ├── disks_module.py     # UI: список дисков, форматы
-    │   ├── disks_utils.py      # Логика: Disk <-> Image <-> Volume
-    │   └── disks_diagnostics.py # Таблицы images, image_group_map
-    │
-    ├── snapshots/              # Модуль Снапшотов
-    │   ├── snapshots_module.py # UI: дерево снапшотов, статусы
-    │   ├── snapshots_utils.py  # Логика: цепочки снапшотов
-    │   └── snapshots_diagnostics.py # Таблицы snapshots, child_map
-    │
-    ├── gluster/                # Модуль GlusterFS
-    │   ├── gluster_module.py   # UI: тома, брики, статусы
-    │   ├── gluster_utils.py    # Логика: мониторинг Gluster
-    │   └── gluster_diagnostics.py # Таблицы gluster_volumes_services
-    │
-    ├── tasks/                  # Модуль Асинхронных задач
-    │   ├── tasks_module.py     # UI: список Jobs, шаги
-    │   ├── tasks_utils.py      # Логика: поиск зависших задач
-    │   └── tasks_diagnostics.py # Таблицы job, step
-    │
-    ├── audit/                  # Модуль Журнала событий
-    │   ├── audit_module.py     # UI: фильтр событий, таймлайн
-    │   ├── audit_utils.py      # Логика: агрегация ошибок
-    │   └── audit_diagnostics.py # Таблица audit_log (с LIMIT)
-    │
-    ├── users/                  # Модуль Пользователей и прав
-    │   ├── users_module.py     # UI: пользователи, роли, проекты
-    │   ├── users_utils.py      # Логика: RBAC проверки
-    │   └── users_diagnostics.py # Таблицы users, permissions
-    │
-    ├── system/                 # Системные таблицы
-    │   ├── system_module.py    # UI: общие настройки engine
-    │   └── system_utils.py     # Логика: конфигурационные ключи
-    │
-    ├── cert/                   # Модуль Сертификатов PKI
-    │   └── certificates.py     # Проверка сроков действия CA/Host
-    │
-    └── atlas/                  # Справочник схемы БД
-        ├── atlas_module.py     # Интерактивная карта таблиц oVirt
-        ├── data_loader.py      # Загрузка JSON-метаданных схемы
-        └── renderer.py         # Отрисовка графа связей
+    ├── hosts/                  # module, utils, diagnostics
+    │   ├── host_inspector_sql.py
+    │   └── host_inspector_sql.txt   # поле → таблица → колонка
+    ├── vms/
+    │   ├── vm_inspector_sql.py
+    │   └── vm_inspector_sql.txt
+    ├── snapshots/
+    │   ├── snapshot_inspector_sql.py
+    │   └── snapshot_inspector_sql.txt
+    ├── clusters/
+    │   ├── cluster_inspector_sql.py
+    │   └── cluster_inspector_sql.txt
+    ├── networks/
+    │   ├── network_inspector_sql.py
+    │   └── network_inspector_sql.txt
+    ├── storage/
+    │   ├── storage_inspector_sql.py
+    │   └── storage_inspector_sql.txt
+    ├── disks/
+    │   ├── disks_inspector_sql.py
+    │   └── disks_inspector_sql.txt
+    ├── gluster/
+    │   ├── gluster_inspector_sql.py
+    │   └── gluster_inspector_sql.txt
+    ├── tasks/                  # module, utils, diagnostics (без инспектора)
+    ├── audit/
+    ├── users/
+    ├── system/
+    ├── cert/                   # certificates.py
+    └── atlas/
+        ├── atlas_module.py
+        ├── data_loader.py
+        ├── renderer.py
+        ├── compat.json
+        ├── changelog.json
+        └── data/*.json
 ```
 
 ## Руководство по модулям
@@ -204,11 +176,13 @@ sudo systemctl reload postgresql-15
 ### Хосты и ВМ
 -   **Список:** Поиск по имени/FQDN, фильтрация по кластерам, выделение проблемных узлов.
 -   **Инспектор:** Текстовый отчет со статусами, ресурсами, сетью и аудиторскими событиями.
+-   **Происхождение полей:** `src/hosts/host_inspector_sql.txt`, `src/vms/vm_inspector_sql.txt`, `src/clusters/cluster_inspector_sql.txt`, `src/snapshots/snapshot_inspector_sql.txt`, `src/networks/network_inspector_sql.txt`, `src/storage/storage_inspector_sql.txt`, `src/disks/disks_inspector_sql.txt`, `src/gluster/gluster_inspector_sql.txt` (подпись в отчёте → колонка → таблица).
 -   **Диагностика:** Прямой просмотр системных таблиц (`vds_static`, `vm_dynamic`) с защитой от переполнения памяти.
 
 ### Сети и Хранилища
 -   Анализ логических сетей, vNIC профилей и состояния Storage Domains.
 -   Проверка связей между хранилищами и дата-центрами, поиск несоответствий LUN.
+-   **Происхождение полей:** `src/networks/network_inspector_sql.txt`, `src/storage/storage_inspector_sql.txt`, `src/disks/disks_inspector_sql.txt`, `src/gluster/gluster_inspector_sql.txt`.
 
 ### Задачи и Аудит
 -   Мониторинг зависших задач (Jobs) и анализ журнала событий (Audit Log).

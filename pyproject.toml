@@ -1,5 +1,5 @@
 [project]
-name = "ovirt-analyzer"
+name = "red-virt-analytics"
 version = "0.1.0"
 description = "Дашборд диагностики дампов PostgreSQL oVirt Engine"
 readme = "README.md"

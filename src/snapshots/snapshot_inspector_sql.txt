@@ -1,0 +1,56 @@
+══════════════════════════════════════════════════════════════════════════════
+  Snapshot-Inspector                                     generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_snapshot_inspector_report / format_snapshot_report в snapshot_inspector_sql.py.
+Ключ: vm_id + snapshot_id. Алиасы: v = vm_static, c = cluster, dc = storage_pool, s = snapshots.
+
+ВМ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            v.vm_name                           ←  vm_static
+  UUID:           v.vm_guid                           ←  vm_static
+  кластер:        c.name                              ←  cluster JOIN v.cluster_id
+  дата-центр:     dc.name                             ←  storage_pool JOIN c.storage_pool_id
+
+ВЫБРАННЫЙ СНАПШОТ
+──────────────────────────────────────────────────────────────────────────────
+  snapshot_id:    s.snapshot_id                       ←  snapshots WHERE s.vm_id
+  тип:            s.snapshot_type                     ←  snapshots (как есть)
+  статус:         s.status                            ←  snapshots
+  дата:           s.creation_date                     ←  snapshots
+  имя:            s.description                       ←  snapshots
+  broken:         s.vm_configuration_broken           ←  snapshots (если колонка есть)
+  app_list:       s.app_list                          ←  snapshots (если колонка есть)
+  changed_fields: s.changed_fields                    ←  snapshots (если колонка есть)
+                  нет extra-колонок → retry SELECT без них
+  память dump:    s.memory_dump_disk_id + dump.disk_alias  ←  base_disks
+  память meta:    s.memory_metadata_disk_id + meta.disk_alias
+  слои:           image_guid слоёв с vm_snapshot_id = выбранный
+
+СЛОИ ЭТОГО СНАПШОТА
+──────────────────────────────────────────────────────────────────────────────
+  фильтр:         images.vm_snapshot_id = выбранный snapshot_id
+  диск:           bd.disk_alias                       ←  base_disks через vm_device type=disk
+  image_guid, active, parentid, imagestatus
+  тип:            volume_type / volume_format         ←  maps из vm_inspector
+  размер:         did.actual_size, иначе i.size       ←  disk_image_dynamic / images
+  хранилище:      string_agg(sd.storage_name)         ←  storage_domain_static
+  порядок:        order_layers_by_parent
+
+ЦЕПОЧКА ВМ
+──────────────────────────────────────────────────────────────────────────────
+  все строки snapshots этой ВМ (ORDER BY creation_date)
+  ► отмечает выбранный snapshot_id
+  слои:           COUNT слоёв с тем же vm_snapshot_id (или COUNT из выборки)
+
+СЛОИ ВМ (по дискам, корень → лист)
+──────────────────────────────────────────────────────────────────────────────
+  все слои дисков ВМ (тот же SELECT, без фильтра снапшота)
+  карточка без хранилища: снапшот = vm_snapshot_id, метка «← выбран»
+
+ЧЕКПОИНТЫ
+──────────────────────────────────────────────────────────────────────────────
+  checkpoint_id, parent_id, _create_date, state, description
+                  ←  vm_checkpoints WHERE vm_id
+
+══════════════════════════════════════════════════════════════════════════════

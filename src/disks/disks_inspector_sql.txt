@@ -1,0 +1,57 @@
+══════════════════════════════════════════════════════════════════════════════
+  DISK-Inspector                                         generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_disk_inspector_report / format_disk_report в disks_inspector_sql.py.
+Ключ отчёта: image_guid (слой). Алиасы: i = images, bd = base_disks, did = disk_image_dynamic.
+
+ВЫБРАННЫЙ СЛОЙ
+──────────────────────────────────────────────────────────────────────────────
+  image_guid:     i.image_guid                        ←  images
+  статус:         i.imagestatus                       ←  IMAGE_STATUS_MAP
+  active:         i.active                            ←  images, да/нет
+  parentid:       i.parentid                          ←  images
+  вирт. размер:   i.size                              ←  images
+  факт. размер:   did.actual_size                     ←  disk_image_dynamic
+  хранилище:      sd.storage_name                     ←  storage_domain_static
+                  JOIN image_storage_domain_map (список имён)
+  снапшот:        i.vm_snapshot_id + vs.description   ←  snapshots
+  создан:         i.creation_date                     ←  images
+
+ДИСК
+──────────────────────────────────────────────────────────────────────────────
+  disk_id:        i.image_group_id                    ←  images
+  имя:            bd.disk_alias                       ←  base_disks
+  shareable:      bd.shareable                        ←  base_disks
+  wipe:           bd.wipe_after_delete                ←  base_disks
+  тип:            i.volume_type, i.volume_format      ←  VOLUME_TYPE_MAP / VOLUME_FORMAT_MAP (vm_inspector)
+  content_type:   bd.disk_content_type                ←  DISK_CONTENT_TYPE_MAP
+
+ПРИВЯЗКИ
+──────────────────────────────────────────────────────────────────────────────
+  ВМ:             vm.vm_name                          ←  vm_static
+  UUID:           vm.vm_guid                          ←  vm_static
+  статус:         vdyn.status                         ←  vm_dynamic, VM_STATUS_MAP
+  подключён:      vd.is_plugged                       ←  vm_device
+  boot:           dve.is_boot                         ←  disk_vm_element
+  шина:           dve.disk_interface                  ←  disk_vm_element
+                  WHERE vd.device_id = disk_id AND vd.type = 'disk'
+
+СЛОИ
+──────────────────────────────────────────────────────────────────────────────
+  все слои диска: images WHERE image_group_id = disk_id
+  image_guid, parentid, imagestatus, active,
+  volume_type/format, actual_size|size, vm_snapshot_id
+  порядок:        order_layers_by_parent (Python)
+  метка «← выбран»: слой = ключ отчёта
+
+ЗАДАЧИ
+──────────────────────────────────────────────────────────────────────────────
+  задача:         at.action_type                      ←  async_tasks, action_type_label
+  статус:         at.status                           ←  async_task_status_label
+  старт:          at.started_at                       ←  async_tasks
+  task_id:        at.task_id                          ←  async_tasks
+                  JOIN async_tasks_entities
+                  WHERE entity_id IN (image_guid, disk_id), LIMIT 10
+
+══════════════════════════════════════════════════════════════════════════════

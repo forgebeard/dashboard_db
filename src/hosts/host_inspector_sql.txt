@@ -1,0 +1,63 @@
+══════════════════════════════════════════════════════════════════════════════
+  Host-Inspector                                     generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_host_inspector_report / format_host_report в host_inspector_sql.py.
+Алиасы основного SELECT: s = vds_static, d = vds_dynamic, c = cluster, sp = storage_pool.
+
+СВЕДЕНИЯ О ХОСТЕ
+──────────────────────────────────────────────────────────────────────────────
+  Имя хоста:      s.vds_name                          ←  vds_static
+  ID:             s.vds_id                            ←  vds_static
+  FQDN:           s.host_name                         ←  vds_static
+                  в отчёте подпись «FQDN», в схеме колонка host_name
+  Кластер:        c.name                              ←  cluster
+                  JOIN s.cluster_id = c.cluster_id
+  Дата-центр:     sp.name                             ←  storage_pool
+                  JOIN c.storage_pool_id = sp.id
+  Создан:         s._create_date                      ←  vds_static, ДД.ММ.ГГГГ ЧЧ:ММ
+  Обновлён:       s._update_date                      ←  vds_static, тот же формат
+
+РЕСУРСЫ
+──────────────────────────────────────────────────────────────────────────────
+  Статус:         d.status                            ←  vds_dynamic, HOST_STATUS_MAP
+  Kdump:          d.kdump_status (kdump_code)         ←  vds_dynamic, KDUMP_MAP
+  SPM:            (s.vds_id = sp.spm_vds_id)          ←  вычисляемое, не колонка хоста
+  CPU:            d.cpu_sockets, cpu_cores, cpu_threads  ←  vds_dynamic
+  Модель CPU:     d.cpu_model                         ←  vds_dynamic
+  RAM:            d.physical_mem_mb, d.mem_commited   ←  vds_dynamic (МБ → ГБ, % committed)
+  ВМ на хосте:    d.vm_active                         ←  vds_dynamic
+
+ВЕРСИИ
+──────────────────────────────────────────────────────────────────────────────
+  ОС:             d.pretty_name, иначе d.host_os      ←  vds_dynamic
+  Ядро:           d.kernel_version                    ←  vds_dynamic
+  VDSM:           d.software_version                  ←  vds_dynamic
+  Libvirt:        d.libvirt_version                   ←  vds_dynamic (срез префикса «libvirt-»)
+  KVM:            d.kvm_version                       ←  vds_dynamic
+
+РЕД ВИРТ 8
+──────────────────────────────────────────────────────────────────────────────
+  Блок не строится, если release_key == "7.3".
+  CPU topology:   cpu_topology                        ←  vds_dynamic, JSON ужимается
+  OVN:            ovn_configured                      ←  vds_dynamic, да/нет
+  VDSM affinity:  vdsm_cpus_affinity                  ←  vds_dynamic
+                  нет колонки → узкий retry / ошибка секции engine8
+
+СЕТЕВЫЕ ИНТЕРФЕЙСЫ
+──────────────────────────────────────────────────────────────────────────────
+  name, mac_addr, addr, subnet, gateway, mtu, speed,
+  is_bond, bond_name, vlan_id [, network_name]
+                  ←  vds_interface, WHERE vds_id, без lo
+                  нет network_name на старой схеме → retry без колонки
+  группировка:    group_host_interfaces (Python, не колонка БД)
+
+ЖУРНАЛ СОБЫТИЙ (последние 5)
+──────────────────────────────────────────────────────────────────────────────
+  log_time, log_type_name, user_name, message
+                  ←  audit_log
+                  WHERE vds_id = хост ИЛИ vds_name = имя хоста
+                  ORDER BY log_time DESC LIMIT 5
+  подписи типов:  AUDIT_TYPE_LABELS в host_inspector_sql.py
+
+══════════════════════════════════════════════════════════════════════════════

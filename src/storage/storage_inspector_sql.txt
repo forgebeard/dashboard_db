@@ -1,0 +1,68 @@
+══════════════════════════════════════════════════════════════════════════════
+  STORAGE-Inspector                                  generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_storage_inspector_report / format_storage_report в storage_inspector_sql.py.
+Алиасы: sds = storage_domain_static, sdd = storage_domain_dynamic,
+sdss = storage_domain_shared_status.
+
+СВЕДЕНИЯ О ДОМЕНЕ
+──────────────────────────────────────────────────────────────────────────────
+  Имя:            sds.storage_name                    ←  storage_domain_static
+  UUID:           sds.id                              ←  storage_domain_static
+  Тип домена:     sds.storage_domain_type             ←  STORAGE_DOMAIN_TYPE_MAP
+  Протокол:       sds.storage_type                    ←  STORAGE_TYPE_MAP
+  Storage:        sds.storage                         ←  storage_domain_static (storage_ref)
+  Формат:         sds.storage_domain_format_type      ←  storage_domain_static
+  Флаги:          Master = тип домена 0;
+                  Hosted Engine = EXISTS ВМ origin IN (5,6) с активным слоем на этом SD
+                  (vm_static + vm_device + images + image_storage_domain_map);
+                  backup = sds.backup
+
+ПРИВЯЗКА
+──────────────────────────────────────────────────────────────────────────────
+  Shared:         sdss.status                         ←  storage_domain_shared_status, SHARED_STATUS_MAP
+  Дата-центр:     sp.name + sp.status                 ←  storage_pool, STORAGE_POOL_STATUS_MAP
+  Attach:         spim.status                         ←  storage_pool_iso_map, STORAGE_DOMAIN_STATUS_MAP
+  SPM:            vs.vds_name + vd.status             ←  vds_static / vds_dynamic
+                  JOIN sp.spm_vds_id, HOST_STATUS_MAP
+
+МЕСТО
+──────────────────────────────────────────────────────────────────────────────
+  Занято:         sdd.used_disk_size                  ←  storage_domain_dynamic (ГБ + %)
+  Свободно:       sdd.available_disk_size             ←  то же
+  Всего:          used + free                         ←  Python, не колонка
+  Пороги:         sds.warning_low_space_indicator,
+                  sds.critical_space_action_blocker   ←  storage_domain_static (% free)
+  External:       sdd.external_status                 ←  EXTERNAL_STATUS_MAP
+  Confirmed:      sdd.confirmed_available_disk_size   ←  если задано
+
+ПОДКЛЮЧЕНИЕ
+──────────────────────────────────────────────────────────────────────────────
+  kind:           _connection_kind(sds.storage_type)
+                  block = типы 2,3 (FCP/iSCSI); glance = 8,9,10; иначе file
+  block LUN:      luns.* JOIN volume_group_id = sds.storage
+                  пути: COUNT lun_storage_server_connection_map
+  порталы:        storage_server_connections (connection, iqn, port)
+  file:           storage_server_connections JOIN ssc.id = sds.storage
+                  connection, nfs_version, mount_options
+  glance/unknown: подписи из header (протокол / storage_ref)
+
+СОДЕРЖИМОЕ
+──────────────────────────────────────────────────────────────────────────────
+  Образы:         COUNT GROUP BY i.imagestatus        ←  images + image_storage_domain_map
+                  IMAGE_STATUS_MAP
+  ВМ:             COUNT DISTINCT vm_guid GROUP BY entity_type, status
+                  ←  image_storage_domain_map + images + vm_device + vm_static + vm_dynamic
+                  VM_STATUS_MAP
+  Проблемные:     imagestatus IN Locked/Illegal/Merging, LIMIT 15
+                  ←  images + base_disks + vm_device + vm_static
+
+ВЕРДИКТ
+──────────────────────────────────────────────────────────────────────────────
+  не колонка БД:  collect_storage_issues (Python)
+                  shared Inactive/Mixed; attach ≠ Active; SPM ≠ Up;
+                  free% < warning/critical; external Warning/Error;
+                  образы Locked/Illegal/Merging
+
+══════════════════════════════════════════════════════════════════════════════

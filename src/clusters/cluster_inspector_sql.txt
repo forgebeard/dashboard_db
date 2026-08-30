@@ -1,0 +1,63 @@
+══════════════════════════════════════════════════════════════════════════════
+  Cluster-Inspector                                  generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_cluster_inspector_report / format_cluster_report в cluster_inspector_sql.py.
+Алиасы основного SELECT: c = cluster, sp = storage_pool, cp = cluster_policies, mp = mac_pools.
+
+СВЕДЕНИЯ О КЛАСТЕРЕ
+──────────────────────────────────────────────────────────────────────────────
+  Имя:            c.name                              ←  cluster
+  UUID:           c.cluster_id                        ←  cluster
+  Дата-центр:     sp.name                             ←  storage_pool
+                  JOIN c.storage_pool_id = sp.id
+  Совместимость:  c.compatibility_version             ←  cluster
+  CPU:            c.cpu_name                          ←  cluster
+  Архитектура:    c.architecture                      ←  cluster, ARCHITECTURE_MAP
+  Машина:         c.emulated_machine                  ←  cluster
+  BIOS:           c.bios_type                         ←  cluster, BIOS_TYPE_MAP
+  MAC-пул:        mp.name                             ←  mac_pools JOIN c.mac_pool_id
+  Планировщик:    cp.name                             ←  cluster_policies JOIN c.cluster_policy_id
+
+РЕСУРСЫ
+──────────────────────────────────────────────────────────────────────────────
+  ВМ:             COUNT(*), COUNT FILTER status=Up    ←  vm_static + vm_dynamic
+                  WHERE cluster_id, entity_type = 'VM'
+  RAM / CPU:      SUM(physical_mem_mb), SUM(cpu_cores) ←  vds (view), Python-сумма
+  Overcommit:     c.max_vds_memory_over_commit        ←  cluster (%)
+
+ПОЛИТИКА
+──────────────────────────────────────────────────────────────────────────────
+  ключи JSON:     c.cluster_policy_custom_properties  ←  cluster (разбор JSON)
+  При ошибке хоста: c.migrate_on_error                ←  cluster, MIGRATE_ON_ERROR_MAP
+  Balloon / KSM:  c.enable_balloon, c.enable_ksm      ←  cluster, вкл/выкл
+  HA reservation: c.ha_reservation                    ←  cluster
+  Fencing:        c.fencing_enabled                   ←  cluster
+  Skip if SD active: c.skip_fencing_if_sd_active      ←  cluster (строка только если вкл)
+  Skip if connectivity: skip_fencing_if_connectivity_broken
+                  + hosts_with_broken_connectivity_threshold  ←  cluster
+
+РЕД ВИРТ 8
+──────────────────────────────────────────────────────────────────────────────
+  Блок не строится, если release_key == "7.3".
+  Паралл. миграции: parallel_migrations               ←  cluster
+  Upgrade id:     upgrade_correlation_id              ←  cluster
+  Upgrade %:      upgrade_percent_complete            ←  cluster
+                  нет колонок → узкий retry / ошибка секции engine8
+
+ХОСТЫ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            v.vds_name                          ←  vds
+  статус:         v.status                            ←  vds, HOST_STATUS_MAP
+                  WHERE v.cluster_id
+
+АФФИННОСТЬ
+──────────────────────────────────────────────────────────────────────────────
+  Группа:         ag.name                             ←  affinity_groups
+  VM:             ag.vm_positive, ag.vm_enforcing     ←  Positive/Negative + Enforced/Soft
+  Host:           ag.vds_positive                     ←  Positive/Negative
+  Члены:          vs.vm_name / hs.vds_name            ←  affinity_group_members
+                  JOIN vm_static, vds_static
+                  группировка: _group_affinity (Python)
+
+══════════════════════════════════════════════════════════════════════════════

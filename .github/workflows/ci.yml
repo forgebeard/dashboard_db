@@ -33,4 +33,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Docker build
-        run: docker build -t ovirt-analyzer:ci .
+        run: docker build -t red-virt-analytics:ci .

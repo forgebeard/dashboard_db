@@ -1,0 +1,57 @@
+══════════════════════════════════════════════════════════════════════════════
+  Gluster-Inspector                                      generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_gluster_volume_report / format_gluster_report в gluster_inspector_sql.py.
+Алиасы: v = gluster_volumes_view, vd = gluster_volume_details.
+
+ТОМ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            v.vol_name                          ←  gluster_volumes_view
+  UUID:           v.id                                ←  gluster_volumes_view
+  кластер:        v.cluster_name                      ←  gluster_volumes_view
+  тип:            v.vol_type                          ←  gluster_volumes_view
+  статус:         v.status                            ←  gluster_volumes_view
+  replica:        v.replica_count                     ←  gluster_volumes_view
+  disperse:       v.disperse_count                    ←  gluster_volumes_view
+  stripe:         v.stripe_count                      ←  gluster_volumes_view
+  снапшоты:       v.snapshot_count                    ←  gluster_volumes_view
+  занято:         vd.used_space                       ←  gluster_volume_details
+  всего:          vd.total_space                      ←  gluster_volume_details
+  заполнено:      used/total                          ←  Python %
+
+КИРПИЧИ
+──────────────────────────────────────────────────────────────────────────────
+  хост:           b.vds_name                          ←  gluster_volume_bricks_view
+  UUID:           b.id                                ←  gluster_volume_bricks_view
+  путь:           b.brick_dir                         ←  gluster_volume_bricks_view
+  адрес:          b.interface_address                 ←  gluster_volume_bricks_view
+  статус:         b.status                            ←  gluster_volume_bricks_view
+  arbiter:        b.is_arbiter                        ←  gluster_volume_bricks_view
+  занято:         bd.used_space                       ←  gluster_volume_brick_details
+  заполнено:      used/total кирпича                  ←  Python %
+                  WHERE b.volume_id, ORDER BY brick_order
+
+ОПЦИИ
+──────────────────────────────────────────────────────────────────────────────
+  опция:          option_key = option_val             ←  gluster_volume_options
+                  WHERE volume_id
+
+GEO
+──────────────────────────────────────────────────────────────────────────────
+  slave:          slave_host_name / slave_volume_name ←  gluster_georep_session
+  статус:         ggs.status                          ←  gluster_georep_session
+  checkpoint:     ggsd.checkpoint_status              ←  gluster_georep_session_details
+  pending:        ggsd.data_pending                   ←  gluster_georep_session_details
+  last_sync:      ggsd.last_synced_at                 ←  gluster_georep_session_details
+                  WHERE master_volume_id
+
+СНАПШОТЫ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            snapshot_name                       ←  gluster_volume_snapshots
+  статус:         status                              ←  gluster_volume_snapshots
+  _create_date:   _create_date                        ←  gluster_volume_snapshots
+  описание:       description                         ←  gluster_volume_snapshots
+                  WHERE volume_id, ORDER BY _create_date DESC
+
+══════════════════════════════════════════════════════════════════════════════

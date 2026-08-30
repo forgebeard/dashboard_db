@@ -1,0 +1,70 @@
+══════════════════════════════════════════════════════════════════════════════
+  Network-Inspector                                      generated_at (локальное время)
+══════════════════════════════════════════════════════════════════════════════
+
+Источник: get_network_inspector_report / format_network_report в network_inspector_sql.py.
+Алиасы: n = network, sp = storage_pool.
+
+СЕТЬ
+──────────────────────────────────────────────────────────────────────────────
+  имя:            n.name                              ←  network
+  UUID:           n.id                                ←  network
+  дата-центр:     sp.name                             ←  storage_pool JOIN n.storage_pool_id
+  описание:       n.description                       ←  network
+  VLAN:           n.vlan_id                           ←  network
+  MTU:            n.mtu                               ←  network
+  vm_network:     n.vm_network                        ←  network, да/нет
+  vdsm_name:      n.vdsm_name                         ←  network
+  type:           n.type                              ←  network (код без словаря)
+  STP:            n.stp                               ←  network, да/нет
+  label:          n.label                             ←  network
+  subnet:         n.subnet                            ←  network
+  gateway:        n.gateway                           ←  network
+
+КЛАСТЕРЫ
+──────────────────────────────────────────────────────────────────────────────
+  кластер:        c.name                              ←  cluster
+  UUID:           c.cluster_id                        ←  cluster
+  статус:         nc.status                           ←  network_cluster, NETWORK_STATUS_MAP
+  management:     nc.management                       ←  network_cluster
+  required:       nc.required                         ←  network_cluster
+  display:        nc.is_display                       ←  network_cluster
+  migration:      nc.migration                        ←  network_cluster
+  gluster:        nc.is_gluster                       ←  network_cluster
+  default_route:  nc.default_route                    ←  network_cluster
+                  JOIN nc.cluster_id = c.cluster_id, WHERE nc.network_id
+
+ПРОФИЛИ
+──────────────────────────────────────────────────────────────────────────────
+  профиль:        vp.name                             ←  vnic_profiles
+  UUID:           vp.id                               ←  vnic_profiles
+  mirroring:      vp.port_mirroring                   ←  vnic_profiles
+  passthrough:    vp.passthrough                      ←  vnic_profiles
+  migratable:     vp.migratable                       ←  vnic_profiles
+  filter:         nf.filter_name                      ←  network_filter JOIN network_filter_id
+  QoS:            qos.name                            ←  qos JOIN vp.network_qos_id
+
+DNS
+──────────────────────────────────────────────────────────────────────────────
+  сервер:         ns.address, ns.position             ←  name_server
+                  WHERE dns_resolver_configuration_id = n.dns_resolver_configuration_id
+                  пустой dns_config_id → секция «нет DNS»
+
+ХОСТЫ
+──────────────────────────────────────────────────────────────────────────────
+  хост:           v.vds_name                          ←  vds_static
+  UUID:           v.vds_id                            ←  vds_static
+  NIC:            vi.name                             ←  vds_interface
+  VLAN:           vi.vlan_id                          ←  vds_interface
+  address:        na.address                          ←  network_attachments
+                  JOIN nic_id = vi.id, vi.vds_id = v.vds_id
+
+ВМ
+──────────────────────────────────────────────────────────────────────────────
+  ВМ:             vm.vm_name                          ←  vm_static
+  UUID:           vm.vm_guid                          ←  vm_static
+  MAC:            vni.mac_addr                        ←  vm_interface
+  профиль:        vp.name                             ←  vnic_profiles
+                  WHERE vp.network_id, LIMIT 50 (подпись «показаны первые 50»)
+
+══════════════════════════════════════════════════════════════════════════════
