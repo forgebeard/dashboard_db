@@ -21,6 +21,7 @@ htmlcov/
 
 # Логи и дампы БД
 logs/*.log
+logs/*.json
 *.dump
 *.sql.gz
 
