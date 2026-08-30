@@ -72,6 +72,14 @@ def test_load_cluster_metadata_structure(mock_db_dependencies):
         pd.DataFrame({'spid': ['dc1'], 'cid': ['c1']}),
         pd.DataFrame({'cid': ['c1'], 'vid': ['h1']}),
         pd.DataFrame({'table_name': ['host_template']}),
+        pd.DataFrame({'version': ['04041510']}),
+        pd.DataFrame(
+            {
+                'option_name': ['RPMVersion'],
+                'option_value': ['7.3.3'],
+                'version': ['general'],
+            }
+        ),
     ]
     mock_db_dependencies["read_sql"].side_effect = dfs
     result = load_cluster_metadata("test_db")
@@ -81,6 +89,8 @@ def test_load_cluster_metadata_structure(mock_db_dependencies):
     assert result['clusters'] == {'c1': 'Cluster1'}
     assert result['hosts'] == {'h1': 'Host1'}
     assert result["engine_release"] == "РЕД ВИРТ 8"
+    assert result["schema_version"] == "04041510"
+    assert result["product_version"] == "7.3.3"
     mock_db_dependencies["engine"].dispose.assert_not_called()
 
 def test_load_cluster_metadata_empty_db(mock_db_dependencies):
@@ -90,6 +100,8 @@ def test_load_cluster_metadata_empty_db(mock_db_dependencies):
     assert result['clusters'] == {}
     assert result['hosts'] == {}
     assert result["engine_release"] is None
+    assert result["schema_version"] is None
+    assert result["product_version"] is None
     mock_db_dependencies["engine"].dispose.assert_not_called()
 
 

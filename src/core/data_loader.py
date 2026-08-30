@@ -41,6 +41,13 @@ WHERE table_schema = 'public'
   )
 """
 
+_ENGINE_OPTION_PRIORITY = (
+    "RPMVersion",
+    "ProductRPMVersion",
+    "EngineVersion",
+    "VdcVersion",
+)
+
 
 def detect_engine_release(engine: Engine) -> str | None:
     """RED Virt 8 / 7.3 по таблицам-маркерам; None если дамп обрезан."""
@@ -57,6 +64,71 @@ def detect_engine_release(engine: Engine) -> str | None:
     if "infrastructure_backup" in names:
         return "РЕД ВИРТ 7.3"
     return None
+
+
+def pick_engine_product_version(rows: list[dict[str, Any]]) -> str:
+    """Первое непустое значение по приоритету имён; при дублях — version=general."""
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        name = str(row.get("option_name") or "")
+        value = row.get("option_value")
+        if not name or value in (None, ""):
+            continue
+        text_val = str(value).strip()
+        if not text_val:
+            continue
+        by_name.setdefault(name, []).append(
+            {"value": text_val, "version": str(row.get("version") or "")}
+        )
+    for name in _ENGINE_OPTION_PRIORITY:
+        candidates = by_name.get(name) or []
+        if not candidates:
+            continue
+        general = [c for c in candidates if c["version"].lower() == "general"]
+        chosen = (general or candidates)[0]
+        return chosen["value"]
+    return "—"
+
+
+def load_schema_version(engine: Engine) -> str | None:
+    try:
+        df = read_sql_df(
+            engine,
+            text("SELECT version FROM schema_version WHERE current = true LIMIT 1"),
+        )
+    except DataLoadError as exc:
+        logger.warning("Не удалось прочитать schema_version: %s", exc)
+        return None
+    if df.empty or "version" not in df.columns:
+        return None
+    value = df.iloc[0]["version"]
+    if value is None or str(value).strip() in ("", "—"):
+        return None
+    return str(value).strip()
+
+
+def load_product_version(engine: Engine) -> str | None:
+    names = ", ".join(f"'{item}'" for item in _ENGINE_OPTION_PRIORITY)
+    try:
+        df = read_sql_df(
+            engine,
+            text(
+                f"""
+                SELECT option_name, option_value, version
+                FROM vdc_options
+                WHERE option_name IN ({names})
+                """
+            ),
+        )
+    except DataLoadError as exc:
+        logger.warning("vdc_options (версия Engine): %s", exc)
+        return None
+    if df.empty:
+        return None
+    picked = pick_engine_product_version(df.to_dict("records"))
+    if picked in ("", "—"):
+        return None
+    return picked
 
 
 def _safe_load_dict(engine: Engine, query: str, id_col: str, name_col: str) -> dict[str, str]:
@@ -106,7 +178,8 @@ def load_cluster_metadata(db_name: str) -> dict[str, Any]:
         
     Returns:
         Словарь со справочниками: clusters, storage_domains, hosts, datacenters,
-                                  dc_to_clusters, cluster_to_hosts, engine_release
+                                  dc_to_clusters, cluster_to_hosts, engine_release,
+                                  product_version, schema_version
     """
     if not db_name:
         logger.warning("Попытка загрузки метаданных с пустым db_name")
@@ -176,6 +249,8 @@ def load_cluster_metadata(db_name: str) -> dict[str, Any]:
         metadata['cluster_to_hosts'] = {}
 
     metadata["engine_release"] = detect_engine_release(engine)
+    metadata["schema_version"] = load_schema_version(engine)
+    metadata["product_version"] = load_product_version(engine)
 
     logger.info(f"Метаданные для '{db_name}' загружены: "
                 f"DC={len(metadata.get('datacenters', {}))}, "

@@ -2,11 +2,14 @@
 
 import pandas as pd
 
+from core.data_loader import pick_engine_product_version
 from system.system_utils import (
     SYSTEM_TAB_SQL,
     fence_agents_caption,
     fence_warning_needed,
     filter_system_rows,
+    first_scalar_int,
+    hosted_engine_caption,
 )
 
 
@@ -40,3 +43,35 @@ def test_filter_system_rows():
     )
     assert len(filter_system_rows(df, "ipmilan")) == 1
     assert len(filter_system_rows(df, "")) == 2
+
+
+def test_pick_engine_product_version_prefers_rpm():
+    rows = [
+        {"option_name": "VdcVersion", "option_value": "4.5", "version": "general"},
+        {"option_name": "RPMVersion", "option_value": "4.5.6-1", "version": "4.5"},
+        {"option_name": "RPMVersion", "option_value": "4.5.6-1.el8", "version": "general"},
+    ]
+    assert pick_engine_product_version(rows) == "4.5.6-1.el8"
+
+
+def test_pick_engine_product_version_skips_empty():
+    rows = [
+        {"option_name": "RPMVersion", "option_value": "  ", "version": "general"},
+        {"option_name": "EngineVersion", "option_value": "4.4", "version": "general"},
+    ]
+    assert pick_engine_product_version(rows) == "4.4"
+    assert pick_engine_product_version([]) == "—"
+
+
+def test_first_scalar_int_uses_position_not_column_name():
+    df = pd.DataFrame({"count": [3]})
+    assert first_scalar_int(df) == 3
+    assert first_scalar_int(pd.DataFrame()) == 0
+
+
+def test_hosted_engine_caption_none_and_counts():
+    assert hosted_engine_caption(he_hosts=0, ha_active=0, he_disks=0) == "нет"
+    assert (
+        hosted_engine_caption(he_hosts=2, ha_active=1, he_disks=4)
+        == "2 хостов, ha-agent 1, диски 4"
+    )

@@ -136,6 +136,15 @@ def run_section(label: str, fn: Callable[[], None]) -> None:
         st.exception(exc)
 
 
+def _header_meta_part(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text == "—":
+        return None
+    return text
+
+
 def render_page_header(
     title: str,
     db_name: str,
@@ -145,9 +154,15 @@ def render_page_header(
     st.subheader(title)
     parts = [f"`{db_name}`"]
     meta = st.session_state.get("cluster_meta") or {}
-    release = meta.get("engine_release")
+    release = _header_meta_part(meta.get("engine_release"))
     if release:
-        parts.append(str(release))
+        parts.append(release)
+    product = _header_meta_part(meta.get("product_version"))
+    if product:
+        parts.append(f"Engine {product}")
+    schema = _header_meta_part(meta.get("schema_version"))
+    if schema:
+        parts.append(f"схема БД {schema}")
     if details:
         parts.extend(str(item) for item in details if item)
     st.caption(" · ".join(parts))

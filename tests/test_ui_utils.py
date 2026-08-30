@@ -38,6 +38,30 @@ def test_render_page_header_includes_release(mock_st):
     mock_st.caption.assert_called_once_with("`67705` · РЕД ВИРТ 8 · 4 хостов")
 
 
+@patch("core.ui_utils.st")
+def test_render_page_header_includes_engine_and_schema(mock_st):
+    mock_st.session_state.get.return_value = {
+        "engine_release": "РЕД ВИРТ 7.3",
+        "product_version": "7.3.3",
+        "schema_version": "04041510",
+    }
+    render_page_header("Хосты", "67705", details=["4 хостов"])
+    mock_st.caption.assert_called_once_with(
+        "`67705` · РЕД ВИРТ 7.3 · Engine 7.3.3 · схема БД 04041510 · 4 хостов"
+    )
+
+
+@patch("core.ui_utils.st")
+def test_render_page_header_skips_placeholder_versions(mock_st):
+    mock_st.session_state.get.return_value = {
+        "engine_release": "РЕД ВИРТ 8",
+        "product_version": "—",
+        "schema_version": "",
+    }
+    render_page_header("Хосты", "67705", details=["4 хостов"])
+    mock_st.caption.assert_called_once_with("`67705` · РЕД ВИРТ 8 · 4 хостов")
+
+
 def test_fix_uuid_columns_stringifies_rv8_cpu_topology():
     topology = {"sockets": [{"cores": [{"cpus": [0, 1]}]}]}
     df = pd.DataFrame(

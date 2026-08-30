@@ -49,7 +49,6 @@ def render_system_list(active_db: str, cluster_meta: dict) -> None:
 
     host_count = len((cluster_meta or {}).get("hosts", {}))
     details = [
-        f"версия {summary['schema_version']}",
         f"сессий: {summary['sessions_count']}",
         fence_agents_caption(summary["fence_configured"]),
         f"трансферов: {summary['active_transfers']}",
@@ -60,6 +59,12 @@ def render_system_list(active_db: str, cluster_meta: dict) -> None:
     if fence_warning_needed(host_count, summary["fence_configured"]):
         st.warning("Хосты есть, но фенсинг не настроен!")
     st.caption(fence_agents_caption(summary["fence_configured"]))
+
+    with st.container(border=True):
+        st.metric(
+            "Hosted Engine",
+            str(summary.get("hosted_engine") or "нет"),
+        )
 
     tabs = st.tabs([SYSTEM_TAB_LABELS[tab_id] for tab_id in _TAB_ORDER])
     for tab, tab_id in zip(tabs, _TAB_ORDER):
