@@ -18,6 +18,12 @@ from core.sql_guard import apply_max_row_limit, validate_adhoc_sql
         "SELECT * FROM vm_static;   ",
         "-- comment\nSELECT 1",
         "SELECT 1 /* block */",
+        "SELECT 'text -- not a comment'",
+        "SELECT 'DELETE'",
+        "SELECT 'a;b'",
+        "SELECT $$ text /* not a comment */ $$",
+        "SELECT $tag$ DELETE ; -- still literal $tag$",
+        'SELECT "INTO"',
     ],
 )
 def test_validate_allows_reads(sql):
@@ -46,6 +52,21 @@ def test_validate_allows_reads(sql):
 def test_validate_rejects_writes(sql):
     with pytest.raises(ValueError):
         validate_adhoc_sql(sql)
+
+
+def test_validate_keeps_literal_payload():
+    sql = "SELECT 'DELETE';   "
+    assert validate_adhoc_sql(sql) == "SELECT 'DELETE'"
+
+
+def test_strip_sql_comments_skips_literals():
+    from core.sql_guard import strip_sql_comments
+
+    text = "SELECT 'a -- b' /* c */ FROM t -- d"
+    cleaned = strip_sql_comments(text)
+    assert "'a -- b'" in cleaned
+    assert "/* c */" not in cleaned
+    assert "-- d" not in cleaned
 
 
 def test_apply_max_row_limit_wraps_select():

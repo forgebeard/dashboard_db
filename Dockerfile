@@ -27,14 +27,20 @@ RUN set -eux; \
       apt-get update; \
     fi; \
     apt-get install -y --no-install-recommends curl; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*; \
+    groupadd --gid 1000 appuser; \
+    useradd --uid 1000 --gid appuser --create-home --shell /usr/sbin/nologin appuser; \
+    mkdir -p /app/logs; \
+    chown -R appuser:appuser /app
 
-COPY requirements.txt .
+COPY --chown=appuser:appuser requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ ./src/
-COPY .streamlit/ ./.streamlit/
-COPY VERSION .
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser .streamlit/ ./.streamlit/
+COPY --chown=appuser:appuser VERSION .
+
+USER appuser
 
 EXPOSE 8501
 ENV PYTHONPATH=/app/src

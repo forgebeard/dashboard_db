@@ -6,8 +6,20 @@ from uuid import UUID
 
 import pandas as pd
 
+from core.config import debug_enabled
 from core.exceptions import DataLoadError
 from core.ui_utils import fix_uuid_columns, render_page_header, run_section
+
+
+def test_debug_enabled_from_env(monkeypatch):
+    monkeypatch.delenv("DEBUG", raising=False)
+    assert debug_enabled() is False
+    monkeypatch.setenv("DEBUG", "true")
+    assert debug_enabled() is True
+    monkeypatch.setenv("DEBUG", "1")
+    assert debug_enabled() is True
+    monkeypatch.setenv("DEBUG", "no")
+    assert debug_enabled() is False
 
 
 @patch("core.ui_utils.st")
@@ -21,14 +33,28 @@ def test_run_section_dataloaderror_no_traceback(mock_st):
     mock_st.exception.assert_not_called()
 
 
+@patch("core.ui_utils.debug_enabled", return_value=True)
 @patch("core.ui_utils.st")
-def test_run_section_other_exception_shows_traceback(mock_st):
+def test_run_section_other_exception_shows_traceback(mock_st, _mock_debug):
     def _boom() -> None:
         raise RuntimeError("ui bug")
 
     run_section("Хосты", _boom)
     mock_st.error.assert_called_once()
+    assert "код " in mock_st.error.call_args[0][0]
     mock_st.exception.assert_called_once()
+
+
+@patch("core.ui_utils.debug_enabled", return_value=False)
+@patch("core.ui_utils.st")
+def test_run_section_other_exception_hides_traceback_without_debug(mock_st, _mock_debug):
+    def _boom() -> None:
+        raise RuntimeError("ui bug")
+
+    run_section("Хосты", _boom)
+    mock_st.error.assert_called_once()
+    assert "код " in mock_st.error.call_args[0][0]
+    mock_st.exception.assert_not_called()
 
 
 @patch("core.ui_utils.st")

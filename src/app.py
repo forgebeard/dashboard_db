@@ -40,7 +40,7 @@ from core.config import APP_LAYOUT, APP_TITLE, FONT_SIZE_CSS, app_version
 from core.data_loader import load_cluster_metadata
 from core.db_utils import get_available_databases
 from core.exceptions import DataLoadError
-from core.sql_editor import render_global_sql
+from core.sql_editor import clear_last_sql_result, render_global_sql
 from core.ui_utils import render_load_error, run_section
 from disks.disks_diagnostics import render_disks_diagnostics
 from disks.disks_module import render_disks_list
@@ -214,6 +214,7 @@ if st.session_state.get("active_db") != selected_db:
     st.session_state["active_db"] = selected_db
     if "cluster_meta" in st.session_state:
         del st.session_state["cluster_meta"]
+    clear_last_sql_result(st.session_state)
     with st.spinner(f"Загрузка структуры {selected_db}..."):
         st.session_state["cluster_meta"] = load_cluster_metadata(selected_db)
 

@@ -18,6 +18,11 @@ def statement_timeout_ms() -> int:
     return int(os.getenv("STATEMENT_TIMEOUT_MS", "30000"))
 
 
+def debug_enabled() -> bool:
+    """Подробности в UI: DEBUG=true/1/yes/on в окружении."""
+    return os.getenv("DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def app_version(version_path: Path | None = None) -> str:
     """Версия из файла VERSION в корне приложения, иначе dev."""
     path = version_path if version_path is not None else (

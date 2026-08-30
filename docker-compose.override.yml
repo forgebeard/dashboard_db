@@ -1,0 +1,8 @@
+# Подхватывается автоматически в репозитории (hot-reload).
+# В пользовательский zip не входит: полевой запуск использует код из образа.
+services:
+  red-virt-analytics:
+    volumes:
+      - ./src:/app/src
+      - ./.streamlit:/app/.streamlit
+      - ./VERSION:/app/VERSION:ro

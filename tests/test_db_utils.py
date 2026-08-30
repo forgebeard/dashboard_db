@@ -213,6 +213,15 @@ def test_pg_read_only_options_follows_env(monkeypatch):
     assert "statement_timeout=30000ms" in pg_read_only_options()
 
 
+@patch("core.db_utils.create_engine")
+def test_get_sqlalchemy_engine_preserves_db_name_case(mock_create, monkeypatch):
+    monkeypatch.setenv("DB_PASSWORD", "secret")
+    mock_create.return_value = MagicMock()
+    get_sqlalchemy_engine("  EngineDump  ")
+    db_url = mock_create.call_args[0][0]
+    assert db_url.database == "EngineDump"
+
+
 @patch("core.db_utils.create_engine", side_effect=RuntimeError("pool down"))
 def test_get_sqlalchemy_engine_wraps_errors(mock_create, monkeypatch):
     monkeypatch.setenv("DB_PASSWORD", "secret")

@@ -8,10 +8,12 @@ import pandas as pd
 from core.config import MAX_ROW_LIMIT
 from core.sql_editor import (
     _HISTORY_LABEL_LEN,
+    _LAST_RESULT_KEY,
     _SQL_INPUT_KEY,
     _WARNING_ROW_THRESHOLD,
     _history_label,
     build_last_result,
+    clear_last_sql_result,
     load_history_file,
     load_history_query,
     next_history,
@@ -59,6 +61,17 @@ def test_history_label_placeholder_and_truncate():
     label = _history_label(long_sql)
     assert label.endswith("...")
     assert len(label) == _HISTORY_LABEL_LEN + 3
+
+
+def test_clear_last_sql_result_on_db_switch():
+    state = {
+        _LAST_RESULT_KEY: {"df": pd.DataFrame({"a": [1]}), "row_count": 1},
+        _SQL_INPUT_KEY: "SELECT 1",
+    }
+    clear_last_sql_result(state)
+    assert _LAST_RESULT_KEY not in state
+    assert state[_SQL_INPUT_KEY] == "SELECT 1"
+    clear_last_sql_result(state)
 
 
 def test_build_last_result_flags():

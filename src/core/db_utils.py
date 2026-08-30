@@ -89,7 +89,7 @@ def get_sqlalchemy_engine(db_name: str):
     
     Используется st.cache_resource вместо lru_cache для корректной интеграции 
     с жизненным циклом Streamlit (очистка при рестарте сервера).
-    Имя БД нормализуется к нижнему регистру для предотвращения дублирования кэша.
+    Имя БД берётся как есть (только strip): регистр совпадает с pg_database.datname.
     Возвращённый Engine нельзя dispose(): это уничтожит общий пул для всего приложения.
     Смена STATEMENT_TIMEOUT_MS в env применяется к новым движкам; уже закэшированный
     engine сохраняет options до рестарта приложения.
@@ -101,10 +101,7 @@ def get_sqlalchemy_engine(db_name: str):
         Объект sqlalchemy.engine.Engine
     """
     try:
-        # Нормализация имени БД для корректного кэширования
-        normalized_name = db_name.lower().strip()
-
-        params = get_db_params(normalized_name)
+        params = get_db_params(db_name.strip())
 
         # Безопасное формирование URL с автоматическим экранированием спецсимволов в пароле
         db_url = URL.create(

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeVar
@@ -17,9 +18,12 @@ from core.config import (
     DATAFRAME_HEIGHT_PAD,
     DATAFRAME_ROW_PX,
     STATUS_TONE_CSS,
+    debug_enabled,
 )
 from core.constants import StatusTone
 from core.exceptions import DataLoadError
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -126,14 +130,19 @@ def try_load(what: str, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T | 
 
 
 def run_section(label: str, fn: Callable[[], None]) -> None:
-    """Отрисовывает раздел: DataLoadError без traceback, прочий Exception — с ним."""
+    """Отрисовывает раздел: DataLoadError без traceback; прочий Exception — в лог."""
     try:
         fn()
     except DataLoadError as exc:
         render_load_error(exc, f"раздела «{label}»")
     except Exception as exc:
-        st.error(f"Ошибка при отрисовке раздела «{label}»: {exc}")
-        st.exception(exc)
+        error_id = uuid.uuid4().hex[:8]
+        logger.exception("Ошибка отрисовки раздела «%s» [%s]", label, error_id)
+        st.error(
+            f"Ошибка при отрисовке раздела «{label}»: {exc} (код {error_id})"
+        )
+        if debug_enabled():
+            st.exception(exc)
 
 
 def _header_meta_part(value: Any) -> str | None:

@@ -62,6 +62,12 @@ def load_history_query(
         state[input_key] = query
 
 
+def clear_last_sql_result(state: Any) -> None:
+    """Сбрасывает таблицу результата редактора (при смене БД)."""
+    if _LAST_RESULT_KEY in state:
+        del state[_LAST_RESULT_KEY]
+
+
 def build_last_result(df: pd.DataFrame, elapsed_ms: float) -> dict[str, Any]:
     n = len(df)
     return {
