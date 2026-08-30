@@ -3,6 +3,7 @@
 
 import streamlit as st
 
+from atlas.data_loader import release_key_from_meta
 from core.constants import vm_health_counts, vm_layer_tone, vm_status_tone
 from core.ui_utils import (
     dataframe_height,
@@ -174,7 +175,11 @@ def render_vms_list(active_db: str, cluster_meta: dict) -> None:
         with st.spinner("Генерация полного отчета VM-Inspector..."):
             from vms.vm_inspector_sql import get_vm_inspector_report
 
-            result = get_vm_inspector_report(active_db, str(row["vm_guid"]))
+            result = get_vm_inspector_report(
+                active_db,
+                str(row["vm_guid"]),
+                release_key=release_key_from_meta(st.session_state.get("cluster_meta")),
+            )
         if "error" in result:
             st.error(result["error"])
         else:

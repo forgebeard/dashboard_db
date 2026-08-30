@@ -19,6 +19,7 @@ from atlas.data_loader import (
     load_compat,
     release_badge_text,
     release_key_from_label,
+    release_key_from_meta,
     table_visible_for_release,
     visible_fields_doc,
 )
@@ -173,6 +174,9 @@ def test_release_helpers():
     assert release_key_from_label("РЕД ВИРТ 8") == "8"
     assert release_key_from_label("РЕД ВИРТ 7.3") == "7.3"
     assert release_key_from_label(None) is None
+    assert release_key_from_meta({"engine_release": "РЕД ВИРТ 8"}) == "8"
+    assert release_key_from_meta({}) is None
+    assert release_key_from_meta(None) is None
     assert release_badge_text({"since": "8"}) == "только РЕД ВИРТ 8"
     assert release_badge_text({}) is None
     note = field_compat_note(
@@ -293,6 +297,6 @@ def test_filter_groups_for_release_skips_versioned_tables():
     only_8 = filter_groups_for_release(groups, "8")
     assert "host_template" in only_8[""]
     unknown = filter_groups_for_release(groups, None)
-    assert "host_template" not in unknown[""]
+    assert "host_template" in unknown[""]
     assert filter_groups_for_release({"": {"host_template": "tpl"}}, "7.3") == {}
 

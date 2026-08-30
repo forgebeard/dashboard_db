@@ -3,6 +3,7 @@
 
 import streamlit as st
 
+from atlas.data_loader import release_key_from_meta
 from core.constants import host_health_counts, host_status_tone
 from core.ui_utils import (
     dataframe_height,
@@ -156,7 +157,11 @@ def render_hosts_list(active_db, cluster_meta):
         with st.spinner("Генерация полного отчета Host-Inspector..."):
             from hosts.host_inspector_sql import get_host_inspector_report
 
-            result = get_host_inspector_report(active_db, str(selected_id))
+            result = get_host_inspector_report(
+                active_db,
+                str(selected_id),
+                release_key=release_key_from_meta(st.session_state.get("cluster_meta")),
+            )
         if "error" in result:
             st.error(result["error"])
         else:

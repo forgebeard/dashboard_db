@@ -359,17 +359,33 @@ def format_vm_report(payload: dict[str, Any]) -> str:
     ]
 
     engine = payload.get("engine_compat") or {}
-    if engine:
+    engine_err = section_errors.get("engine_compat")
+    if engine_err or engine:
+        rel = engine.get("release")
+        if engine_err:
+            heading = "РЕД ВИРТ 8"
+        elif rel == "7.3":
+            heading = "РЕД ВИРТ 7.3"
+        else:
+            heading = "РЕД ВИРТ 8"
         lines += [
-            "СХЕМА ENGINE",
+            heading,
             BAR_SINGLE,
         ]
-        if "virtio_scsi" in engine:
-            lines.append(_kv("virtio-scsi queues", engine["virtio_scsi"]))
-        if "cpu_pinning_policy" in engine:
-            lines.append(_kv("CPU pinning", engine["cpu_pinning_policy"]))
-        if "parallel_migrations" in engine:
-            lines.append(_kv("Паралл. миграции", engine["parallel_migrations"]))
+        if engine_err:
+            lines.append(f"  ошибка чтения ({engine_err})")
+        else:
+            if "virtio_scsi" in engine:
+                if rel == "7.3":
+                    lines.append(
+                        _kv("virtio-scsi multi-queue", _yes_no(engine["virtio_scsi"]))
+                    )
+                else:
+                    lines.append(_kv("virtio-scsi queues", engine["virtio_scsi"]))
+            if "cpu_pinning_policy" in engine:
+                lines.append(_kv("CPU pinning", engine["cpu_pinning_policy"]))
+            if "parallel_migrations" in engine:
+                lines.append(_kv("Паралл. миграции", engine["parallel_migrations"]))
         lines.append("")
 
     lines += [
@@ -507,6 +523,8 @@ def _fetch_vm_engine_compat(insp: InspectorBase, vm_guid: Any) -> dict[str, Any]
                 extra["cpu_pinning_policy"] = row["cpu_pinning_policy"]
             if row.get("parallel_migrations") is not None:
                 extra["parallel_migrations"] = row["parallel_migrations"]
+        if extra:
+            extra["release"] = "8"
         return extra
     except DataLoadError as exc:
         if not should_retry_narrow_sql(exc):
@@ -521,10 +539,12 @@ def _fetch_vm_engine_compat(insp: InspectorBase, vm_guid: Any) -> dict[str, Any]
     )
     if not row or row.get("virtio_scsi_multi_queues_enabled") is None:
         return {}
-    return {"virtio_scsi": row["virtio_scsi_multi_queues_enabled"]}
+    return {"release": "7.3", "virtio_scsi": row["virtio_scsi_multi_queues_enabled"]}
 
 
-def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
+def get_vm_inspector_report(
+    db_name: str, vm_guid: str, *, release_key: str | None = None
+) -> dict:
     """Возвращает словарь с отчетом и навигационными данными."""
     vm_search = str(vm_guid).strip().lower()
 
@@ -698,10 +718,31 @@ def get_vm_inspector_report(db_name: str, vm_guid: str) -> dict:
                 section_errors["events"] = str(exc)
 
             engine_compat: dict[str, Any] = {}
-            try:
-                engine_compat = _fetch_vm_engine_compat(insp, vm["vm_guid"])
-            except DataLoadError as exc:
-                section_errors["engine_compat"] = str(exc)
+            if release_key != "7.3":
+                try:
+                    engine_compat = _fetch_vm_engine_compat(insp, vm["vm_guid"])
+                except DataLoadError as exc:
+                    section_errors["engine_compat"] = str(exc)
+            else:
+                try:
+                    row = insp.fetch_one(
+                        """
+                        SELECT virtio_scsi_multi_queues_enabled
+                        FROM vm_static
+                        WHERE vm_guid = :vm_guid
+                        """,
+                        {"vm_guid": vm["vm_guid"]},
+                    )
+                    if row and row.get("virtio_scsi_multi_queues_enabled") is not None:
+                        engine_compat = {
+                            "release": "7.3",
+                            "virtio_scsi": row["virtio_scsi_multi_queues_enabled"],
+                        }
+                except DataLoadError as exc:
+                    if should_retry_narrow_sql(exc):
+                        engine_compat = {}
+                    else:
+                        section_errors["engine_compat"] = str(exc)
 
             bios_code = vm["bios_type"]
             try:

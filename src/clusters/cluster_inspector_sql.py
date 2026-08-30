@@ -121,14 +121,18 @@ def format_cluster_report(payload: dict[str, Any]) -> str:
         lines.append(_kv(extra[0], extra[1]))
 
     engine8 = payload.get("engine8") or {}
-    if engine8:
+    engine8_err = section_errors.get("engine8")
+    if engine8_err or engine8:
         lines += ["", "РЕД ВИРТ 8", BAR_SINGLE]
-        if "parallel_migrations" in engine8:
-            lines.append(_kv("Паралл. миграции", engine8["parallel_migrations"]))
-        if "upgrade_correlation_id" in engine8:
-            lines.append(_kv("Upgrade id", engine8["upgrade_correlation_id"]))
-        if "upgrade_percent_complete" in engine8:
-            lines.append(_kv("Upgrade %", engine8["upgrade_percent_complete"]))
+        if engine8_err:
+            lines.append(f"  ошибка чтения ({engine8_err})")
+        else:
+            if "parallel_migrations" in engine8:
+                lines.append(_kv("Паралл. миграции", engine8["parallel_migrations"]))
+            if "upgrade_correlation_id" in engine8:
+                lines.append(_kv("Upgrade id", engine8["upgrade_correlation_id"]))
+            if "upgrade_percent_complete" in engine8:
+                lines.append(_kv("Upgrade %", engine8["upgrade_percent_complete"]))
 
     lines += ["", "ХОСТЫ", BAR_SINGLE]
     if section_errors.get("hosts"):
@@ -212,7 +216,9 @@ def _fetch_cluster_engine8(insp: InspectorBase, cluster_id: str) -> dict[str, An
     return extra
 
 
-def get_cluster_inspector_report(db_name: str, cluster_id: str) -> dict:
+def get_cluster_inspector_report(
+    db_name: str, cluster_id: str, *, release_key: str | None = None
+) -> dict:
     cluster_search = str(cluster_id).strip().lower()
 
     try:
@@ -251,10 +257,11 @@ def get_cluster_inspector_report(db_name: str, cluster_id: str) -> dict:
             engine8: dict[str, Any] = {}
             params = {"cluster_id": cluster_search}
 
-            try:
-                engine8 = _fetch_cluster_engine8(insp, cluster_search)
-            except DataLoadError as exc:
-                section_errors["engine8"] = str(exc)
+            if release_key != "7.3":
+                try:
+                    engine8 = _fetch_cluster_engine8(insp, cluster_search)
+                except DataLoadError as exc:
+                    section_errors["engine8"] = str(exc)
 
             try:
                 host_rows = insp.fetch_all(

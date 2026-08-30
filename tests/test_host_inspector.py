@@ -227,3 +227,75 @@ def test_fetch_host_engine8_stringifies_topology():
     assert "CPU topology" in text
     assert "OVN" in text
 
+
+def test_format_host_report_engine8_error():
+    from hosts.host_inspector_sql import format_host_report
+
+    text = format_host_report(
+        {
+            "generated_at": "01.01.2026 00:00:00",
+            "header": {"name": "h1"},
+            "metrics": {},
+            "versions": {},
+            "networks": [],
+            "events": [],
+            "section_errors": {"engine8": "timeout"},
+        }
+    )
+    assert "РЕД ВИРТ 8" in text
+    assert "ошибка чтения (timeout)" in text
+
+
+def test_get_host_inspector_skips_engine8_on_73():
+    from unittest.mock import MagicMock, patch
+
+    from hosts.host_inspector_sql import get_host_inspector_report
+
+    host = {
+        "vds_id": "id",
+        "vds_name": "h1",
+        "host_name": "fqdn",
+        "cluster_id": "c",
+        "_create_date": None,
+        "_update_date": None,
+        "status": 1,
+        "cpu_sockets": 1,
+        "cpu_cores": 4,
+        "cpu_threads": 4,
+        "cpu_model": "x",
+        "physical_mem_mb": 1024,
+        "mem_commited": 0,
+        "vm_active": 0,
+        "software_version": "1",
+        "host_os": "os",
+        "kvm_version": "k",
+        "kernel_version": "k",
+        "libvirt_version": "l",
+        "pretty_name": "p",
+        "kdump_code": 0,
+        "cluster_name": "cl",
+        "dc_name": "dc",
+        "storage_pool_id": "sp",
+        "is_spm": False,
+    }
+    insp = MagicMock()
+    insp.fetch_one.return_value = host
+    insp.fetch_all.return_value = []
+    with patch("hosts.host_inspector_sql.InspectorBase") as mock_cls:
+        mock_cls.return_value.__enter__.return_value = insp
+        result = get_host_inspector_report("db", "id", release_key="7.3")
+    assert "error" not in result
+    assert insp.fetch_one.call_count == 1
+    assert "cpu_topology" not in str(insp.fetch_one.call_args)
+    assert "РЕД ВИРТ 8" not in result["report_text"]
+
+
+def test_topology_label_shortens_long_json():
+    from hosts.host_inspector_sql import _topology_label
+
+    huge = {"sockets": [{"id": i, "pad": "x" * 20} for i in range(20)]}
+    label = _topology_label(huge)
+    assert label == "sockets: 20"
+    assert len(label) < 120
+
+

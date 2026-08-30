@@ -3,6 +3,7 @@
 
 import streamlit as st
 
+from atlas.data_loader import release_key_from_meta
 from clusters.clusters_utils import fetch_clusters_data, process_cluster_dataframe
 from core.constants import (
     cluster_health_counts,
@@ -138,7 +139,11 @@ def render_clusters_list(active_db: str, cluster_meta: dict) -> None:
         with st.spinner("Генерация полного отчета Cluster-Inspector..."):
             from clusters.cluster_inspector_sql import get_cluster_inspector_report
 
-            result = get_cluster_inspector_report(active_db, str(selected_uuid))
+            result = get_cluster_inspector_report(
+                active_db,
+                str(selected_uuid),
+                release_key=release_key_from_meta(st.session_state.get("cluster_meta")),
+            )
         if "error" in result:
             st.error(result["error"])
         else:

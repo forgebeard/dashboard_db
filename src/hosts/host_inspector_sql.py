@@ -244,17 +244,21 @@ def format_host_report(payload: dict[str, Any]) -> str:
     ]
 
     engine8 = payload.get("engine8") or {}
-    if engine8:
+    engine8_err = section_errors.get("engine8")
+    if engine8_err or engine8:
         lines += [
             "РЕД ВИРТ 8",
             BAR_SINGLE,
         ]
-        if "cpu_topology" in engine8:
-            lines.append(_kv("CPU topology", engine8["cpu_topology"]))
-        if "ovn_configured" in engine8:
-            lines.append(_kv("OVN", engine8["ovn_configured"]))
-        if "vdsm_cpus_affinity" in engine8:
-            lines.append(_kv("VDSM affinity", engine8["vdsm_cpus_affinity"]))
+        if engine8_err:
+            lines.append(f"  ошибка чтения ({engine8_err})")
+        else:
+            if "cpu_topology" in engine8:
+                lines.append(_kv("CPU topology", engine8["cpu_topology"]))
+            if "ovn_configured" in engine8:
+                lines.append(_kv("OVN", engine8["ovn_configured"]))
+            if "vdsm_cpus_affinity" in engine8:
+                lines.append(_kv("VDSM affinity", engine8["vdsm_cpus_affinity"]))
         lines.append("")
 
     lines += [
@@ -381,12 +385,31 @@ def _fetch_host_networks(insp: InspectorBase, host_id: Any) -> list[dict[str, An
         )
 
 
+_TOPOLOGY_MAX_LEN = 120
+
+
 def _json_cell(value: Any) -> str | None:
     if value in (None, ""):
         return None
     if isinstance(value, (dict, list)):
         return json.dumps(value, ensure_ascii=False, default=str)
     return str(value)
+
+
+def _topology_label(value: Any) -> str | None:
+    dumped = _json_cell(value)
+    if dumped is None:
+        return None
+    if len(dumped) <= _TOPOLOGY_MAX_LEN:
+        return dumped
+    if isinstance(value, dict):
+        sockets = value.get("sockets")
+        if isinstance(sockets, list):
+            return f"sockets: {len(sockets)}"
+        return f"keys: {len(value)}"
+    if isinstance(value, list):
+        return f"items: {len(value)}"
+    return dumped[: _TOPOLOGY_MAX_LEN - 3] + "..."
 
 
 def _fetch_host_engine8(insp: InspectorBase, host_id: Any) -> dict[str, str]:
@@ -406,7 +429,7 @@ def _fetch_host_engine8(insp: InspectorBase, host_id: Any) -> dict[str, str]:
     if not row:
         return {}
     extra: dict[str, str] = {}
-    topology = _json_cell(row.get("cpu_topology"))
+    topology = _topology_label(row.get("cpu_topology"))
     if topology is not None:
         extra["cpu_topology"] = topology
     if row.get("ovn_configured") is not None:
@@ -417,7 +440,9 @@ def _fetch_host_engine8(insp: InspectorBase, host_id: Any) -> dict[str, str]:
     return extra
 
 
-def get_host_inspector_report(db_name: str, host_id: str) -> dict:
+def get_host_inspector_report(
+    db_name: str, host_id: str, *, release_key: str | None = None
+) -> dict:
     """Возвращает словарь с отчетом и навигационными данными."""
     try:
         with InspectorBase(db_name) as insp:
@@ -452,10 +477,11 @@ def get_host_inspector_report(db_name: str, host_id: str) -> dict:
             events: list[dict[str, Any]] = []
             engine8: dict[str, str] = {}
 
-            try:
-                engine8 = _fetch_host_engine8(insp, host["vds_id"])
-            except DataLoadError as exc:
-                section_errors["engine8"] = str(exc)
+            if release_key != "7.3":
+                try:
+                    engine8 = _fetch_host_engine8(insp, host["vds_id"])
+                except DataLoadError as exc:
+                    section_errors["engine8"] = str(exc)
 
             try:
                 networks = _fetch_host_networks(insp, host["vds_id"])

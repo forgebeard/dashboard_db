@@ -261,3 +261,35 @@ def test_network_ip_on_same_line():
     assert "10.1.2.3" in text
     assert "ovirtmgmt" in text
     assert "IP-адреса (Guest Agent)" not in text
+
+
+def test_format_vm_report_73_virtio_heading():
+    text = format_vm_report(
+        _payload(engine_compat={"release": "7.3", "virtio_scsi": True})
+    )
+    assert "РЕД ВИРТ 7.3" in text
+    assert "СХЕМА ENGINE" not in text
+    assert "virtio-scsi multi-queue" in text
+    assert "virtio-scsi queues" not in text
+
+
+def test_fetch_vm_engine_compat_falls_back_to_73():
+    from unittest.mock import MagicMock
+
+    from core.exceptions import DataLoadError
+    from vms.vm_inspector_sql import _fetch_vm_engine_compat, format_vm_report
+
+    insp = MagicMock()
+    insp.fetch_one.side_effect = [
+        DataLoadError(
+            'column "virtio_scsi_multi_queues" does not exist',
+            kind="undefined_column",
+        ),
+        {"virtio_scsi_multi_queues_enabled": True},
+    ]
+    extra = _fetch_vm_engine_compat(insp, "guid")
+    assert extra == {"release": "7.3", "virtio_scsi": True}
+    text = format_vm_report(_payload(engine_compat=extra))
+    assert "РЕД ВИРТ 7.3" in text
+    assert "СХЕМА ENGINE" not in text
+

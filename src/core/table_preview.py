@@ -9,7 +9,12 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
-from atlas.data_loader import filter_groups_for_release, release_key_from_label
+from atlas.data_loader import (
+    filter_groups_for_release,
+    load_compat,
+    release_badge_text,
+    release_key_from_meta,
+)
 from core.config import DEFAULT_ROW_LIMIT, MAX_ROW_LIMIT, ROW_STEP
 from core.db_utils import get_sqlalchemy_engine, read_sql_df
 from core.exceptions import DataLoadError, is_undefined_table
@@ -81,12 +86,10 @@ def render_grouped_table_preview(
         )
     row_limit = min(int(row_limit), MAX_ROW_LIMIT)
 
-    meta = st.session_state.get("cluster_meta")
-    if not isinstance(meta, dict):
-        meta = {}
     groups = filter_groups_for_release(
-        groups, release_key_from_label(meta.get("engine_release"))
+        groups, release_key_from_meta(st.session_state.get("cluster_meta"))
     )
+    table_specs = (load_compat().get("tables") or {})
 
     order_overrides = order_overrides or {}
     row_limit_overrides = row_limit_overrides or {}
@@ -99,7 +102,11 @@ def render_grouped_table_preview(
             if group_name:
                 st.markdown(f"**{group_name}**")
             for table_name, description in tables.items():
-                with st.expander(f"`{table_name}` — {description}", expanded=False):
+                badge = release_badge_text(table_specs.get(table_name) or {})
+                label = f"`{table_name}` — {description}"
+                if badge:
+                    label = f"{label} · {badge}"
+                with st.expander(label, expanded=False):
                     try:
                         ident = _quoted(table_name)
                         limit = min(int(row_limit_overrides.get(table_name, row_limit)), MAX_ROW_LIMIT)

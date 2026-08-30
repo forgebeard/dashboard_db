@@ -108,7 +108,53 @@ def test_preview_shows_host_template_on_8(mock_read_sql, _mock_engine, mock_st):
 
     labels = _expander_labels(mock_st)
     assert any("host_template" in label for label in labels)
+    assert any("только РЕД ВИРТ 8" in label for label in labels)
     assert mock_read_sql.call_count == 2
+
+
+@patch("core.table_preview.st")
+@patch("core.table_preview.get_sqlalchemy_engine")
+@patch("core.table_preview.read_sql_df")
+def test_preview_shows_host_template_when_release_unknown(
+    mock_read_sql, _mock_engine, mock_st
+):
+    mock_read_sql.return_value = pd.DataFrame({"id": ["a"]})
+    _preview_st_mocks(mock_st)
+    mock_st.session_state = {"cluster_meta": {}}
+
+    render_grouped_table_preview(
+        "dump_db",
+        {"": {"vds_static": "Хост", "host_template": "Шаблон"}},
+        title="Таблицы",
+        limit_key="lim_dump_db",
+    )
+
+    labels = _expander_labels(mock_st)
+    assert any("host_template" in label for label in labels)
+
+
+@patch("core.table_preview.st")
+@patch("core.table_preview.get_sqlalchemy_engine")
+@patch("core.table_preview.read_sql_df")
+def test_preview_unknown_release_missing_table_is_caption(
+    mock_read_sql, _mock_engine, mock_st
+):
+    mock_read_sql.side_effect = DataLoadError(
+        'relation "host_template" does not exist', kind="undefined_table"
+    )
+    _preview_st_mocks(mock_st)
+    mock_st.session_state = {}
+
+    render_grouped_table_preview(
+        "dump_db",
+        {"": {"host_template": "Шаблон"}},
+        title="Таблицы",
+        limit_key="lim_dump_db",
+    )
+
+    mock_st.error.assert_not_called()
+    assert "нет в этом дампе" in mock_st.caption.call_args.args[0]
+
 
 
 @patch("core.table_preview.st")

@@ -29,6 +29,13 @@ def release_key_from_label(label: str | None) -> str | None:
     return None
 
 
+def release_key_from_meta(meta: Any) -> str | None:
+    """cluster_meta.engine_release → 7.3 / 8 / None."""
+    if not isinstance(meta, dict):
+        return None
+    return release_key_from_label(meta.get("engine_release"))
+
+
 def load_compat(path: Path | None = None) -> dict[str, Any]:
     """Читает overlay; пустой dict если файла нет или JSON битый."""
     compat_path = path or COMPAT_PATH
@@ -96,7 +103,12 @@ def filter_groups_for_release(
     release_key: str | None,
     compat: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, str]]:
-    """Убирает из превью таблицы since/until, не совпавшие с релизом дампа."""
+    """Убирает из превью таблицы since/until, не совпавшие с релизом дампа.
+
+    Неизвестный релиз (None) не режет список: отсутствующие таблицы ловит превью.
+    """
+    if release_key is None:
+        return groups
     table_specs = (compat if compat is not None else load_compat()).get("tables") or {}
     filtered: dict[str, dict[str, str]] = {}
     for group_name, tables in groups.items():
