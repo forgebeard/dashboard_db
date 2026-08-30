@@ -106,6 +106,8 @@ def _lex_sql(sql: str) -> tuple[str, str]:
                     i += 2
                     continue
                 i += 1
+            if depth:
+                raise ValueError("Незакрытый блочный комментарий в SQL-запросе.")
             executable.append(" ")
             skeleton.append(" ")
             continue
