@@ -41,7 +41,9 @@ def test_run_section_other_exception_shows_traceback(mock_st, _mock_debug):
 
     run_section("Хосты", _boom)
     mock_st.error.assert_called_once()
-    assert "код " in mock_st.error.call_args[0][0]
+    message = mock_st.error.call_args[0][0]
+    assert "Код события:" in message
+    assert "ui bug" not in message
     mock_st.exception.assert_called_once()
 
 
@@ -53,7 +55,9 @@ def test_run_section_other_exception_hides_traceback_without_debug(mock_st, _moc
 
     run_section("Хосты", _boom)
     mock_st.error.assert_called_once()
-    assert "код " in mock_st.error.call_args[0][0]
+    message = mock_st.error.call_args[0][0]
+    assert "Код события:" in message
+    assert "ui bug" not in message
     mock_st.exception.assert_not_called()
 
 

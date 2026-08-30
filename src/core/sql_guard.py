@@ -24,13 +24,29 @@ def _append_literal(executable: list[str], skeleton: list[str], chunk: str) -> N
     skeleton.append(" " * len(chunk))
 
 
+def _is_escape_string_prefix(sql: str, quote_pos: int) -> bool:
+    """True, если перед ' стоит E/e, не являющийся частью идентификатора."""
+    if quote_pos < 1:
+        return False
+    prefix = sql[quote_pos - 1]
+    if prefix not in {"E", "e"}:
+        return False
+    if quote_pos == 1:
+        return True
+    prev = sql[quote_pos - 2]
+    return not (prev.isalnum() or prev == "_")
+
+
 def _scan_quoted(
-    sql: str, start: int, quote: str
+    sql: str, start: int, quote: str, *, escape: bool = False
 ) -> tuple[int, str]:
     """Возвращает индекс после закрывающей кавычки и сам литерал."""
     i = start + 1
     n = len(sql)
     while i < n:
+        if escape and sql[i] == "\\" and i + 1 < n:
+            i += 2
+            continue
         if sql[i] == quote:
             if i + 1 < n and sql[i + 1] == quote:
                 i += 2
@@ -93,7 +109,14 @@ def _lex_sql(sql: str) -> tuple[str, str]:
             skeleton.append(" ")
             continue
 
-        if ch in {"'", '"'}:
+        if ch == "'":
+            i, chunk = _scan_quoted(
+                sql, i, ch, escape=_is_escape_string_prefix(sql, i)
+            )
+            _append_literal(executable, skeleton, chunk)
+            continue
+
+        if ch == '"':
             i, chunk = _scan_quoted(sql, i, ch)
             _append_literal(executable, skeleton, chunk)
             continue

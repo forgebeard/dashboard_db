@@ -139,7 +139,7 @@ def run_section(label: str, fn: Callable[[], None]) -> None:
         error_id = uuid.uuid4().hex[:8]
         logger.exception("Ошибка отрисовки раздела «%s» [%s]", label, error_id)
         st.error(
-            f"Ошибка при отрисовке раздела «{label}»: {exc} (код {error_id})"
+            f"Ошибка при отрисовке раздела «{label}». Код события: {error_id}"
         )
         if debug_enabled():
             st.exception(exc)
