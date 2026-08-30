@@ -14,7 +14,7 @@ from typing import Any
 from core.constants import HOST_STATUS_MAP
 from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
-from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _yes_no
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _fmt_date, _kv, _yes_no
 
 KDUMP_MAP = {0: "Disabled", 1: "Enabled", 2: "Timeout"}
 
@@ -40,23 +40,6 @@ def _fmt_size_mb(mb: Any) -> str:
         return f"{round(float(mb) / 1024, 1)} ГБ"
     except (ValueError, TypeError):
         return f"{mb} MB"
-
-
-def _safe_date(dt: Any) -> datetime | None:
-    """Приводит дату к naive-формату без tzinfo."""
-    if not dt:
-        return None
-    return dt.replace(tzinfo=None) if hasattr(dt, "replace") else dt
-
-
-def _fmt_date(dt: Any) -> str:
-    """Форматирует дату в читаемый вид."""
-    if not dt:
-        return "—"
-    parsed = _safe_date(dt)
-    if parsed is None:
-        return "—"
-    return parsed.strftime("%d.%m.%Y %H:%M")
 
 
 def _fmt_speed(mbps: Any) -> str:

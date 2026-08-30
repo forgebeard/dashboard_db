@@ -42,10 +42,8 @@ Thumbs.db
 # Streamlit agent skills (environment-specific symlinks)
 .agents/skills/developing-with-streamlit
 
-# Pytest artifacts
-.pytest_cache/
-.coverage
-htmlcov/
-
 # Локальный дамп ruff check
 ruff.txt
+
+# Пользовательские поставки
+dist/

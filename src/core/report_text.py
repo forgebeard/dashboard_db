@@ -1,11 +1,36 @@
-"""Общее оформление текстовых инспекторов: рамки и строки ключ: значение."""
+"""Общее оформление текстовых инспекторов: рамки, ключ: значение, даты."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 BAR_DOUBLE = "═" * 78
 BAR_SINGLE = "─" * 78
+
+
+def _safe_date(dt: Any) -> datetime | None:
+    if not dt:
+        return None
+    return dt.replace(tzinfo=None) if hasattr(dt, "replace") else dt
+
+
+def _fmt_date(dt: Any) -> str:
+    if not dt:
+        return "—"
+    parsed = _safe_date(dt)
+    if parsed is None:
+        return "—"
+    return parsed.strftime("%d.%m.%Y %H:%M")
+
+
+def _fmt_ts(dt: Any) -> str:
+    if not dt:
+        return "—"
+    parsed = _safe_date(dt)
+    if parsed is None:
+        return "—"
+    return parsed.strftime("%d.%m.%Y %H:%M:%S")
 
 
 def _kv_at(indent: str, label: str, value: Any, width: int = 16) -> str:

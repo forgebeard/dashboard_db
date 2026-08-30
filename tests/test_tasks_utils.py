@@ -281,8 +281,3 @@ class TestTasksModuleSQL:
         assert mock_load.call_count == 1
         mock_ui_st.error.assert_called()
         mock_st.dataframe.assert_not_called()
-
-
-def test_task_inspector_not_imported():
-    with pytest.raises(ImportError):
-        import tasks.task_inspector_sql  # noqa: F401

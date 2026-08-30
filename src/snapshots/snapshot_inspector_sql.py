@@ -8,10 +8,9 @@ from typing import Any
 from core.constants import IMAGE_STATUS_MAP, mapped_code_label
 from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
-from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
+from core.report_text import BAR_DOUBLE, BAR_SINGLE, _fmt_ts, _kv, _kv_at, _yes_no
 from vms.vm_inspector_sql import (
     _fmt_size_bytes,
-    _fmt_ts,
     _id_text,
     _norm_id,
     _volume_bit,

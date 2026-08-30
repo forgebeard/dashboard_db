@@ -18,7 +18,16 @@ from core.constants import (
 )
 from core.exceptions import DataLoadError, should_retry_narrow_sql
 from core.inspector_base import InspectorBase
-from core.report_text import BAR_DOUBLE, BAR_SINGLE, _kv, _kv_at, _yes_no
+from core.report_text import (
+    BAR_DOUBLE,
+    BAR_SINGLE,
+    _fmt_date,
+    _fmt_ts,
+    _kv,
+    _kv_at,
+    _safe_date,
+    _yes_no,
+)
 
 VOLUME_TYPE_MAP = {0: "Unassigned", 1: "Preallocated", 2: "Sparse"}
 VOLUME_FORMAT_MAP = {1: "RAW", 4: "COW"}
@@ -58,30 +67,6 @@ def _fmt_size_bytes(raw: Any) -> str:
         return f"{round(float(raw) / (1024**3), 1)} ГБ"
     except (ValueError, TypeError):
         return "—"
-
-
-def _safe_date(dt: Any) -> datetime | None:
-    if not dt:
-        return None
-    return dt.replace(tzinfo=None) if hasattr(dt, "replace") else dt
-
-
-def _fmt_date(dt: Any) -> str:
-    if not dt:
-        return "—"
-    parsed = _safe_date(dt)
-    if parsed is None:
-        return "—"
-    return parsed.strftime("%d.%m.%Y %H:%M")
-
-
-def _fmt_ts(dt: Any) -> str:
-    if not dt:
-        return "—"
-    parsed = _safe_date(dt)
-    if parsed is None:
-        return "—"
-    return parsed.strftime("%d.%m.%Y %H:%M:%S")
 
 
 NIL_UUID = "00000000-0000-0000-0000-000000000000"

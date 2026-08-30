@@ -15,6 +15,7 @@ services:
       - ./src:/app/src
       - ./.streamlit:/app/.streamlit
       - ./logs:/app/logs
+      - ./VERSION:/app/VERSION:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
       interval: 30s

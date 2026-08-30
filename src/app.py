@@ -36,7 +36,7 @@ from audit.audit_module import render_audit_log
 from cert.certificates import render_certificates
 from clusters.clusters_diagnostics import render_clusters_diagnostics
 from clusters.clusters_module import render_clusters_list
-from core.config import APP_LAYOUT, APP_TITLE, FONT_SIZE_CSS
+from core.config import APP_LAYOUT, APP_TITLE, FONT_SIZE_CSS, app_version
 from core.data_loader import load_cluster_metadata
 from core.db_utils import get_available_databases
 from core.exceptions import DataLoadError
@@ -220,6 +220,7 @@ if st.session_state.get("active_db") != selected_db:
 active_display_db = st.session_state.get("active_db", selected_db)
 st.sidebar.markdown(f"Текущая БД: `{active_display_db}`")
 st.sidebar.caption("READ ONLY")
+st.sidebar.caption(f"Версия {app_version()}")
 
 icon_by_id = {item[0]: item[2] for item in SECTIONS}
 nav_spec = {

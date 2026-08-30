@@ -1,22 +1,16 @@
 # src/core/config.py
-"""
-Глобальная конфигурация приложения RED Virt Analytics.
-
-Этот модуль централизует все настройки, лимиты и константы отображения.
-Изменение значений здесь применяется ко всему приложению сразу,
-что упрощает поддержку и масштабирование дашборда.
-"""
+"""Лимиты выборки, заголовок приложения и тона статусов."""
 
 import os
+from pathlib import Path
 
-# --- КОНФИГУРАЦИЯ ПРИЛОЖЕНИЯ ---
-APP_TITLE = "RED Virt Analytics"  # Заголовок вкладки браузера и сайдбара
-APP_LAYOUT = "wide"               # Режим разметки: 'centered' (узкий) или 'wide' (на всю ширину)
+APP_TITLE = "RED Virt Analytics"
+APP_LAYOUT = "wide"
+_VERSION_FALLBACK = "dev"
 
-# --- ЛИМИТЫ РАБОТЫ С ДАННЫМИ ---
-DEFAULT_ROW_LIMIT = 50      # Стандартный лимит строк для превью таблиц
-MAX_ROW_LIMIT = 2000        # Жесткий потолок защиты от переполнения памяти Streamlit
-ROW_STEP = 10               # Шаг изменения лимита в виджете number_input
+DEFAULT_ROW_LIMIT = 50
+MAX_ROW_LIMIT = 2000
+ROW_STEP = 10
 
 
 def statement_timeout_ms() -> int:
@@ -24,16 +18,27 @@ def statement_timeout_ms() -> int:
     return int(os.getenv("STATEMENT_TIMEOUT_MS", "30000"))
 
 
+def app_version(version_path: Path | None = None) -> str:
+    """Версия из файла VERSION в корне приложения, иначе dev."""
+    path = version_path if version_path is not None else (
+        Path(__file__).resolve().parent.parent.parent / "VERSION"
+    )
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return _VERSION_FALLBACK
+    return text or _VERSION_FALLBACK
+
+
 STATEMENT_TIMEOUT_MS = statement_timeout_ms()
 
-# --- НАСТРОЙКИ ОТОБРАЖЕНИЯ (UI) ---
-DATAFRAME_HEIGHT = 500      # Потолок высоты st.dataframe (px)
-DATAFRAME_ROW_PX = 36       # Оценка высоты строки таблицы
-DATAFRAME_HEADER_PX = 40    # Оценка высоты шапки таблицы
-DATAFRAME_HEIGHT_PAD = 16   # Запас под рамку/скролл
-FONT_SIZE_CSS = "0.85rem"   # Размер шрифта внутри st.dataframe для компактности
+DATAFRAME_HEIGHT = 500
+DATAFRAME_ROW_PX = 36
+DATAFRAME_HEADER_PX = 40
+DATAFRAME_HEIGHT_PAD = 16
+FONT_SIZE_CSS = "0.85rem"
 
-# CSS для семантических тонов статуса (не использовать green/red в модулях).
+# Не использовать green/red в модулях.
 STATUS_TONE_CSS = {
     "success": "color: #2ecc71; font-weight: bold;",
     "warning": "color: #e67e22; font-weight: bold;",
